@@ -1,21 +1,58 @@
-# [專題名稱]
+# URniversity
 
 ## Proposal Report
 
-### 動機與目標
-<!-- 說明為什麼想做這個專題 -->
+### Motivation and Goals
+After becoming a college student, I've been using various apps to manage my life. For example, I use `Calendar` to manage schedule and `Google Tasks` to manage things to do. However, I find it kind of disorganized, as every feature I need is scattered, and I need to switch between apps and pay extra attention. Furthermore, I don't have an app to draw up my future plans and visualize them, making it harder to organize my life.
 
-### 預期功能
-<!-- 列出預計實作的功能 -->
+Therefore, I would like to develop an app called URniversity, managing to keep track of students' lives in college. I hope people can use this app to form a better imagination about the future, or at least organize their daily or semester lives.
 
-### 使用技術
-<!-- 使用的語言、框架、工具等 -->
+### Expected Features
+- Inspiration -> can record inspirations and develop further connections to future goals.
+- Task -> can formulate periodic tasks or normal tasks and notify people to do them.
+- Plan -> can plan what to do without a daily basis. E.g. study what subject / do what project / practice something.
+- Note -> a diary system, can record what people have done in a day, and retrospect such memories.
+- Future -> can organize future goals such as exchanging, interning, competition, certification, performance, and so on, and create relationships between major goals and minor goals.
 
-### 時程規劃
-<!-- 各週預計完成的進度 -->
+### Used Tech
+#### Frontend
+- React Native (Expo) : Use TypeScript to develop Android and iOS apps.
+- NativeWind : Provide UI development tools.
+- Zustand : Manage shared application state across components.
+- MMKV : A key-value local storage library.
 
-### 與課程的關聯
-<!-- 你的專題可能涉及哪些資料結構或演算法概念？為什麼？ -->
+#### Backend
+- Supabase : Provide PostgreSQL, user authentication, real-time subscriptions, and file storage.
+- Expo Notifications + OneSignal : Push notifications.
+
+#### Other
+- Git + Github : Version control.
+- Figma : Prototype design.
+- Postman : API testing and development tool.
+
+### Schedule
+W7 : Environment, usage scenario
+W8 : Task module
+W9 : Plan module
+W10 : Note module
+W11 : Inspiration module
+W12 : Future module and connections
+W13 : Dashboard and UI
+W14 : Test, debug
+W15 : Demo
+
+### Connections to the course
+1. Tree structure
+In future module, there are hierarchical relationship between major and minor goals, which is applicable using tree structure.
+
+2. Graph
+Connections between different modules form a graph, especially a directed graph.
+
+3. Queue
+Tasks are sorted by deadline and priority using a Min-Heap.
+
+4. Hash Map
+The Tag system in Inspiration module uses a Hash Map to implement.
 
 ---
 
