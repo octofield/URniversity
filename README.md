@@ -31,15 +31,15 @@ Therefore, I would like to develop an app called URniversity, managing to keep t
 - Postman : API testing and development tool.
 
 ### Schedule
-W7 : Environment, usage scenario
-W8 : Task module
-W9 : Plan module
-W10 : Note module
-W11 : Inspiration module
-W12 : Future module and connections
-W13 : Dashboard and UI
-W14 : Test, debug
-W15 : Demo
+W7 : Environment, usage scenario  
+W8 : Task module  
+W9 : Plan module  
+W10 : Note module  
+W11 : Inspiration module  
+W12 : Future module and connections  
+W13 : Dashboard and UI  
+W14 : Test, debug  
+W15 : Demo  
 
 ### Connections to the course
 1. Tree structure
