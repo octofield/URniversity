@@ -42,16 +42,16 @@ W14 : Test, debug
 W15 : Demo  
 
 ### Connections to the course
-1. Tree structure
+1. Tree structure  
 In future module, there are hierarchical relationship between major and minor goals, which is applicable using tree structure.
 
-2. Graph
+2. Graph  
 Connections between different modules form a graph, especially a directed graph.
 
-3. Queue
+3. Queue  
 Tasks are sorted by deadline and priority using a Min-Heap.
 
-4. Hash Map
+4. Hash Map  
 The Tag system in Inspiration module uses a Hash Map to implement.
 
 ---
