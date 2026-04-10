@@ -8,11 +8,13 @@ After becoming a college student, I've been using various apps to manage my life
 Therefore, I would like to develop an app called URniversity, managing to keep track of students' lives in college. I hope people can use this app to form a better imagination about the future, or at least organize their daily or semester lives.
 
 ### Expected Features
-- Inspiration -> can record inspirations and develop further connections to future goals.
-- Task -> can formulate periodic tasks or normal tasks and notify people to do them.
-- Plan -> can plan what to do without a daily basis. E.g. study what subject / do what project / practice something.
-- Note -> a diary system, can record what people have done in a day, and retrospect such memories.
-- Future -> can organize future goals such as exchanging, interning, competition, certification, performance, and so on, and create relationships between major goals and minor goals.
+There are three main layers called future, semester, and today. 
+  
+Today: Tasks and inspiration, what to do in a day.  
+Semester: Some targets and achievements in a semester.  
+Future: Major goals in the future such as exchanging, interning, competition, certification, performance, and so on.  
+  
+Another supplementary system is diary, which can generate retro on a daily / weekly / monthly, or even a semester basis.
 
 ### Used Tech
 #### Frontend
