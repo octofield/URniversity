@@ -1,0 +1,105 @@
+Table users {
+  id uuid [primary key]
+  email varchar(255) [unique]
+  username varchar(20) [not null]
+  grade integer
+
+  created_at timestamp
+}
+
+Table future_goals {
+  id uuid [primary key]
+  user_id uuid
+
+  title varchar(255) [not null]
+  content text
+
+  category varchar(255) [not null]
+  parent_goal_id uuid
+
+  start_semester varchar(10)
+  end_semester varchar(10)
+
+  is_completed bool [not null, default: false]
+  created_at timestamp
+}
+
+Table semester_objectives {
+  id uuid [primary key]
+  user_id uuid
+  
+  title varchar(255) [not null]
+  content text
+
+  category varchar(255) [not null]
+  semester varchar(10)
+  future_goals_id uuid [note: "Optional, can be related to some future goals"]
+  
+  is_completed bool [not null, default: false]
+  created_at timestamp
+}
+
+Table tasks {
+  id uuid [primary key]
+  user_id uuid
+
+  title varchar(255) [not null]
+  content text
+
+  due_time timestamp
+  priority integer
+
+  future_goals_id uuid [note: "Optional, can be related to some future goals"]
+  semester_objectives_id uuid [note: "Optional, can be related to some semester objectives"]
+  
+  is_recurring bool [default: false]
+  recurrence_rule varchar(10) [note: "daily / weekly / monthly / null"]
+
+  is_completed bool [not null, default: false]
+  created_at timestamp
+}
+
+Table inspirations {
+  id uuid [primary key]
+  user_id uuid
+
+  title varchar(255) [not null]
+  content text
+  
+  archived bool [default: false]
+  future_goals_id uuid [note: "Optional, can be related to some future goals"]
+  
+  created_at timestamp
+}
+
+Table journals {
+  id uuid [primary key]
+  user_id uuid
+
+  date date [not null]
+  content text
+  retro_type varchar(10) [note: "daily / weekly / monthly / null"]
+
+  created_at timestamp
+}
+
+
+Ref: "users"."id" < "future_goals"."user_id"
+
+Ref: "users"."id" < "tasks"."user_id"
+
+Ref: "future_goals"."id" < "tasks"."future_goals_id"
+
+Ref: "users"."id" < "semester_objectives"."user_id"
+
+Ref: "semester_objectives"."id" < "tasks"."semester_objectives_id"
+
+Ref: "users"."id" < "journals"."user_id"
+
+Ref: "users"."id" < "inspirations"."user_id"
+
+Ref: "future_goals"."id" < "future_goals"."parent_goal_id"
+
+Ref: "future_goals"."id" < "semester_objectives"."future_goals_id"
+
+Ref: "future_goals"."id" < "inspirations"."future_goals_id"
