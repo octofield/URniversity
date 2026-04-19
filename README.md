@@ -3,29 +3,28 @@
 ## Proposal Report
 
 ### Motivation and Goals
-After becoming a college student, I've been using various apps to manage my life. For example, I use `Calendar` to manage schedule and `Google Tasks` to manage things to do. However, I find it kind of disorganized, as every feature I need is scattered, and I need to switch between apps and pay extra attention. Furthermore, I don't have an app to draw up my future plans and visualize them, making it harder to organize my life.
-
+After becoming a college student, I've been using various apps to manage my life. For example, I use `Calendar` to manage schedule and `Google Tasks` to manage things to do. However, I find it kind of disorganized, as every feature I need is scattered, and I need to switch between apps and pay extra attention. Furthermore, I don't have an app to draw up my future plans and visualize them, making it harder to organize my life.  
+  
 Therefore, I would like to develop an app called URniversity, managing to keep track of students' lives in college. I hope people can use this app to form a better imagination about the future, or at least organize their daily or semester lives.
 
 ### Expected Features
-There are three main layers called future, semester, and today. 
+There are three main layers called future, semester, and today.  
   
 Today: Tasks and inspiration, what to do in a day.  
 Semester: Some targets and achievements in a semester.  
 Future: Major goals in the future such as exchanging, interning, competition, certification, performance, and so on.  
   
-Another supplementary system is diary, which can generate retro on a daily / weekly / monthly, or even a semester basis.
+Another supplementary system is diary, which can generate retro on a daily / weekly / monthly, or even a semesterly basis.
 
 ### Used Tech
 #### Frontend
-- React Native (Expo) : Use TypeScript to develop Android and iOS apps.
-- NativeWind : Provide UI development tools.
-- Zustand : Manage shared application state across components.
-- MMKV : A key-value local storage library.
+- Flutter : Use Dart to develop Android, iOS, and even Windows, Linux apps.
+- Dart : Language used to develop Flutter.
+- Riverpod : A package used to manage status across components.
+- Flutter Material Design 3 : Built-in UI component library in flutter.
 
 #### Backend
-- Supabase : Provide PostgreSQL, user authentication, real-time subscriptions, and file storage.
-- Expo Notifications + OneSignal : Push notifications.
+- Supabase : Provide PostgreSQL, user authentication, realtime, and file storage.
 
 #### Other
 - Git + Github : Version control.
@@ -33,15 +32,11 @@ Another supplementary system is diary, which can generate retro on a daily / wee
 - Postman : API testing and development tool.
 
 ### Schedule
-W7 : Environment, usage scenario  
-W8 : Task module  
-W9 : Plan module  
-W10 : Note module  
-W11 : Inspiration module  
-W12 : Future module and connections  
-W13 : Dashboard and UI  
-W14 : Test, debug  
-W15 : Demo  
+W7/W8 : Onboarding + Future module  
+W9/W10 : TOday module  
+W11/W12 : Semester module + Linkage  
+W13/14 : Journal module + UI optimization  
+W15 : Demo    
 
 ### Connections to the course
 1. Tree structure  
