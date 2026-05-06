@@ -25,8 +25,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
-  Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
+  Win32Window::Size size(480, 900);
+  int screenW = ::GetSystemMetrics(SM_CXSCREEN);
+  int screenH = ::GetSystemMetrics(SM_CYSCREEN);
+  Win32Window::Point origin((screenW - 480) / 2, (screenH - 900) / 2);
   if (!window.Create(L"urniversity", origin, size)) {
     return EXIT_FAILURE;
   }
