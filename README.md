@@ -10,7 +10,22 @@ Therefore, I would like to develop an app named URniversity, managing to keep tr
 One sentence to summarize, "To know where you are and where to go in your college."
 
 ### Competitive Analysis
+#### 1. Notion
+**Strengths**: Flexible, database relations, collaborative  
+**Weaknesses**: High learning curve  
 
+#### 2. TodoList
+**Strengths**: Strongest for daily task management  
+**Weaknesses**: No academic information, no long-term linkage  
+
+#### 3. MyStudyLife
+**Strengths**: Schedules, exam tracking, almost everything in daily needs  
+**Weaknesses**: Not support career planning, inspirations, or personal growth  
+  
+#### Overall
+**Structure**: 3-layer structure (Today / Semester / Future) provides immediate value  
+**Inspiration**: Merges innovative ideas with solid goals  
+**Growth**: Users can see their evolution from freshman to graduate.  
 
 ### Expected Features
 There are three main layers called future, semester, and today.  
@@ -54,20 +69,36 @@ Three layers can be used independently. However, there are linking relations bet
 - Postman : API testing and development tool.
 
 ### Prototype Validation Goals
-
+- Basic UI structure
+- Available Today / Semester / Future pages
+- Add tasks to today and goals future
+- Due date setting
+- Future goals categorization
+- Linkage between tasks and goals
+- Adjustable subgoals
 
 ---
 
 ## Prototype Report
 
 ### Progress
-<!-- 完成了什麼 -->
+I have done Basic UI structure, available Today / Semester / Future pages, add tasks to today and goals future, due date setting, future goals categorization. To make it better, linkage and visualization are necessary.
 
 ### Difficulties
-<!-- 遇到什麼問題、如何解決或打算如何解決 -->
+Nothing big bruh
 
 ### Next
-<!-- 接下來要做什麼 -->
+- Editable tasks and goals
+- Semester default setting
+- Linkage between tasks / targets / goals
+- Advancement visualization
+- Better subgoals (more detail)
+- Supabase connection
+- UI improvement to make it convenient
+- Default template for future goals
+- Diary system and retro system
+- Cross-platform and cross-device usage
+- Maybe exam and GPA tracking
 
 ---
 
