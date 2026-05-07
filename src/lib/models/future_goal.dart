@@ -11,18 +11,6 @@ class FutureCategories {
   ];
 }
 
-class Subgoal {
-  final String id;
-  final String title;
-  final bool isDone;
-
-  const Subgoal({required this.id, required this.title, this.isDone = false});
-
-  Subgoal copyWith({String? title, bool? isDone}) {
-    return Subgoal(id: id, title: title ?? this.title, isDone: isDone ?? this.isDone);
-  }
-}
-
 // Compare semester strings like "114-1" < "114-2" < "115-1"
 int compareSemesters(String a, String b) {
   final pa = a.split('-');
@@ -34,41 +22,45 @@ int compareSemesters(String a, String b) {
 
 class FutureGoal {
   final String id;
+  final String? parentId;         // null = top-level goal
   final String title;
-  final String category;
+  final List<String> categories;  // multiple categories
   final String? startSemester;
   final String? endSemester;
   final String? notes;
-  final List<Subgoal> subgoals;
+  final bool isDone;
 
   const FutureGoal({
     required this.id,
+    this.parentId,
     required this.title,
-    this.category = FutureCategories.other,
+    this.categories = const [FutureCategories.other],
     this.startSemester,
     this.endSemester,
     this.notes,
-    this.subgoals = const [],
+    this.isDone = false,
   });
 
   FutureGoal copyWith({
+    Object? parentId = _sentinel,
     String? title,
-    String? category,
-    String? startSemester,
-    String? endSemester,
-    String? notes,
-    List<Subgoal>? subgoals,
+    List<String>? categories,
+    Object? startSemester = _sentinel,
+    Object? endSemester = _sentinel,
+    Object? notes = _sentinel,
+    bool? isDone,
   }) {
     return FutureGoal(
       id: id,
+      parentId: parentId == _sentinel ? this.parentId : parentId as String?,
       title: title ?? this.title,
-      category: category ?? this.category,
-      startSemester: startSemester ?? this.startSemester,
-      endSemester: endSemester ?? this.endSemester,
-      notes: notes ?? this.notes,
-      subgoals: subgoals ?? this.subgoals,
+      categories: categories ?? this.categories,
+      startSemester: startSemester == _sentinel ? this.startSemester : startSemester as String?,
+      endSemester: endSemester == _sentinel ? this.endSemester : endSemester as String?,
+      notes: notes == _sentinel ? this.notes : notes as String?,
+      isDone: isDone ?? this.isDone,
     );
   }
-
-  int get completedCount => subgoals.where((s) => s.isDone).length;
 }
+
+const Object _sentinel = Object();

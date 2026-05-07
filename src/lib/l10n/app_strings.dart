@@ -97,4 +97,12 @@ abstract class AppStrings {
   String get threeSemesters;
   String get fourSemesters;
   String get semesterStartMonth;
+
+  // Trash
+  String get trash;
+  String get restore;
+  String get emptyTrash;
+  String get noTrash;
+  String get markDone;
+  String get markUndone;
 }

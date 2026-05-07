@@ -43,6 +43,12 @@ class TasksNotifier extends StateNotifier<List<Task>> {
   void remove(String id) {
     state = state.where((t) => t.id != id).toList();
   }
+
+  void restore(Task task) {
+    if (!state.any((t) => t.id == task.id)) {
+      state = [...state, task];
+    }
+  }
 }
 
 final tasksProvider = StateNotifierProvider<TasksNotifier, List<Task>>(

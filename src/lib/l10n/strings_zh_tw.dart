@@ -62,8 +62,8 @@ class StringsZhTw implements AppStrings {
   @override String get noTargets => '尚無目標';
   @override String get editTarget => '編輯目標';
   @override String goalProgress(int done, int total) => '$done / $total 完成';
-  @override String get milestones => '里程碑';
-  @override String get addMilestone => '新增里程碑';
+  @override String get milestones => '子目標';
+  @override String get addMilestone => '新增子目標';
   @override String get backToCurrentSem => '本學期';
   @override String get goalNotes => '備註（選填）';
 
@@ -80,8 +80,8 @@ class StringsZhTw implements AppStrings {
   @override String get catOther => '其他';
   @override String get startSemester => '開始學期';
   @override String get endSemester => '結束學期';
-  @override String get subgoals => '子目標';
-  @override String get addSubgoal => '新增子目標';
+  @override String get subgoals => '子願景';
+  @override String get addSubgoal => '新增子願景';
   @override String get editTask => '編輯任務';
   @override String get save => '儲存';
   @override String get addCategory => '新增分類';
@@ -97,4 +97,11 @@ class StringsZhTw implements AppStrings {
   @override String get threeSemesters => '三學期制';
   @override String get fourSemesters => '四學期制';
   @override String get semesterStartMonth => '開始月份';
+
+  @override String get trash => '垃圾桶';
+  @override String get restore => '復原';
+  @override String get emptyTrash => '清空垃圾桶';
+  @override String get noTrash => '垃圾桶是空的';
+  @override String get markDone => '標記完成';
+  @override String get markUndone => '取消完成';
 }

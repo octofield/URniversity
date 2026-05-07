@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/settings_provider.dart';
+import 'trash_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -34,6 +35,15 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text(_semesterSettingsLabel(semSettings, s)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showSemesterSettingsDialog(context, ref, s, semSettings),
+          ),
+          ListTile(
+            title: Text(s.trash),
+            leading: const Icon(Icons.delete_outline),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TrashScreen()),
+            ),
           ),
         ],
       ),

@@ -97,4 +97,11 @@ class StringsEn implements AppStrings {
   @override String get threeSemesters => 'Three-semester';
   @override String get fourSemesters => 'Four-semester';
   @override String get semesterStartMonth => 'Start Month';
+
+  @override String get trash => 'Trash';
+  @override String get restore => 'Restore';
+  @override String get emptyTrash => 'Empty Trash';
+  @override String get noTrash => 'Trash is empty';
+  @override String get markDone => 'Mark Done';
+  @override String get markUndone => 'Unmark Done';
 }

@@ -5,8 +5,9 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
   FutureGoalsNotifier() : super([]);
 
   void addGoal({
+    String? parentId,
     required String title,
-    String category = FutureCategories.other,
+    List<String> categories = const [FutureCategories.other],
     String? startSemester,
     String? endSemester,
     String? notes,
@@ -15,8 +16,9 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
       ...state,
       FutureGoal(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        parentId: parentId,
         title: title,
-        category: category,
+        categories: categories,
         startSemester: startSemester,
         endSemester: endSemester,
         notes: notes,
@@ -24,9 +26,10 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
     ];
   }
 
-  void updateGoal(String goalId, {
+  void updateGoal(
+    String goalId, {
     required String title,
-    required String category,
+    required List<String> categories,
     String? startSemester,
     String? endSemester,
     String? notes,
@@ -36,59 +39,56 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
         if (g.id == goalId)
           FutureGoal(
             id: g.id,
+            parentId: g.parentId,
             title: title,
-            category: category,
+            categories: categories,
             startSemester: startSemester,
             endSemester: endSemester,
             notes: notes,
-            subgoals: g.subgoals,
+            isDone: g.isDone,
           )
         else
           g,
     ];
   }
 
-  void removeGoal(String goalId) {
-    state = state.where((g) => g.id != goalId).toList();
-  }
-
-  void addSubgoal(String goalId, String title) {
+  void toggleDone(String goalId) {
     state = [
       for (final g in state)
-        if (g.id == goalId)
-          g.copyWith(subgoals: [
-            ...g.subgoals,
-            Subgoal(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              title: title,
-            ),
-          ])
-        else
-          g,
+        if (g.id == goalId) g.copyWith(isDone: !g.isDone) else g,
     ];
   }
 
-  void toggleSubgoal(String goalId, String subgoalId) {
-    state = [
-      for (final g in state)
-        if (g.id == goalId)
-          g.copyWith(subgoals: [
-            for (final s in g.subgoals)
-              if (s.id == subgoalId) s.copyWith(isDone: !s.isDone) else s,
-          ])
-        else
-          g,
-    ];
+  // Returns the goal and ALL its descendants (for cascading trash)
+  List<FutureGoal> getWithDescendants(String goalId) {
+    final result = <FutureGoal>[];
+    void collect(String id) {
+      final goal = state.where((g) => g.id == id).firstOrNull;
+      if (goal == null) return;
+      result.add(goal);
+      for (final child in state.where((g) => g.parentId == id)) {
+        collect(child.id);
+      }
+    }
+    collect(goalId);
+    return result;
   }
 
-  void removeSubgoal(String goalId, String subgoalId) {
-    state = [
-      for (final g in state)
-        if (g.id == goalId)
-          g.copyWith(subgoals: g.subgoals.where((s) => s.id != subgoalId).toList())
-        else
-          g,
-    ];
+  void remove(String goalId) {
+    final toRemove = getWithDescendants(goalId).map((g) => g.id).toSet();
+    state = state.where((g) => !toRemove.contains(g.id)).toList();
+  }
+
+  void restore(FutureGoal goal) {
+    if (!state.any((g) => g.id == goal.id)) {
+      // If parent no longer exists, restore as top-level
+      final parentExists = goal.parentId == null ||
+          state.any((g) => g.id == goal.parentId);
+      state = [
+        ...state,
+        parentExists ? goal : goal.copyWith(parentId: null),
+      ];
+    }
   }
 }
 

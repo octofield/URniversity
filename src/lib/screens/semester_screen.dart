@@ -9,6 +9,7 @@ import '../models/semester_goal.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import 'settings_screen.dart';
 
@@ -20,7 +21,7 @@ class SemesterScreen extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final selectedSem = ref.watch(selectedSemesterProvider);
     final goals = ref.watch(semesterGoalsProvider)
-        .where((g) => g.semester == selectedSem)
+        .where((g) => g.semester == selectedSem && g.parentId == null)
         .toList();
 
     return SafeArea(
@@ -183,7 +184,9 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
                         duration: const Duration(milliseconds: 150),
                         style: TextStyle(
                           fontSize: isSelected ? 17 : 13,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           color: isSelected
                               ? AppColors.primary
                               : AppColors.textTertiary,
@@ -221,9 +224,11 @@ class _GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
+    final allGoals = ref.watch(semesterGoalsProvider);
+    final children = allGoals.where((g) => g.parentId == goal.id).toList();
     final notifier = ref.read(semesterGoalsProvider.notifier);
-    final total = goal.milestones.length;
-    final done = goal.completedCount;
+    final done = children.where((c) => c.isDone).length;
+    final total = children.length;
     final progress = total > 0 ? done / total : 0.0;
     final catC = catColor(goal.category);
 
@@ -281,20 +286,22 @@ class _GoalCard extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(s.goalProgress(done, total),
-                style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: AppSpacing.xs),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.full),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 4,
-                color: catC,
-                backgroundColor: AppColors.surfaceVariant,
+            if (total > 0) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(s.goalProgress(done, total),
+                  style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: AppSpacing.xs),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  color: catC,
+                  backgroundColor: AppColors.surfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpacing.xs),
+            ],
           ],
         ),
         trailing: Row(
@@ -310,14 +317,17 @@ class _GoalCard extends ConsumerWidget {
               icon: const Icon(Icons.delete_outline, size: 18),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              onPressed: () => notifier.removeGoal(goal.id),
+              onPressed: () {
+                ref.read(trashProvider.notifier).addSemesterGoal(goal);
+                notifier.remove(goal.id);
+              },
             ),
             const Icon(Icons.expand_more),
           ],
         ),
         children: [
           const Divider(height: 1),
-          if (goal.milestones.isEmpty)
+          if (children.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md, vertical: 12,
@@ -329,33 +339,67 @@ class _GoalCard extends ConsumerWidget {
                 ),
               ),
             ),
-          for (final m in goal.milestones)
-            CheckboxListTile(
+          for (final child in children)
+            ListTile(
               dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              value: m.isDone,
-              onChanged: (_) => notifier.toggleMilestone(goal.id, m.id),
-              title: Text(
-                m.title,
-                style: TextStyle(
-                  decoration: m.isDone ? TextDecoration.lineThrough : null,
-                  color: m.isDone ? AppColors.textTertiary : null,
+              contentPadding: const EdgeInsets.only(left: 12, right: 4),
+              leading: GestureDetector(
+                onTap: () => notifier.toggleDone(child.id),
+                child: Icon(
+                  child.isDone
+                      ? Icons.check_circle
+                      : Icons.check_circle_outline,
+                  color: child.isDone
+                      ? AppColors.primary
+                      : AppColors.textTertiary,
+                  size: 20,
                 ),
               ),
-              secondary: IconButton(
-                icon: const Icon(Icons.close, size: 16),
-                onPressed: () => notifier.removeMilestone(goal.id, m.id),
+              title: Text(
+                child.title,
+                style: TextStyle(
+                  decoration:
+                      child.isDone ? TextDecoration.lineThrough : null,
+                  color: child.isDone ? AppColors.textTertiary : null,
+                  fontSize: 14,
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () =>
+                        _showEditGoalSheet(context, ref, child),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      ref
+                          .read(trashProvider.notifier)
+                          .addSemesterGoal(child);
+                      notifier.remove(child.id);
+                    },
+                  ),
+                ],
               ),
             ),
           ListTile(
             dense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            leading: const Icon(Icons.add, size: 20, color: AppColors.primary),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            leading:
+                const Icon(Icons.add, size: 20, color: AppColors.primary),
             title: Text(
               s.addMilestone,
               style: const TextStyle(color: AppColors.primary, fontSize: 14),
             ),
-            onTap: () => _showAddMilestoneDialog(context, ref, goal.id),
+            onTap: () => showAddSemesterGoalSheet(context, ref,
+                parentId: goal.id),
           ),
         ],
       ),
@@ -374,7 +418,6 @@ Widget _sheetDragHandle() => Center(
       ),
     );
 
-// Compact category selector for the sheet
 Widget _categoryChips(
   BuildContext context,
   AppStrings s,
@@ -398,7 +441,6 @@ Widget _categoryChips(
   );
 }
 
-// Prominent "linked goal" tile
 Widget _goalLinkTile(
   BuildContext context,
   AppStrings s,
@@ -431,7 +473,7 @@ Widget _goalLinkTile(
               children: [
                 Text(
                   s.linkedFutureGoal,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
@@ -453,8 +495,8 @@ Widget _goalLinkTile(
           if (linked != null)
             GestureDetector(
               onTap: onClear,
-              child: const Icon(Icons.close, size: 18,
-                  color: AppColors.textTertiary),
+              child: const Icon(Icons.close,
+                  size: 18, color: AppColors.textTertiary),
             ),
         ],
       ),
@@ -462,8 +504,8 @@ Widget _goalLinkTile(
   );
 }
 
-// Public — called from HomeScreen FAB
-void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref) {
+void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref,
+    {String? parentId}) {
   final semester = ref.read(selectedSemesterProvider);
   final titleCtrl = TextEditingController();
   final notesCtrl = TextEditingController();
@@ -479,16 +521,22 @@ void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref) {
       builder: (sheetCtx, setState) {
         final futureGoals = ref.read(futureGoalsProvider);
         final linked = selectedFutureGoalId != null
-            ? futureGoals.where((g) => g.id == selectedFutureGoalId).firstOrNull
+            ? futureGoals
+                .where((g) => g.id == selectedFutureGoalId)
+                .firstOrNull
             : null;
 
         void submit() {
           if (titleCtrl.text.trim().isEmpty) return;
           ref.read(semesterGoalsProvider.notifier).addGoal(
-            titleCtrl.text.trim(), semester,
+            titleCtrl.text.trim(),
+            semester,
+            parentId: parentId,
             category: selectedCategory,
-            futureGoalId: selectedFutureGoalId,
-            notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+            futureGoalId: parentId != null ? null : selectedFutureGoalId,
+            notes: notesCtrl.text.trim().isEmpty
+                ? null
+                : notesCtrl.text.trim(),
           );
           Navigator.pop(sheetCtx);
         }
@@ -496,14 +544,16 @@ void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref) {
         return Container(
           decoration: const BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
           ),
           child: SingleChildScrollView(
             padding: EdgeInsets.only(
               left: AppSpacing.pageHorizontal,
               right: AppSpacing.pageHorizontal,
               top: AppSpacing.lg,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+              bottom:
+                  MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -511,7 +561,10 @@ void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref) {
               children: [
                 _sheetDragHandle(),
                 const SizedBox(height: AppSpacing.lg),
-                Text(s.addTarget, style: Theme.of(sheetCtx).textTheme.titleLarge),
+                Text(
+                  parentId != null ? s.addMilestone : s.addTarget,
+                  style: Theme.of(sheetCtx).textTheme.titleLarge,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: titleCtrl,
@@ -538,13 +591,16 @@ void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref) {
                 const SizedBox(height: AppSpacing.xs),
                 _categoryChips(sheetCtx, s, selectedCategory,
                     (cat) => setState(() => selectedCategory = cat)),
-                const SizedBox(height: AppSpacing.md),
-                _goalLinkTile(
-                  sheetCtx, s, linked,
-                  () => _showFutureGoalSelector(context, ref, selectedFutureGoalId,
-                      (id) => setState(() => selectedFutureGoalId = id)),
-                  () => setState(() => selectedFutureGoalId = null),
-                ),
+                if (parentId == null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _goalLinkTile(
+                    sheetCtx, s, linked,
+                    () => _showFutureGoalSelector(
+                        context, ref, selectedFutureGoalId,
+                        (id) => setState(() => selectedFutureGoalId = id)),
+                    () => setState(() => selectedFutureGoalId = null),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   width: double.infinity,
@@ -562,7 +618,8 @@ void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref) {
   );
 }
 
-void _showEditGoalSheet(BuildContext context, WidgetRef ref, SemesterGoal goal) {
+void _showEditGoalSheet(
+    BuildContext context, WidgetRef ref, SemesterGoal goal) {
   final titleCtrl = TextEditingController(text: goal.title);
   final notesCtrl = TextEditingController(text: goal.notes ?? '');
   final s = ref.read(stringsProvider);
@@ -577,7 +634,9 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, SemesterGoal goal) 
       builder: (sheetCtx, setState) {
         final futureGoals = ref.read(futureGoalsProvider);
         final linked = selectedFutureGoalId != null
-            ? futureGoals.where((g) => g.id == selectedFutureGoalId).firstOrNull
+            ? futureGoals
+                .where((g) => g.id == selectedFutureGoalId)
+                .firstOrNull
             : null;
 
         void submit() {
@@ -587,7 +646,9 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, SemesterGoal goal) 
             title: titleCtrl.text.trim(),
             category: selectedCategory,
             futureGoalId: selectedFutureGoalId,
-            notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+            notes: notesCtrl.text.trim().isEmpty
+                ? null
+                : notesCtrl.text.trim(),
           );
           Navigator.pop(sheetCtx);
         }
@@ -595,14 +656,16 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, SemesterGoal goal) 
         return Container(
           decoration: const BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
           ),
           child: SingleChildScrollView(
             padding: EdgeInsets.only(
               left: AppSpacing.pageHorizontal,
               right: AppSpacing.pageHorizontal,
               top: AppSpacing.lg,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+              bottom:
+                  MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -610,7 +673,8 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, SemesterGoal goal) 
               children: [
                 _sheetDragHandle(),
                 const SizedBox(height: AppSpacing.lg),
-                Text(s.editTarget, style: Theme.of(sheetCtx).textTheme.titleLarge),
+                Text(s.editTarget,
+                    style: Theme.of(sheetCtx).textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: titleCtrl,
@@ -640,7 +704,8 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, SemesterGoal goal) 
                 const SizedBox(height: AppSpacing.md),
                 _goalLinkTile(
                   sheetCtx, s, linked,
-                  () => _showFutureGoalSelector(context, ref, selectedFutureGoalId,
+                  () => _showFutureGoalSelector(
+                      context, ref, selectedFutureGoalId,
                       (id) => setState(() => selectedFutureGoalId = id)),
                   () => setState(() => selectedFutureGoalId = null),
                 ),
@@ -690,7 +755,8 @@ void _showFutureGoalSelector(
             for (final g in goals)
               ListTile(
                 title: Text(g.title),
-                subtitle: g.startSemester != null ? Text(g.startSemester!) : null,
+                subtitle:
+                    g.startSemester != null ? Text(g.startSemester!) : null,
                 selected: g.id == currentId,
                 onTap: () {
                   onSelect(g.id);
@@ -704,43 +770,6 @@ void _showFutureGoalSelector(
         TextButton(
           onPressed: () => Navigator.pop(dlgCtx),
           child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-      ],
-    ),
-  );
-}
-
-void _showAddMilestoneDialog(BuildContext context, WidgetRef ref, String goalId) {
-  final ctrl = TextEditingController();
-  final s = ref.read(stringsProvider);
-
-  showDialog(
-    context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.addMilestone),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(labelText: s.titleField),
-        onSubmitted: (_) {
-          if (ctrl.text.trim().isEmpty) return;
-          ref.read(semesterGoalsProvider.notifier).addMilestone(goalId, ctrl.text.trim());
-          Navigator.pop(dlgCtx);
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (ctrl.text.trim().isEmpty) return;
-            ref.read(semesterGoalsProvider.notifier).addMilestone(goalId, ctrl.text.trim());
-            Navigator.pop(dlgCtx);
-          },
-          child: Text(s.add),
         ),
       ],
     ),

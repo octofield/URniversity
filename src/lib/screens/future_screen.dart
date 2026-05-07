@@ -4,10 +4,11 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/future_goal.dart';
-import '../providers/custom_categories_provider.dart';
+import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import 'settings_screen.dart';
 
@@ -80,10 +81,9 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
 
     showDialog(
       context: context,
-      builder: (dlgCtx) => StatefulBuilder(
-        builder: (dlgCtx, setDlgState) {
-          final customCats = ref.read(customCategoriesProvider);
-
+      builder: (dlgCtx) => Consumer(
+        builder: (_, cRef, _) {
+          final cats = cRef.watch(categoriesProvider);
           return AlertDialog(
             title: Text(s.category),
             content: SizedBox(
@@ -91,59 +91,52 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.select_all,
-                              color: AppColors.textTertiary),
-                          title: Text(s.catAll),
-                          selected: _catFilter == null,
+                  SizedBox(
+                    height: 300,
+                    child: ReorderableListView.builder(
+                      itemCount: cats.length,
+                      onReorder: (o, n) =>
+                          cRef.read(categoriesProvider.notifier).reorder(o, n),
+                      itemBuilder: (_, i) {
+                        final cat = cats[i];
+                        final isBuiltIn = cRef
+                            .read(categoriesProvider.notifier)
+                            .isBuiltIn(cat);
+                        return ListTile(
+                          key: ValueKey(cat),
+                          leading: Icon(catIcon(cat), color: catColor(cat)),
+                          title: Text(catLabel(cat, s)),
+                          selected: _catFilter == cat,
                           selectedColor: AppColors.primary,
+                          trailing: isBuiltIn
+                              ? const Icon(Icons.drag_handle,
+                                  color: AppColors.textTertiary)
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline,
+                                          size: 18),
+                                      onPressed: () {
+                                        cRef
+                                            .read(categoriesProvider.notifier)
+                                            .remove(cat);
+                                        if (_catFilter == cat) {
+                                          setState(() => _catFilter = null);
+                                        }
+                                      },
+                                    ),
+                                    const Icon(Icons.drag_handle,
+                                        color: AppColors.textTertiary),
+                                  ],
+                                ),
                           onTap: () {
-                            setState(() => _catFilter = null);
+                            setState(() =>
+                                _catFilter = _catFilter == cat ? null : cat);
                             Navigator.pop(dlgCtx);
                           },
-                        ),
-                        for (final cat in FutureCategories.builtIns)
-                          ListTile(
-                            leading: Icon(catIcon(cat), color: catColor(cat)),
-                            title: Text(catLabel(cat, s)),
-                            selected: _catFilter == cat,
-                            selectedColor: AppColors.primary,
-                            onTap: () {
-                              setState(() =>
-                                  _catFilter = _catFilter == cat ? null : cat);
-                              Navigator.pop(dlgCtx);
-                            },
-                          ),
-                        for (final cat in customCats)
-                          ListTile(
-                            leading: const Icon(Icons.label_outline,
-                                color: AppColors.categoryOther),
-                            title: Text(cat),
-                            selected: _catFilter == cat,
-                            selectedColor: AppColors.primary,
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              onPressed: () {
-                                ref
-                                    .read(customCategoriesProvider.notifier)
-                                    .remove(cat);
-                                if (_catFilter == cat) {
-                                  setState(() => _catFilter = null);
-                                }
-                                setDlgState(() {});
-                              },
-                            ),
-                            onTap: () {
-                              setState(() =>
-                                  _catFilter = _catFilter == cat ? null : cat);
-                              Navigator.pop(dlgCtx);
-                            },
-                          ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                   const Divider(),
@@ -152,14 +145,14 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                       Expanded(
                         child: TextField(
                           controller: addCtrl,
-                          decoration: InputDecoration(hintText: s.categoryName),
+                          decoration:
+                              InputDecoration(hintText: s.categoryName),
                           textCapitalization: TextCapitalization.sentences,
-                          onSubmitted: (_) {
-                            final name = addCtrl.text.trim();
-                            if (name.isEmpty) return;
-                            ref.read(customCategoriesProvider.notifier).add(name);
+                          onSubmitted: (name) {
+                            final trimmed = name.trim();
+                            if (trimmed.isEmpty) return;
+                            cRef.read(categoriesProvider.notifier).add(trimmed);
                             addCtrl.clear();
-                            setDlgState(() {});
                           },
                         ),
                       ),
@@ -168,9 +161,8 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                         onPressed: () {
                           final name = addCtrl.text.trim();
                           if (name.isEmpty) return;
-                          ref.read(customCategoriesProvider.notifier).add(name);
+                          cRef.read(categoriesProvider.notifier).add(name);
                           addCtrl.clear();
-                          setDlgState(() {});
                         },
                       ),
                     ],
@@ -181,7 +173,8 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dlgCtx),
-                child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+                child: Text(
+                    MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
               ),
             ],
           );
@@ -194,14 +187,15 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final settings = ref.watch(semesterSettingsProvider);
-    final goals = ref.watch(futureGoalsProvider);
+    final allGoals = ref.watch(futureGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
     final semChips = _semesterChips(settings);
-    final customCats = ref.watch(customCategoriesProvider);
-    final allCats = [...FutureCategories.builtIns, ...customCats];
 
-    final filtered = goals.where((g) {
+    final filtered = allGoals.where((g) {
+      if (g.parentId != null) return false;
       final semOk = _semFilter == null || g.startSemester == _semFilter;
-      final catOk = _catFilter == null || g.category == _catFilter;
+      final catOk =
+          _catFilter == null || g.categories.contains(_catFilter);
       return semOk && catOk;
     }).toList();
 
@@ -231,7 +225,6 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ],
             ),
           ),
-          // Semester filter — adaptive (no scroll, 更多 pinned right)
           Padding(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.pageHorizontal, vertical: 4),
@@ -258,7 +251,6 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ),
             ),
           ),
-          // Category filter — adaptive
           Padding(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.pageHorizontal, vertical: 4),
@@ -269,7 +261,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 onTap: () => setState(() => _catFilter = null),
               ),
               chips: [
-                for (final cat in allCats)
+                for (final cat in cats)
                   _FilterChip(
                     label: catLabel(cat, s),
                     selected: _catFilter == cat,
@@ -309,7 +301,6 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
   }
 }
 
-// Adaptive chip row: shows "all" chip + as many other chips as fit, then trailing
 class _AdaptiveChipRow extends StatelessWidget {
   final Widget allChip;
   final List<Widget> chips;
@@ -376,11 +367,16 @@ class _GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
+    final allGoals = ref.watch(futureGoalsProvider);
+    final children = allGoals.where((g) => g.parentId == goal.id).toList();
     final notifier = ref.read(futureGoalsProvider.notifier);
-    final total = goal.subgoals.length;
-    final done = goal.completedCount;
+    final done = children.where((c) => c.isDone).length;
+    final total = children.length;
     final progress = total > 0 ? done / total : 0.0;
-    final catC = catColor(goal.category);
+    final primaryCat = goal.categories.isNotEmpty
+        ? goal.categories.first
+        : FutureCategories.other;
+    final catC = catColor(primaryCat);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -401,7 +397,7 @@ class _GoalCard extends ConsumerWidget {
             color: catC.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          child: Icon(catIcon(goal.category), color: catC, size: 20),
+          child: Icon(catIcon(primaryCat), color: catC, size: 20),
         ),
         title: Text(
           goal.title,
@@ -418,7 +414,9 @@ class _GoalCard extends ConsumerWidget {
                 child: Text(
                   [
                     if (goal.startSemester != null) goal.startSemester!,
-                    if (goal.startSemester != null && goal.endSemester != null) '→',
+                    if (goal.startSemester != null &&
+                        goal.endSemester != null)
+                      '→',
                     if (goal.endSemester != null) goal.endSemester!,
                   ].join(' '),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -469,14 +467,17 @@ class _GoalCard extends ConsumerWidget {
               icon: const Icon(Icons.delete_outline, size: 18),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              onPressed: () => notifier.removeGoal(goal.id),
+              onPressed: () {
+                ref.read(trashProvider.notifier).addFutureGoal(goal);
+                notifier.remove(goal.id);
+              },
             ),
             const Icon(Icons.expand_more),
           ],
         ),
         children: [
           const Divider(height: 1),
-          if (goal.subgoals.isEmpty)
+          if (children.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md, vertical: 12,
@@ -488,31 +489,66 @@ class _GoalCard extends ConsumerWidget {
                 ),
               ),
             ),
-          for (final sg in goal.subgoals)
-            CheckboxListTile(
+          for (final child in children)
+            ListTile(
               dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              value: sg.isDone,
-              onChanged: (_) => notifier.toggleSubgoal(goal.id, sg.id),
-              title: Text(
-                sg.title,
-                style: TextStyle(
-                  decoration: sg.isDone ? TextDecoration.lineThrough : null,
-                  color: sg.isDone ? AppColors.textTertiary : null,
+              contentPadding: const EdgeInsets.only(left: 12, right: 4),
+              leading: GestureDetector(
+                onTap: () => notifier.toggleDone(child.id),
+                child: Icon(
+                  child.isDone
+                      ? Icons.check_circle
+                      : Icons.check_circle_outline,
+                  color: child.isDone
+                      ? AppColors.primary
+                      : AppColors.textTertiary,
+                  size: 20,
                 ),
               ),
-              secondary: IconButton(
-                icon: const Icon(Icons.close, size: 16),
-                onPressed: () => notifier.removeSubgoal(goal.id, sg.id),
+              title: Text(
+                child.title,
+                style: TextStyle(
+                  decoration:
+                      child.isDone ? TextDecoration.lineThrough : null,
+                  color: child.isDone ? AppColors.textTertiary : null,
+                  fontSize: 14,
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () =>
+                        _showEditGoalSheet(context, ref, child),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      ref
+                          .read(trashProvider.notifier)
+                          .addFutureGoal(child);
+                      notifier.remove(child.id);
+                    },
+                  ),
+                ],
               ),
             ),
           ListTile(
             dense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            leading: const Icon(Icons.add, size: 20, color: AppColors.primary),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            leading:
+                const Icon(Icons.add, size: 20, color: AppColors.primary),
             title: Text(s.addSubgoal,
-                style: const TextStyle(color: AppColors.primary, fontSize: 14)),
-            onTap: () => _showAddSubgoalDialog(context, ref, goal.id),
+                style: const TextStyle(
+                    color: AppColors.primary, fontSize: 14)),
+            onTap: () =>
+                showAddFutureGoalSheet(context, ref, parentId: goal.id),
           ),
         ],
       ),
@@ -531,7 +567,6 @@ Widget _sheetDragHandle() => Center(
       ),
     );
 
-// Semester dropdown that only shows semesters after (or equal to) a given start
 Widget _semesterDropdown({
   required String? value,
   required List<String> semesters,
@@ -548,24 +583,47 @@ Widget _semesterDropdown({
     decoration: InputDecoration(labelText: label, isDense: true),
     items: [
       const DropdownMenuItem(value: null, child: Text('—')),
-      for (final sem in valid) DropdownMenuItem(value: sem, child: Text(sem)),
+      for (final sem in valid)
+        DropdownMenuItem(value: sem, child: Text(sem)),
     ],
     onChanged: onChanged,
   );
 }
 
-// Public — called from HomeScreen FAB
+Widget _categoryChipsMulti(
+  BuildContext context,
+  dynamic s,
+  List<String> allCats,
+  List<String> selected,
+  void Function(String) onToggle,
+) {
+  return Wrap(
+    spacing: AppSpacing.xs,
+    runSpacing: AppSpacing.xs,
+    children: [
+      for (final cat in allCats)
+        FilterChip(
+          label: Text(catLabel(cat, s)),
+          selected: selected.contains(cat),
+          onSelected: (_) => onToggle(cat),
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+        ),
+    ],
+  );
+}
+
 void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
-    {String? defaultSemester}) {
+    {String? defaultSemester, String? parentId}) {
   final titleCtrl = TextEditingController();
   final notesCtrl = TextEditingController();
   final s = ref.read(stringsProvider);
   final settings = ref.read(semesterSettingsProvider);
-  final customCats = ref.read(customCategoriesProvider);
+  final cats = ref.read(categoriesProvider);
   final semesters = generateSemesters(settings);
-  final allCats = [...FutureCategories.builtIns, ...customCats];
 
-  var selectedCategory = FutureCategories.other;
+  var selectedCategories = <String>[FutureCategories.other];
   String? startSemester = defaultSemester ?? currentSemester(settings);
   String? endSemester;
 
@@ -577,7 +635,8 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
       builder: (sheetCtx, setState) => Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         ),
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
@@ -592,7 +651,10 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
             children: [
               _sheetDragHandle(),
               const SizedBox(height: AppSpacing.lg),
-              Text(s.addGoal, style: Theme.of(sheetCtx).textTheme.titleLarge),
+              Text(
+                parentId != null ? s.addSubgoal : s.addGoal,
+                style: Theme.of(sheetCtx).textTheme.titleLarge,
+              ),
               const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: titleCtrl,
@@ -616,21 +678,16 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                     color: AppColors.textSecondary,
                   )),
               const SizedBox(height: AppSpacing.xs),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  for (final cat in allCats)
-                    FilterChip(
-                      label: Text(catLabel(cat, s)),
-                      selected: selectedCategory == cat,
-                      onSelected: (_) => setState(() => selectedCategory = cat),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                    ),
-                ],
-              ),
+              _categoryChipsMulti(sheetCtx, s, cats, selectedCategories,
+                (cat) => setState(() {
+                  if (selectedCategories.contains(cat)) {
+                    if (selectedCategories.length > 1) {
+                      selectedCategories.remove(cat);
+                    }
+                  } else {
+                    selectedCategories.add(cat);
+                  }
+                })),
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
@@ -642,9 +699,11 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                       minSemester: null,
                       onChanged: (v) => setState(() {
                         startSemester = v;
-                        // Reset end if it's before new start
-                        if (endSemester != null && startSemester != null &&
-                            compareSemesters(endSemester!, startSemester!) < 0) {
+                        if (endSemester != null &&
+                            startSemester != null &&
+                            compareSemesters(
+                                    endSemester!, startSemester!) <
+                                0) {
                           endSemester = null;
                         }
                       }),
@@ -669,8 +728,9 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                   onPressed: () {
                     if (titleCtrl.text.trim().isEmpty) return;
                     ref.read(futureGoalsProvider.notifier).addGoal(
+                      parentId: parentId,
                       title: titleCtrl.text.trim(),
-                      category: selectedCategory,
+                      categories: selectedCategories,
                       startSemester: startSemester,
                       endSemester: endSemester,
                       notes: notesCtrl.text.trim().isEmpty
@@ -690,16 +750,16 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
   );
 }
 
-void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
+void _showEditGoalSheet(
+    BuildContext context, WidgetRef ref, FutureGoal goal) {
   final titleCtrl = TextEditingController(text: goal.title);
   final notesCtrl = TextEditingController(text: goal.notes ?? '');
   final s = ref.read(stringsProvider);
   final settings = ref.read(semesterSettingsProvider);
-  final customCats = ref.read(customCategoriesProvider);
+  final cats = ref.read(categoriesProvider);
   final semesters = generateSemesters(settings);
-  final allCats = [...FutureCategories.builtIns, ...customCats];
 
-  var selectedCategory = goal.category;
+  var selectedCategories = List<String>.from(goal.categories);
   String? startSemester = goal.startSemester;
   String? endSemester = goal.endSemester;
 
@@ -711,7 +771,8 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
       builder: (sheetCtx, setState) => Container(
         decoration: const BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         ),
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
@@ -726,7 +787,8 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
             children: [
               _sheetDragHandle(),
               const SizedBox(height: AppSpacing.lg),
-              Text(s.editGoal, style: Theme.of(sheetCtx).textTheme.titleLarge),
+              Text(s.editGoal,
+                  style: Theme.of(sheetCtx).textTheme.titleLarge),
               const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: titleCtrl,
@@ -750,21 +812,16 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
                     color: AppColors.textSecondary,
                   )),
               const SizedBox(height: AppSpacing.xs),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  for (final cat in allCats)
-                    FilterChip(
-                      label: Text(catLabel(cat, s)),
-                      selected: selectedCategory == cat,
-                      onSelected: (_) => setState(() => selectedCategory = cat),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                    ),
-                ],
-              ),
+              _categoryChipsMulti(sheetCtx, s, cats, selectedCategories,
+                (cat) => setState(() {
+                  if (selectedCategories.contains(cat)) {
+                    if (selectedCategories.length > 1) {
+                      selectedCategories.remove(cat);
+                    }
+                  } else {
+                    selectedCategories.add(cat);
+                  }
+                })),
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
@@ -776,8 +833,11 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
                       minSemester: null,
                       onChanged: (v) => setState(() {
                         startSemester = v;
-                        if (endSemester != null && startSemester != null &&
-                            compareSemesters(endSemester!, startSemester!) < 0) {
+                        if (endSemester != null &&
+                            startSemester != null &&
+                            compareSemesters(
+                                    endSemester!, startSemester!) <
+                                0) {
                           endSemester = null;
                         }
                       }),
@@ -804,7 +864,7 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
                     ref.read(futureGoalsProvider.notifier).updateGoal(
                       goal.id,
                       title: titleCtrl.text.trim(),
-                      category: selectedCategory,
+                      categories: selectedCategories,
                       startSemester: startSemester,
                       endSemester: endSemester,
                       notes: notesCtrl.text.trim().isEmpty
@@ -820,43 +880,6 @@ void _showEditGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
           ),
         ),
       ),
-    ),
-  );
-}
-
-void _showAddSubgoalDialog(BuildContext context, WidgetRef ref, String goalId) {
-  final ctrl = TextEditingController();
-  final s = ref.read(stringsProvider);
-
-  showDialog(
-    context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.addSubgoal),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(labelText: s.titleField),
-        onSubmitted: (_) {
-          if (ctrl.text.trim().isEmpty) return;
-          ref.read(futureGoalsProvider.notifier).addSubgoal(goalId, ctrl.text.trim());
-          Navigator.pop(dlgCtx);
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (ctrl.text.trim().isEmpty) return;
-            ref.read(futureGoalsProvider.notifier).addSubgoal(goalId, ctrl.text.trim());
-            Navigator.pop(dlgCtx);
-          },
-          child: Text(s.add),
-        ),
-      ],
     ),
   );
 }

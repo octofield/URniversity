@@ -53,6 +53,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
   void addGoal(
     String title,
     String semester, {
+    String? parentId,
     String category = 'other',
     String? futureGoalId,
     String? notes,
@@ -61,6 +62,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
       ...state,
       SemesterGoal(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        parentId: parentId,
         title: title,
         semester: semester,
         category: category,
@@ -82,59 +84,55 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
         if (g.id == goalId)
           SemesterGoal(
             id: g.id,
+            parentId: g.parentId,
             title: title,
             semester: g.semester,
             category: category,
             futureGoalId: futureGoalId,
-            milestones: g.milestones,
             notes: notes,
+            isDone: g.isDone,
           )
         else
           g,
     ];
   }
 
-  void removeGoal(String goalId) {
-    state = state.where((g) => g.id != goalId).toList();
-  }
-
-  void addMilestone(String goalId, String title) {
+  void toggleDone(String goalId) {
     state = [
       for (final g in state)
-        if (g.id == goalId)
-          g.copyWith(milestones: [
-            ...g.milestones,
-            Milestone(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              title: title,
-            ),
-          ])
-        else
-          g,
+        if (g.id == goalId) g.copyWith(isDone: !g.isDone) else g,
     ];
   }
 
-  void toggleMilestone(String goalId, String milestoneId) {
-    state = [
-      for (final g in state)
-        if (g.id == goalId)
-          g.copyWith(milestones: [
-            for (final m in g.milestones)
-              if (m.id == milestoneId) m.copyWith(isDone: !m.isDone) else m,
-          ])
-        else
-          g,
-    ];
+  // Returns the goal and ALL its descendants (for cascading trash)
+  List<SemesterGoal> getWithDescendants(String goalId) {
+    final result = <SemesterGoal>[];
+    void collect(String id) {
+      final goal = state.where((g) => g.id == id).firstOrNull;
+      if (goal == null) return;
+      result.add(goal);
+      for (final child in state.where((g) => g.parentId == id)) {
+        collect(child.id);
+      }
+    }
+    collect(goalId);
+    return result;
   }
 
-  void removeMilestone(String goalId, String milestoneId) {
-    state = [
-      for (final g in state)
-        if (g.id == goalId)
-          g.copyWith(milestones: g.milestones.where((m) => m.id != milestoneId).toList())
-        else
-          g,
-    ];
+  void remove(String goalId) {
+    final toRemove = getWithDescendants(goalId).map((g) => g.id).toSet();
+    state = state.where((g) => !toRemove.contains(g.id)).toList();
+  }
+
+  void restore(SemesterGoal goal) {
+    if (!state.any((g) => g.id == goal.id)) {
+      final parentExists = goal.parentId == null ||
+          state.any((g) => g.id == goal.parentId);
+      state = [
+        ...state,
+        parentExists ? goal : goal.copyWith(parentId: null),
+      ];
+    }
   }
 }
 

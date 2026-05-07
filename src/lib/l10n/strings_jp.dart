@@ -97,4 +97,11 @@ class StringsJp implements AppStrings {
   @override String get threeSemesters => '三学期制';
   @override String get fourSemesters => '四学期制';
   @override String get semesterStartMonth => '開始月';
+
+  @override String get trash => 'ゴミ箱';
+  @override String get restore => '元に戻す';
+  @override String get emptyTrash => 'ゴミ箱を空にする';
+  @override String get noTrash => 'ゴミ箱は空です';
+  @override String get markDone => '完了にする';
+  @override String get markUndone => '未完了に戻す';
 }
