@@ -25,6 +25,17 @@ class StringsZhTw implements AppStrings {
   @override String get dueTime => '截止時間';
   @override String get clearTime => '清除';
 
+  @override String get linkedTarget => '連結目標';
+  @override String get selectTarget => '選擇目標';
+  @override String get linkedGoal => '連結願景';
+  @override String get repeat => '重複';
+  @override String get repeatNone => '不重複';
+  @override String get repeatDaily => '每天';
+  @override String get repeatWeekly => '每週';
+  @override String get repeatMonthly => '每月';
+  @override String get repeatEveryNDays => '每隔幾天';
+  @override String get repeatInterval => '間隔（天）';
+
   @override String get inspirations => '靈感';
   @override String get noInspirations => '尚無靈感，點 + 記錄';
   @override String get addInspiration => '新增靈感';
@@ -38,6 +49,8 @@ class StringsZhTw implements AppStrings {
 
   @override String get semester => '學期';
   @override String get future => '未來';
+  @override String get targets => '目標';
+  @override String get goals => '願景';
 
   @override String get dateFormat => '日期格式';
   @override String get fmtMmddWeekday => 'MM/dd（星期）';
@@ -45,12 +58,18 @@ class StringsZhTw implements AppStrings {
   @override String get fmtYyyymmdd => 'yyyy/MM/dd';
   @override String get fmtLongDate => 'MMMM d';
 
-  @override String get addGoal => '新增目標';
-  @override String get noGoals => '尚無目標';
+  @override String get addTarget => '新增目標';
+  @override String get noTargets => '尚無目標';
+  @override String get editTarget => '編輯目標';
   @override String goalProgress(int done, int total) => '$done / $total 完成';
   @override String get milestones => '里程碑';
   @override String get addMilestone => '新增里程碑';
+  @override String get backToCurrentSem => '本學期';
+  @override String get goalNotes => '備註（選填）';
 
+  @override String get addGoal => '新增願景';
+  @override String get noGoals => '尚無願景';
+  @override String get editGoal => '編輯願景';
   @override String get category => '分類';
   @override String get catAll => '全部';
   @override String get catExchange => '交換';
@@ -59,8 +78,23 @@ class StringsZhTw implements AppStrings {
   @override String get catCertification => '證照';
   @override String get catPerformance => '表演';
   @override String get catOther => '其他';
-  @override String get startTime => '開始';
-  @override String get endTime => '結束';
+  @override String get startSemester => '開始學期';
+  @override String get endSemester => '結束學期';
   @override String get subgoals => '子目標';
   @override String get addSubgoal => '新增子目標';
+  @override String get editTask => '編輯任務';
+  @override String get save => '儲存';
+  @override String get addCategory => '新增分類';
+  @override String get categoryName => '分類名稱';
+  @override String get linkedFutureGoal => '連結的願景';
+  @override String get selectFutureGoal => '選擇願景';
+  @override String get noLink => '無連結';
+  @override String get more => '更多';
+
+  @override String get semesterSettings => '學期設定';
+  @override String get semesterCount => '學期制';
+  @override String get twoSemesters => '兩學期制';
+  @override String get threeSemesters => '三學期制';
+  @override String get fourSemesters => '四學期制';
+  @override String get semesterStartMonth => '開始月份';
 }

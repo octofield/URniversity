@@ -79,3 +79,55 @@ class SettingsNotifier extends StateNotifier<DateDisplayFormat> {
 final settingsProvider = StateNotifierProvider<SettingsNotifier, DateDisplayFormat>(
   (ref) => SettingsNotifier(),
 );
+
+// ── Semester settings ─────────────────────────────────────────────────────────
+
+class SemesterSettings {
+  final int count;             // 2, 3, or 4 semesters per year
+  final List<int> startMonths; // start month for each semester (index 0 = sem 1)
+
+  const SemesterSettings({required this.count, required this.startMonths});
+
+  // Taiwan default: sem 1 starts Aug, sem 2 starts Feb
+  static const defaultSettings = SemesterSettings(
+    count: 2,
+    startMonths: [8, 2],
+  );
+
+  SemesterSettings copyWith({int? count, List<int>? startMonths}) {
+    return SemesterSettings(
+      count: count ?? this.count,
+      startMonths: startMonths ?? this.startMonths,
+    );
+  }
+}
+
+class SemesterSettingsNotifier extends StateNotifier<SemesterSettings> {
+  SemesterSettingsNotifier() : super(SemesterSettings.defaultSettings);
+
+  void setCount(int count) {
+    final current = state.startMonths;
+    List<int> newStarts;
+    if (count <= current.length) {
+      newStarts = current.sublist(0, count);
+    } else {
+      const defaults = [8, 2, 6, 12];
+      newStarts = [
+        ...current,
+        for (int i = current.length; i < count; i++) defaults[i % defaults.length],
+      ];
+    }
+    state = SemesterSettings(count: count, startMonths: newStarts);
+  }
+
+  void setStartMonth(int semIdx, int month) {
+    final updated = List<int>.from(state.startMonths);
+    updated[semIdx] = month;
+    state = state.copyWith(startMonths: updated);
+  }
+}
+
+final semesterSettingsProvider =
+    StateNotifierProvider<SemesterSettingsNotifier, SemesterSettings>(
+  (ref) => SemesterSettingsNotifier(),
+);

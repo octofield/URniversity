@@ -21,6 +21,18 @@ abstract class AppStrings {
   String get dueTime;
   String get clearTime;
 
+  // Task linking & recurrence
+  String get linkedTarget;
+  String get selectTarget;
+  String get linkedGoal;
+  String get repeat;
+  String get repeatNone;
+  String get repeatDaily;
+  String get repeatWeekly;
+  String get repeatMonthly;
+  String get repeatEveryNDays;
+  String get repeatInterval;
+
   String get inspirations;
   String get noInspirations;
   String get addInspiration;
@@ -34,6 +46,8 @@ abstract class AppStrings {
 
   String get semester;
   String get future;
+  String get targets;    // nav label for semester tab
+  String get goals;      // nav label for future tab
 
   String get dateFormat;
   String get fmtMmddWeekday;
@@ -41,14 +55,20 @@ abstract class AppStrings {
   String get fmtYyyymmdd;
   String get fmtLongDate;
 
-  // Semester goals
-  String get addGoal;
-  String get noGoals;
+  // Semester targets
+  String get addTarget;
+  String get noTargets;
+  String get editTarget;
   String goalProgress(int done, int total);
   String get milestones;
   String get addMilestone;
+  String get backToCurrentSem;
+  String get goalNotes;
 
   // Future goals
+  String get addGoal;
+  String get noGoals;
+  String get editGoal;
   String get category;
   String get catAll;
   String get catExchange;
@@ -57,8 +77,24 @@ abstract class AppStrings {
   String get catCertification;
   String get catPerformance;
   String get catOther;
-  String get startTime;
-  String get endTime;
+  String get startSemester;
+  String get endSemester;
   String get subgoals;
   String get addSubgoal;
+  String get editTask;
+  String get save;
+  String get addCategory;
+  String get categoryName;
+  String get linkedFutureGoal;
+  String get selectFutureGoal;
+  String get noLink;
+  String get more;
+
+  // Semester system settings
+  String get semesterSettings;
+  String get semesterCount;
+  String get twoSemesters;
+  String get threeSemesters;
+  String get fourSemesters;
+  String get semesterStartMonth;
 }

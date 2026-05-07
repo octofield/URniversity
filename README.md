@@ -69,6 +69,7 @@ Three layers can be used independently. However, there are linking relations bet
 - Postman : API testing and development tool.
 
 ### Prototype Validation Goals
+- Flutter environment setup
 - Basic UI structure
 - Available Today / Semester / Future pages
 - Add tasks to today and goals future

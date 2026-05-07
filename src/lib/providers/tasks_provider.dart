@@ -4,7 +4,15 @@ import '../models/task.dart';
 class TasksNotifier extends StateNotifier<List<Task>> {
   TasksNotifier() : super([]);
 
-  void add(String title, {String? content, int priority = 1, DateTime? dueTime}) {
+  void add(
+    String title, {
+    String? content,
+    int priority = 1,
+    DateTime? dueTime,
+    RecurrenceRule? recurrence,
+    String? linkedTargetId,
+    String? linkedGoalId,
+  }) {
     state = [
       ...state,
       Task(
@@ -14,6 +22,9 @@ class TasksNotifier extends StateNotifier<List<Task>> {
         dueTime: dueTime,
         priority: priority,
         createdAt: DateTime.now(),
+        recurrence: recurrence,
+        linkedTargetId: linkedTargetId,
+        linkedGoalId: linkedGoalId,
       ),
     ];
   }
@@ -23,6 +34,10 @@ class TasksNotifier extends StateNotifier<List<Task>> {
       for (final task in state)
         if (task.id == id) task.copyWith(isCompleted: !task.isCompleted) else task,
     ];
+  }
+
+  void update(Task task) {
+    state = [for (final t in state) if (t.id == task.id) task else t];
   }
 
   void remove(String id) {
