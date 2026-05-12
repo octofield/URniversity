@@ -98,6 +98,11 @@ abstract class AppStrings {
   String get fourSemesters;
   String get semesterStartMonth;
 
+  // Goal detail screen
+  String get goalDetail;
+  String get linkedTasks;
+  String get linkedTargets;
+
   // Trash
   String get trash;
   String get restore;

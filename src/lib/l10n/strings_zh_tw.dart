@@ -98,6 +98,10 @@ class StringsZhTw implements AppStrings {
   @override String get fourSemesters => '四學期制';
   @override String get semesterStartMonth => '開始月份';
 
+  @override String get goalDetail => '願景詳情';
+  @override String get linkedTasks => '連結的任務';
+  @override String get linkedTargets => '連結的學期目標';
+
   @override String get trash => '垃圾桶';
   @override String get restore => '復原';
   @override String get emptyTrash => '清空垃圾桶';

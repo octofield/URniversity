@@ -10,6 +10,7 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
+import 'future_goal_detail_screen.dart';
 import 'settings_screen.dart';
 
 class FutureScreen extends ConsumerStatefulWidget {
@@ -386,170 +387,116 @@ class _GoalCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border, width: 1),
       ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xs,
-        ),
-        childrenPadding: EdgeInsets.zero,
-        leading: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: catC.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          child: Icon(catIcon(primaryCat), color: catC, size: 20),
-        ),
-        title: Text(
-          goal.title,
-          style: Theme.of(context).textTheme.titleMedium,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (goal.startSemester != null || goal.endSemester != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 2, bottom: 2),
-                child: Text(
-                  [
-                    if (goal.startSemester != null) goal.startSemester!,
-                    if (goal.startSemester != null &&
-                        goal.endSemester != null)
-                      '→',
-                    if (goal.endSemester != null) goal.endSemester!,
-                  ].join(' '),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            if (goal.notes != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  goal.notes!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            if (total > 0) ...[
-              const SizedBox(height: 2),
-              Text(s.goalProgress(done, total),
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: AppSpacing.xs),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.full),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                  color: catC,
-                  backgroundColor: AppColors.surfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () => _showEditGoalSheet(context, ref, goal),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 18),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                ref.read(trashProvider.notifier).addFutureGoal(goal);
-                notifier.remove(goal.id);
-              },
-            ),
-            const Icon(Icons.expand_more),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Divider(height: 1),
-          if (children.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: 12,
-              ),
-              child: Text(
-                s.subgoals,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textTertiary,
-                ),
+          // Summary row — taps to open detail screen
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FutureGoalDetailScreen(goalId: goal.id),
               ),
             ),
-          for (final child in children)
-            ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.only(left: 12, right: 4),
-              leading: GestureDetector(
-                onTap: () => notifier.toggleDone(child.id),
-                child: Icon(
-                  child.isDone
-                      ? Icons.check_circle
-                      : Icons.check_circle_outline,
-                  color: child.isDone
-                      ? AppColors.primary
-                      : AppColors.textTertiary,
-                  size: 20,
-                ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.sm,
               ),
-              title: Text(
-                child.title,
-                style: TextStyle(
-                  decoration:
-                      child.isDone ? TextDecoration.lineThrough : null,
-                  color: child.isDone ? AppColors.textTertiary : null,
-                  fontSize: 14,
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: catC.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(catIcon(primaryCat), color: catC, size: 20),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(goal.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        if (goal.startSemester != null ||
+                            goal.endSemester != null)
+                          Text(
+                            [
+                              if (goal.startSemester != null)
+                                goal.startSemester!,
+                              if (goal.startSemester != null &&
+                                  goal.endSemester != null)
+                                '→',
+                              if (goal.endSemester != null)
+                                goal.endSemester!,
+                            ].join(' '),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: AppColors.primary),
+                          ),
+                        if (goal.notes != null)
+                          Text(goal.notes!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                      color: AppColors.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        if (total > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(s.goalProgress(done, total),
+                              style:
+                                  Theme.of(context).textTheme.bodySmall),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.full),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 4,
+                              color: catC,
+                              backgroundColor: AppColors.surfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
                   IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
                     onPressed: () =>
-                        _showEditGoalSheet(context, ref, child),
+                        showEditFutureGoalSheet(context, ref, goal),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 16),
-                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.delete_outline, size: 18),
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
                     onPressed: () {
-                      ref
-                          .read(trashProvider.notifier)
-                          .addFutureGoal(child);
-                      notifier.remove(child.id);
+                      ref.read(trashProvider.notifier).addFutureGoal(goal);
+                      notifier.remove(goal.id);
                     },
                   ),
+                  const Icon(Icons.arrow_forward_ios,
+                      size: 13, color: AppColors.textTertiary),
                 ],
               ),
             ),
-          ListTile(
-            dense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            leading:
-                const Icon(Icons.add, size: 20, color: AppColors.primary),
-            title: Text(s.addSubgoal,
-                style: const TextStyle(
-                    color: AppColors.primary, fontSize: 14)),
-            onTap: () =>
-                showAddFutureGoalSheet(context, ref, parentId: goal.id),
           ),
+          // Sub-goal tree (shown when there are children)
+          if (total > 0) ...[
+            const Divider(height: 1),
+            GoalSubtreeView(parentId: goal.id),
+            const SizedBox(height: AppSpacing.xs),
+          ],
         ],
       ),
     );
@@ -750,7 +697,7 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
   );
 }
 
-void _showEditGoalSheet(
+void showEditFutureGoalSheet(
     BuildContext context, WidgetRef ref, FutureGoal goal) {
   final titleCtrl = TextEditingController(text: goal.title);
   final notesCtrl = TextEditingController(text: goal.notes ?? '');
