@@ -5,7 +5,7 @@ class StringsJp implements AppStrings {
 
   @override String get appName => 'URniversity';
   @override String get settings => '設定';
-  @override String get backToToday => '今日';
+  @override String get backToToday => '今日に戻る';
   @override String get add => '追加';
   @override String get titleField => 'タイトル';
   @override String get language => '言語';
@@ -108,4 +108,19 @@ class StringsJp implements AppStrings {
   @override String get noTrash => 'ゴミ箱は空です';
   @override String get markDone => '完了にする';
   @override String get markUndone => '未完了に戻す';
+
+  @override String get dailyTasks => '今日';
+  @override String get weeklyTasks => '今週';
+  @override String get allTasks => 'すべてのタスク';
+  @override String get createdAtLabel => '作成日時';
+  @override String get completedTasks => '完了したタスク';
+  @override String get delete => '削除';
+  @override String weekdayShort(int weekday) {
+    const names = ['月', '火', '水', '木', '金', '土', '日'];
+    return names[weekday - 1];
+  }
+  @override String get addLinkedTask => 'タスクをリンク';
+  @override String get addLinkedTarget => 'ターゲットをリンク';
+  @override String get addLinkedGoal => 'ゴールをリンク';
+  @override String get selectTask => 'タスクを選択';
 }

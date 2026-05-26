@@ -42,6 +42,38 @@ class Task {
     this.linkedGoalId,
   });
 
+  factory Task.fromJson(Map<String, dynamic> j) => Task(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    content: j['content'] as String?,
+    dueTime: j['due_time'] != null ? DateTime.parse(j['due_time'] as String) : null,
+    priority: j['priority'] as int? ?? 1,
+    isCompleted: j['is_completed'] as bool? ?? false,
+    createdAt: DateTime.parse(j['created_at'] as String),
+    recurrence: j['recurrence_type'] != null
+        ? RecurrenceRule(
+            type: RecurrenceType.values.byName(j['recurrence_type'] as String),
+            interval: j['recurrence_interval'] as int? ?? 1,
+          )
+        : null,
+    linkedTargetId: j['linked_target_id'] as String?,
+    linkedGoalId: j['linked_goal_id'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'content': content,
+    'due_time': dueTime?.toIso8601String(),
+    'priority': priority,
+    'is_completed': isCompleted,
+    'created_at': createdAt.toIso8601String(),
+    'recurrence_type': (recurrence != null && !recurrence!.isNone) ? recurrence!.type.name : null,
+    'recurrence_interval': (recurrence != null && !recurrence!.isNone) ? recurrence!.interval : null,
+    'linked_target_id': linkedTargetId,
+    'linked_goal_id': linkedGoalId,
+  };
+
   Task copyWith({
     String? title,
     String? content,

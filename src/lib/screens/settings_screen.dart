@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/settings_provider.dart';
 import 'trash_screen.dart';
@@ -45,10 +46,42 @@ class SettingsScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const TrashScreen()),
             ),
           ),
+          const Divider(),
+          ListTile(
+            title: const Text('登出', style: TextStyle(color: AppColors.error)),
+            leading: const Icon(Icons.logout, color: AppColors.error),
+            onTap: () => _confirmLogout(context),
+          ),
         ],
       ),
     );
   }
+}
+
+void _confirmLogout(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (dlgCtx) => AlertDialog(
+      title: const Text('登出'),
+      content: const Text('確定要登出嗎？'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(dlgCtx);
+            await Supabase.instance.client.auth.signOut();
+            if (context.mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
+          child: const Text('登出', style: TextStyle(color: AppColors.error)),
+        ),
+      ],
+    ),
+  );
 }
 
 String _semesterSettingsLabel(SemesterSettings settings, dynamic s) {

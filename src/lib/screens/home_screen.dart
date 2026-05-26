@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/settings_provider.dart';
-import 'today_screen.dart' show TodayScreen, showAddTaskSheet;
+import 'today_screen.dart' show TodayScreen, showAddTaskSheet, showAddInspirationSheet;
 import 'semester_screen.dart';
+import 'semester_goal_detail_screen.dart' show showAddSemesterGoalSheet;
 import 'future_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -21,12 +22,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final s = ref.watch(stringsProvider);
 
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: const [
-          TodayScreen(),
-          SemesterScreen(),
-          FutureScreen(),
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _index,
+            children: const [
+              TodayScreen(),
+              SemesterScreen(),
+              FutureScreen(),
+            ],
+          ),
+          if (_index == 0)
+            Positioned(
+              left: 16,
+              bottom: 16,
+              child: Material(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(24),
+                elevation: 3,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () => showAddInspirationSheet(context, ref),
+                  child: const SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(Icons.cloud_outlined, size: 34, color: AppColors.primary),
+                        Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(Icons.lightbulb_outline, size: 17, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: switch (_index) {

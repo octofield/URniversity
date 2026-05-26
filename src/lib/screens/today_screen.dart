@@ -5,41 +5,60 @@ import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
 import '../models/task.dart';
-import '../models/inspiration.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/inspirations_provider.dart';
-import '../providers/concentration_provider.dart';
 import '../providers/date_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/future_goals_provider.dart';
 import 'settings_screen.dart';
 
-class TodayScreen extends ConsumerWidget {
+class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends ConsumerState<TodayScreen> {
+  late DateTime _weekStart;
+
+  @override
+  void initState() {
+    super.initState();
+    _weekStart = _mondayOf(DateTime.now());
+  }
+
+  DateTime _mondayOf(DateTime date) {
+    final offset = date.weekday - 1;
+    return DateTime(date.year, date.month, date.day - offset);
+  }
+
+  void _prevWeek() => setState(() => _weekStart = _weekStart.subtract(const Duration(days: 7)));
+  void _nextWeek() => setState(() => _weekStart = _weekStart.add(const Duration(days: 7)));
+
+  @override
+  Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+    final taskView = ref.watch(taskViewProvider);
     final selectedDate = ref.watch(dateProvider);
     final dateFormat = ref.watch(settingsProvider);
     final now = DateTime.now();
     final isToday = selectedDate.year == now.year &&
         selectedDate.month == now.month &&
         selectedDate.day == now.day;
+    final weekEnd = _weekStart.add(const Duration(days: 6));
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.pageHorizontal,
-          AppSpacing.pageTop,
-          AppSpacing.pageHorizontal,
-          AppSpacing.xl,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageHorizontal, AppSpacing.pageTop,
+              AppSpacing.pageHorizontal, 0,
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
@@ -57,56 +76,266 @@ class TodayScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            Row(
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+            child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => ref.read(dateProvider.notifier).prev(),
-                ),
-                Text(
-                  formatDate(selectedDate, dateFormat),
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => ref.read(dateProvider.notifier).next(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
-                    );
-                    if (picked != null) {
-                      ref.read(dateProvider.notifier).setDate(picked);
-                    }
-                  },
-                ),
-                if (!isToday)
-                  TextButton(
-                    onPressed: () => ref.read(dateProvider.notifier).goToToday(),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                    ),
-                    child: Text(s.backToToday),
+                if (taskView == 1) ...[
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => ref.read(dateProvider.notifier).prev(),
                   ),
+                  Text(
+                    formatDate(selectedDate, dateFormat),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => ref.read(dateProvider.notifier).next(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) {
+                        ref.read(dateProvider.notifier).setDate(picked);
+                      }
+                    },
+                  ),
+                  if (!isToday)
+                    TextButton(
+                      onPressed: () => ref.read(dateProvider.notifier).goToToday(),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                      ),
+                      child: Text(s.backToToday),
+                    ),
+                ],
+                const Spacer(),
+                _ViewToggleLabel(label: s.allTasks, active: taskView == 0,
+                    onTap: () => ref.read(taskViewProvider.notifier).state = 0),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                ),
+                _ViewToggleLabel(label: s.dailyTasks, active: taskView == 1,
+                    onTap: () => ref.read(taskViewProvider.notifier).state = 1),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                ),
+                _ViewToggleLabel(label: s.weeklyTasks, active: taskView == 2,
+                    onTap: () => ref.read(taskViewProvider.notifier).state = 2),
               ],
             ),
-            const SizedBox(height: 12),
-            const _SummaryCard(),
-            const SizedBox(height: AppSpacing.lg),
-            const _TasksSection(),
-            const SizedBox(height: AppSpacing.lg),
-            const _InspirationsSection(),
-            const SizedBox(height: AppSpacing.lg),
-            const _ConcentrationSection(),
+          ),
+          if (taskView == 2)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal - 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _prevWeek,
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${_weekStart.month}/${_weekStart.day} – ${weekEnd.month}/${weekEnd.day}',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _nextWeek,
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: taskView == 2
+                ? _WeeklyGrid(weekStart: _weekStart)
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageHorizontal, 12,
+                      AppSpacing.pageHorizontal, AppSpacing.xl,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        _SummaryCard(),
+                        SizedBox(height: AppSpacing.lg),
+                        _TasksSection(),
+                        SizedBox(height: AppSpacing.lg),
+                        _CompletedTasksSection(),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ViewToggleLabel extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const _ViewToggleLabel({required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+          color: active ? AppColors.primary : AppColors.textTertiary,
+        ),
+      ),
+    );
+  }
+}
+
+class _WeeklyGrid extends ConsumerWidget {
+  final DateTime weekStart;
+  const _WeeklyGrid({required this.weekStart});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 8, AppSpacing.pageHorizontal, 80),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (int i = 0; i < 7; i++)
+            _DayColumn(date: weekStart.add(Duration(days: i))),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayColumn extends ConsumerWidget {
+  final DateTime date;
+  const _DayColumn({required this.date});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final normalDate = DateTime(date.year, date.month, date.day);
+    final tasks = ref.watch(tasksForDateProvider(normalDate));
+    final now = DateTime.now();
+    final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+
+    return Container(
+      width: 130,
+      margin: const EdgeInsets.only(right: 8),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: isToday ? AppColors.primary : AppColors.border,
+          width: isToday ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.weekdayShort(date.weekday),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isToday ? AppColors.primary : AppColors.textTertiary,
+                  ),
+                ),
+                Text(
+                  '${date.month}/${date.day}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                    color: isToday ? AppColors.primary : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          if (tasks.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text(
+                '–',
+                style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              ),
+            )
+          else
+            for (final task in tasks)
+              _WeekTaskTile(task: task),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekTaskTile extends ConsumerWidget {
+  final Task task;
+  const _WeekTaskTile({required this.task});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return InkWell(
+      onTap: () => _showEditTaskSheet(context, ref, task),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: task.isCompleted,
+                onChanged: (_) => ref.read(tasksProvider.notifier).toggle(task.id),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                task.title,
+                style: TextStyle(
+                  fontSize: 12,
+                  decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                  color: task.isCompleted ? AppColors.textTertiary : null,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
@@ -120,7 +349,7 @@ class _SummaryCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final tasks = ref.watch(tasksProvider);
+    final tasks = ref.watch(filteredTasksProvider);
     final completed = tasks.where((t) => t.isCompleted).length;
     final total = tasks.length;
     final allDone = total > 0 && completed == total;
@@ -172,7 +401,7 @@ class _TasksSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final tasks = ref.watch(tasksProvider);
+    final tasks = ref.watch(filteredTasksProvider).where((t) => !t.isCompleted).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,6 +436,42 @@ class _TasksSection extends ConsumerWidget {
                     ],
                   ],
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompletedTasksSection extends ConsumerWidget {
+  const _CompletedTasksSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final completed = ref.watch(filteredTasksProvider).where((t) => t.isCompleted).toList();
+
+    if (completed.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(s.completedTasks, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border, width: 1),
+          ),
+          child: Column(
+            children: [
+              for (final task in completed) ...[
+                _TaskTile(task: task),
+                const Divider(height: 1, indent: 56),
+              ],
+            ],
+          ),
         ),
       ],
     );
@@ -327,7 +592,11 @@ class _TaskTile extends ConsumerWidget {
             ),
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 20),
-            onPressed: () => ref.read(tasksProvider.notifier).remove(task.id),
+            onPressed: () async {
+              if (await _confirmDelete(context, s)) {
+                ref.read(tasksProvider.notifier).remove(task.id);
+              }
+            },
           ),
         ],
       ),
@@ -336,126 +605,24 @@ class _TaskTile extends ConsumerWidget {
   }
 }
 
-class _InspirationsSection extends ConsumerWidget {
-  const _InspirationsSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(stringsProvider);
-    final inspirations = ref.watch(inspirationsProvider);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(s.inspirations, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.sm),
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border, width: 1),
-          ),
-          child: Column(
-            children: [
-              for (final inspiration in inspirations) ...[
-                _InspirationCard(inspiration: inspiration),
-                const Divider(height: 1, indent: AppSpacing.md),
-              ],
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                leading: const Icon(Icons.add, color: AppColors.primary),
-                title: Text(
-                  s.addInspiration,
-                  style: const TextStyle(color: AppColors.primary),
-                ),
-                onTap: () => _showAddInspirationSheet(context, ref),
-              ),
-            ],
-          ),
+Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
+  return await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      content: Text('${s.delete}？'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          child: Text(s.delete),
         ),
       ],
-    );
-  }
-}
-
-class _InspirationCard extends ConsumerWidget {
-  final Inspiration inspiration;
-  const _InspirationCard({required this.inspiration});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      title: Text(inspiration.title),
-      subtitle: inspiration.content != null ? Text(inspiration.content!) : null,
-      trailing: IconButton(
-        icon: const Icon(Icons.delete_outline, size: 20),
-        onPressed: () =>
-            ref.read(inspirationsProvider.notifier).remove(inspiration.id),
-      ),
-    );
-  }
-}
-
-class _ConcentrationSection extends ConsumerWidget {
-  const _ConcentrationSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(stringsProvider);
-    final state = ref.watch(concentrationProvider);
-    final notifier = ref.read(concentrationProvider.notifier);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(s.concentration, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.sm),
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border, width: 1),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.timer_outlined,
-                size: 32,
-                color: state.isRunning ? AppColors.primary : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      s.concentrationToday(
-                          _formatDuration(state.totalToday + state.elapsed)),
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    if (state.isRunning)
-                      Text(
-                        s.concentrationSession(_formatDuration(state.elapsed)),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.primary,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              FilledButton.tonal(
-                onPressed: state.isRunning ? notifier.stop : notifier.start,
-                child: Text(state.isRunning ? s.stop : s.start),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+    ),
+  ) ?? false;
 }
 
 // ─── Date+time picker (clock style) ──────────────────────────────────────────
@@ -915,6 +1082,13 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                   const SizedBox(height: AppSpacing.lg),
                   Text(s.editTask,
                       style: Theme.of(sheetCtx).textTheme.titleLarge),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    '${s.createdAtLabel}：${_formatCreatedAt(task.createdAt)}',
+                    style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: titleController,
@@ -1065,7 +1239,7 @@ void _submitTask(
   Navigator.pop(context);
 }
 
-void _showAddInspirationSheet(BuildContext context, WidgetRef ref) {
+void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
   final titleController = TextEditingController();
   final contentController = TextEditingController();
   final s = ref.read(stringsProvider);
@@ -1155,9 +1329,11 @@ String _formatDueTime(DateTime dt) {
   return '$mm/$dd $hh:$min';
 }
 
-String _formatDuration(Duration d) {
-  final h = d.inHours;
-  final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return h > 0 ? '${h}h ${m}m' : '$m:$s';
+String _formatCreatedAt(DateTime dt) {
+  final yyyy = dt.year;
+  final mm = dt.month.toString().padLeft(2, '0');
+  final dd = dt.day.toString().padLeft(2, '0');
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final min = dt.minute.toString().padLeft(2, '0');
+  return '$yyyy/$mm/$dd $hh:$min';
 }

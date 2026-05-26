@@ -570,7 +570,7 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
   final cats = ref.read(categoriesProvider);
   final semesters = generateSemesters(settings);
 
-  var selectedCategories = <String>[FutureCategories.other];
+  var selectedCategories = <String>[];
   String? startSemester = defaultSemester ?? currentSemester(settings);
   String? endSemester;
 
@@ -628,9 +628,7 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
               _categoryChipsMulti(sheetCtx, s, cats, selectedCategories,
                 (cat) => setState(() {
                   if (selectedCategories.contains(cat)) {
-                    if (selectedCategories.length > 1) {
-                      selectedCategories.remove(cat);
-                    }
+                    selectedCategories.remove(cat);
                   } else {
                     selectedCategories.add(cat);
                   }
@@ -677,7 +675,7 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                     ref.read(futureGoalsProvider.notifier).addGoal(
                       parentId: parentId,
                       title: titleCtrl.text.trim(),
-                      categories: selectedCategories,
+                      categories: selectedCategories.isEmpty ? [FutureCategories.other] : selectedCategories,
                       startSemester: startSemester,
                       endSemester: endSemester,
                       notes: notesCtrl.text.trim().isEmpty
@@ -762,9 +760,7 @@ void showEditFutureGoalSheet(
               _categoryChipsMulti(sheetCtx, s, cats, selectedCategories,
                 (cat) => setState(() {
                   if (selectedCategories.contains(cat)) {
-                    if (selectedCategories.length > 1) {
-                      selectedCategories.remove(cat);
-                    }
+                    selectedCategories.remove(cat);
                   } else {
                     selectedCategories.add(cat);
                   }
@@ -811,7 +807,7 @@ void showEditFutureGoalSheet(
                     ref.read(futureGoalsProvider.notifier).updateGoal(
                       goal.id,
                       title: titleCtrl.text.trim(),
-                      categories: selectedCategories,
+                      categories: selectedCategories.isEmpty ? [FutureCategories.other] : selectedCategories,
                       startSemester: startSemester,
                       endSemester: endSemester,
                       notes: notesCtrl.text.trim().isEmpty

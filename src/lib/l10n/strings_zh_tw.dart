@@ -5,7 +5,7 @@ class StringsZhTw implements AppStrings {
 
   @override String get appName => 'URniversity';
   @override String get settings => '設定';
-  @override String get backToToday => '今天';
+  @override String get backToToday => '回到今天';
   @override String get add => '新增';
   @override String get titleField => '標題';
   @override String get language => '語言';
@@ -108,4 +108,19 @@ class StringsZhTw implements AppStrings {
   @override String get noTrash => '垃圾桶是空的';
   @override String get markDone => '標記完成';
   @override String get markUndone => '取消完成';
+
+  @override String get dailyTasks => '當日任務';
+  @override String get weeklyTasks => '當週任務';
+  @override String get allTasks => '所有任務';
+  @override String get createdAtLabel => '建立時間';
+  @override String get completedTasks => '已完成的任務';
+  @override String get delete => '刪除';
+  @override String weekdayShort(int weekday) {
+    const names = ['一', '二', '三', '四', '五', '六', '日'];
+    return names[weekday - 1];
+  }
+  @override String get addLinkedTask => '新增連結任務';
+  @override String get addLinkedTarget => '新增連結目標';
+  @override String get addLinkedGoal => '新增連結願景';
+  @override String get selectTask => '選擇任務';
 }

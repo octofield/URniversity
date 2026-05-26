@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/semester_goal.dart';
 import 'settings_provider.dart';
 
-// Find current semester given settings; robust algorithm based on most-recent start
 String currentSemester(SemesterSettings settings) {
   final now = DateTime.now();
   final rocYear = now.year - 1911;
@@ -50,32 +50,64 @@ final selectedSemesterProvider = StateProvider<String>(
 class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
   SemesterGoalsNotifier() : super([]);
 
+  String? _userId;
+  SupabaseClient get _db => Supabase.instance.client;
+
+  Future<void> load(String userId) async {
+    if (_userId == userId) return;
+    _userId = userId;
+    try {
+      final rows = await _db.from('semester_goals').select().eq('user_id', userId);
+      state = (rows as List<dynamic>)
+          .map((r) => SemesterGoal.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      _userId = null;
+    }
+  }
+
+  void clear() {
+    _userId = null;
+    state = [];
+  }
+
+  void _upsert(SemesterGoal goal) {
+    if (_userId == null) return;
+    _db.from('semester_goals')
+        .upsert({...goal.toJson(), 'user_id': _userId})
+        .catchError((_) {});
+  }
+
+  void _delete(String id) {
+    if (_userId == null) return;
+    _db.from('semester_goals').delete().eq('id', id).catchError((_) {});
+  }
+
   void addGoal(
     String title,
     String semester, {
     String? parentId,
-    String category = 'other',
+    List<String> categories = const [],
     String? futureGoalId,
     String? notes,
   }) {
-    state = [
-      ...state,
-      SemesterGoal(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        parentId: parentId,
-        title: title,
-        semester: semester,
-        category: category,
-        futureGoalId: futureGoalId,
-        notes: notes,
-      ),
-    ];
+    final goal = SemesterGoal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      parentId: parentId,
+      title: title,
+      semester: semester,
+      categories: categories.isEmpty ? ['other'] : categories,
+      futureGoalId: futureGoalId,
+      notes: notes,
+    );
+    state = [...state, goal];
+    _upsert(goal);
   }
 
   void updateGoal(
     String goalId, {
     required String title,
-    required String category,
+    required List<String> categories,
     String? futureGoalId,
     String? notes,
   }) {
@@ -87,7 +119,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
             parentId: g.parentId,
             title: title,
             semester: g.semester,
-            category: category,
+            categories: categories.isEmpty ? ['other'] : categories,
             futureGoalId: futureGoalId,
             notes: notes,
             isDone: g.isDone,
@@ -95,6 +127,8 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
         else
           g,
     ];
+    final updated = state.where((g) => g.id == goalId).firstOrNull;
+    if (updated != null) _upsert(updated);
   }
 
   void toggleDone(String goalId) {
@@ -102,9 +136,10 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
       for (final g in state)
         if (g.id == goalId) g.copyWith(isDone: !g.isDone) else g,
     ];
+    final updated = state.where((g) => g.id == goalId).firstOrNull;
+    if (updated != null) _upsert(updated);
   }
 
-  // Returns the goal and ALL its descendants (for cascading trash)
   List<SemesterGoal> getWithDescendants(String goalId) {
     final result = <SemesterGoal>[];
     void collect(String id) {
@@ -122,16 +157,27 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
   void remove(String goalId) {
     final toRemove = getWithDescendants(goalId).map((g) => g.id).toSet();
     state = state.where((g) => !toRemove.contains(g.id)).toList();
+    for (final id in toRemove) {
+      _delete(id);
+    }
+  }
+
+  void linkFutureGoal(String goalId, String? futureGoalId) {
+    state = [
+      for (final g in state)
+        if (g.id == goalId) g.copyWith(futureGoalId: futureGoalId) else g,
+    ];
+    final updated = state.where((g) => g.id == goalId).firstOrNull;
+    if (updated != null) _upsert(updated);
   }
 
   void restore(SemesterGoal goal) {
     if (!state.any((g) => g.id == goal.id)) {
-      final parentExists = goal.parentId == null ||
-          state.any((g) => g.id == goal.parentId);
-      state = [
-        ...state,
-        parentExists ? goal : goal.copyWith(parentId: null),
-      ];
+      final parentExists =
+          goal.parentId == null || state.any((g) => g.id == goal.parentId);
+      final restored = parentExists ? goal : goal.copyWith(parentId: null);
+      state = [...state, restored];
+      _upsert(restored);
     }
   }
 }

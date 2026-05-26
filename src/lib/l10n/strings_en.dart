@@ -5,7 +5,7 @@ class StringsEn implements AppStrings {
 
   @override String get appName => 'URniversity';
   @override String get settings => 'Settings';
-  @override String get backToToday => 'Today';
+  @override String get backToToday => 'Back to Today';
   @override String get add => 'Add';
   @override String get titleField => 'Title';
   @override String get language => 'Language';
@@ -108,4 +108,19 @@ class StringsEn implements AppStrings {
   @override String get noTrash => 'Trash is empty';
   @override String get markDone => 'Mark Done';
   @override String get markUndone => 'Unmark Done';
+
+  @override String get dailyTasks => 'Today';
+  @override String get weeklyTasks => 'This Week';
+  @override String get allTasks => 'All Tasks';
+  @override String get createdAtLabel => 'Created';
+  @override String get completedTasks => 'Completed Tasks';
+  @override String get delete => 'Delete';
+  @override String weekdayShort(int weekday) {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return names[weekday - 1];
+  }
+  @override String get addLinkedTask => 'Link Task';
+  @override String get addLinkedTarget => 'Link Target';
+  @override String get addLinkedGoal => 'Link Goal';
+  @override String get selectTask => 'Select Task';
 }
