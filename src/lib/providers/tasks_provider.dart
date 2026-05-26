@@ -63,14 +63,29 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     _upsert(task);
   }
 
-  void toggle(String id) {
-    state = [
-      for (final task in state)
-        if (task.id == id) task.copyWith(isCompleted: !task.isCompleted) else task,
-    ];
-    final updated = state.where((t) => t.id == id).firstOrNull;
-    if (updated != null) _upsert(updated);
+  void toggleOnDate(String id, DateTime date) {
+    final task = state.where((t) => t.id == id).firstOrNull;
+    if (task == null) return;
+
+    final Task updated;
+    if (task.recurrence == null || task.recurrence!.isNone) {
+      updated = task.copyWith(isCompleted: !task.isCompleted);
+    } else {
+      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final newDates = List<String>.from(task.completedDates);
+      if (newDates.contains(key)) {
+        newDates.remove(key);
+      } else {
+        newDates.add(key);
+      }
+      updated = task.copyWith(completedDates: newDates);
+    }
+
+    state = [for (final t in state) if (t.id == id) updated else t];
+    _upsert(updated);
   }
+
+  void toggle(String id) => toggleOnDate(id, DateTime.now());
 
   void update(Task task) {
     state = [for (final t in state) if (t.id == task.id) task else t];
