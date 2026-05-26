@@ -10,6 +10,7 @@ import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../utils/category_helpers.dart';
 import 'future_screen.dart';
+import 'semester_goal_detail_screen.dart';
 
 class FutureGoalDetailScreen extends ConsumerWidget {
   final String goalId;
@@ -177,7 +178,21 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis)
                   : null,
+              trailing: IconButton(
+                icon: const Icon(Icons.link_off, size: 18),
+                color: AppColors.textTertiary,
+                onPressed: () => ref.read(tasksProvider.notifier).update(
+                  task.copyWith(linkedGoalId: null),
+                ),
+              ),
             ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.add_link, color: AppColors.primary),
+            title: Text(s.addLinkedTask,
+                style: const TextStyle(color: AppColors.primary)),
+            onTap: () => _showTaskSelectorForGoal(context, ref, goalId),
+          ),
 
           const Divider(),
 
@@ -215,7 +230,35 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                       .textTheme
                       .bodySmall
                       ?.copyWith(color: AppColors.textSecondary)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.link_off, size: 18),
+                    color: AppColors.textTertiary,
+                    onPressed: () => ref
+                        .read(semesterGoalsProvider.notifier)
+                        .linkFutureGoal(target.id, null),
+                  ),
+                  const Icon(Icons.arrow_forward_ios,
+                      size: 12, color: AppColors.textTertiary),
+                ],
+              ),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SemesterGoalDetailScreen(goalId: target.id),
+                ),
+              ),
             ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.add_link, color: AppColors.primary),
+            title: Text(s.addLinkedTarget,
+                style: const TextStyle(color: AppColors.primary)),
+            onTap: () => _showTargetSelectorForGoal(context, ref, goalId),
+          ),
         ],
       ),
     );
@@ -400,4 +443,134 @@ class _CategoryBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showTaskSelectorForGoal(
+    BuildContext context, WidgetRef ref, String goalId) {
+  final s = ref.read(stringsProvider);
+  showDialog(
+    context: context,
+    builder: (dlgCtx) => AlertDialog(
+      title: Text(s.selectTask),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Consumer(
+          builder: (_, dlgRef, _) {
+            final tasks = dlgRef.watch(tasksProvider);
+            if (tasks.isEmpty) {
+              return Text(s.noTasks,
+                  style: const TextStyle(color: AppColors.textTertiary));
+            }
+            return ListView(
+              shrinkWrap: true,
+              children: [
+                for (final task in tasks)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      task.linkedGoalId == goalId
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: task.linkedGoalId == goalId
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                    title: Text(task.title,
+                        style: TextStyle(
+                          color: task.linkedGoalId == goalId
+                              ? AppColors.textTertiary
+                              : null,
+                        )),
+                    enabled: task.linkedGoalId != goalId,
+                    onTap: task.linkedGoalId == goalId
+                        ? null
+                        : () {
+                            dlgRef.read(tasksProvider.notifier).update(
+                              task.copyWith(linkedGoalId: goalId),
+                            );
+                            Navigator.pop(dlgCtx);
+                          },
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showTargetSelectorForGoal(
+    BuildContext context, WidgetRef ref, String goalId) {
+  final s = ref.read(stringsProvider);
+  showDialog(
+    context: context,
+    builder: (dlgCtx) => AlertDialog(
+      title: Text(s.selectTarget),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Consumer(
+          builder: (_, dlgRef, _) {
+            final targets = dlgRef
+                .watch(semesterGoalsProvider)
+                .where((g) => g.parentId == null)
+                .toList();
+            if (targets.isEmpty) {
+              return Text(s.noTargets,
+                  style: const TextStyle(color: AppColors.textTertiary));
+            }
+            return ListView(
+              shrinkWrap: true,
+              children: [
+                for (final target in targets)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      target.futureGoalId == goalId
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: target.futureGoalId == goalId
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                    title: Text(target.title,
+                        style: TextStyle(
+                          color: target.futureGoalId == goalId
+                              ? AppColors.textTertiary
+                              : null,
+                        )),
+                    subtitle: Text(target.semester,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary)),
+                    enabled: target.futureGoalId != goalId,
+                    onTap: target.futureGoalId == goalId
+                        ? null
+                        : () {
+                            dlgRef
+                                .read(semesterGoalsProvider.notifier)
+                                .linkFutureGoal(target.id, goalId);
+                            Navigator.pop(dlgCtx);
+                          },
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+      ],
+    ),
+  );
 }

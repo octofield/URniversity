@@ -110,4 +110,17 @@ abstract class AppStrings {
   String get noTrash;
   String get markDone;
   String get markUndone;
+
+  String get dailyTasks;
+  String get weeklyTasks;
+  String get allTasks;
+  String get createdAtLabel;
+  String get completedTasks;
+  String get delete;
+  String weekdayShort(int weekday);
+
+  String get addLinkedTask;
+  String get addLinkedTarget;
+  String get addLinkedGoal;
+  String get selectTask;
 }

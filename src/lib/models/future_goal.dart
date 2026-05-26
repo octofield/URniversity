@@ -41,6 +41,28 @@ class FutureGoal {
     this.isDone = false,
   });
 
+  factory FutureGoal.fromJson(Map<String, dynamic> j) => FutureGoal(
+    id: j['id'] as String,
+    parentId: j['parent_id'] as String?,
+    title: j['title'] as String,
+    categories: (j['categories'] as List<dynamic>).cast<String>(),
+    startSemester: j['start_semester'] as String?,
+    endSemester: j['end_semester'] as String?,
+    notes: j['notes'] as String?,
+    isDone: j['is_done'] as bool? ?? false,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'parent_id': parentId,
+    'title': title,
+    'categories': categories,
+    'start_semester': startSemester,
+    'end_semester': endSemester,
+    'notes': notes,
+    'is_done': isDone,
+  };
+
   FutureGoal copyWith({
     Object? parentId = _sentinel,
     String? title,
