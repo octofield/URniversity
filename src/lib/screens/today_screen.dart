@@ -37,6 +37,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   void _prevWeek() => setState(() => _weekStart = _weekStart.subtract(const Duration(days: 7)));
   void _nextWeek() => setState(() => _weekStart = _weekStart.add(const Duration(days: 7)));
 
+  bool get _isCurrentWeek {
+    final today = DateTime.now();
+    final monday = _mondayOf(today);
+    return _weekStart.year == monday.year &&
+        _weekStart.month == monday.month &&
+        _weekStart.day == monday.day;
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
@@ -78,10 +86,32 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 2),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (taskView == 1) ...[
+                _ViewToggleLabel(label: s.allTasks, active: taskView == 0,
+                    onTap: () => ref.read(taskViewProvider.notifier).state = 0),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                ),
+                _ViewToggleLabel(label: s.dailyTasks, active: taskView == 1,
+                    onTap: () => ref.read(taskViewProvider.notifier).state = 1),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+                ),
+                _ViewToggleLabel(label: s.weeklyTasks, active: taskView == 2,
+                    onTap: () => ref.read(taskViewProvider.notifier).state = 2),
+              ],
+            ),
+          ),
+          if (taskView == 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+              child: Row(
+                children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     visualDensity: VisualDensity.compact,
@@ -121,24 +151,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       child: Text(s.backToToday),
                     ),
                 ],
-                const Spacer(),
-                _ViewToggleLabel(label: s.allTasks, active: taskView == 0,
-                    onTap: () => ref.read(taskViewProvider.notifier).state = 0),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                ),
-                _ViewToggleLabel(label: s.dailyTasks, active: taskView == 1,
-                    onTap: () => ref.read(taskViewProvider.notifier).state = 1),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                ),
-                _ViewToggleLabel(label: s.weeklyTasks, active: taskView == 2,
-                    onTap: () => ref.read(taskViewProvider.notifier).state = 2),
-              ],
+              ),
             ),
-          ),
           if (taskView == 2)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal - 8),
@@ -161,6 +175,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     visualDensity: VisualDensity.compact,
                     onPressed: _nextWeek,
                   ),
+                  if (!_isCurrentWeek)
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _weekStart = _mondayOf(DateTime.now()));
+                        ref.read(dateProvider.notifier).goToToday();
+                      },
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                      ),
+                      child: Text(s.backToToday),
+                    ),
                 ],
               ),
             ),
@@ -212,20 +238,55 @@ class _ViewToggleLabel extends StatelessWidget {
   }
 }
 
-class _WeeklyGrid extends ConsumerWidget {
+class _WeeklyGrid extends ConsumerStatefulWidget {
   final DateTime weekStart;
   const _WeeklyGrid({required this.weekStart});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WeeklyGrid> createState() => _WeeklyGridState();
+}
+
+class _WeeklyGridState extends ConsumerState<_WeeklyGrid> {
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _scrollToDay(int index) {
+    if (!_scrollCtrl.hasClients) return;
+    const colWidth = 130.0;
+    const gap = 8.0;
+    const hPad = AppSpacing.pageHorizontal;
+    final viewportWidth = MediaQuery.of(context).size.width;
+    final target = hPad + index * (colWidth + gap) + colWidth / 2 - viewportWidth / 2;
+    _scrollCtrl.animateTo(
+      target.clamp(0.0, _scrollCtrl.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(dateProvider, (_, next) {
+      final dayIndex = next.difference(widget.weekStart).inDays;
+      if (dayIndex >= 0 && dayIndex < 7) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToDay(dayIndex));
+      }
+    });
+
     return SingleChildScrollView(
+      controller: _scrollCtrl,
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 8, AppSpacing.pageHorizontal, 80),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < 7; i++)
-            _DayColumn(date: weekStart.add(Duration(days: i))),
+            _DayColumn(date: widget.weekStart.add(Duration(days: i))),
         ],
       ),
     );
@@ -241,8 +302,13 @@ class _DayColumn extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final normalDate = DateTime(date.year, date.month, date.day);
     final tasks = ref.watch(tasksForDateProvider(normalDate));
+    final selectedDate = ref.watch(dateProvider);
     final now = DateTime.now();
     final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+    final isFocused = date.year == selectedDate.year &&
+        date.month == selectedDate.month &&
+        date.day == selectedDate.day;
+    final headerColor = isToday ? AppColors.primary : (isFocused ? AppColors.primary : AppColors.textTertiary);
 
     return Container(
       width: 130,
@@ -252,50 +318,47 @@ class _DayColumn extends ConsumerWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: isToday ? AppColors.primary : AppColors.border,
-          width: isToday ? 1.5 : 1,
+          color: (isToday || isFocused) ? AppColors.primary : AppColors.border,
+          width: (isToday || isFocused) ? 1.5 : 1,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  s.weekdayShort(date.weekday),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isToday ? AppColors.primary : AppColors.textTertiary,
-                  ),
-                ),
-                Text(
-                  '${date.month}/${date.day}',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                    color: isToday ? AppColors.primary : null,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          if (tasks.isEmpty)
+      child: InkWell(
+        onTap: () => ref.read(dateProvider.notifier).setDate(normalDate),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Padding(
-              padding: const EdgeInsets.all(10),
-              child: Text(
-                '–',
-                style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.weekdayShort(date.weekday),
+                    style: TextStyle(fontSize: 11, color: headerColor),
+                  ),
+                  Text(
+                    '${date.month}/${date.day}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: (isToday || isFocused) ? FontWeight.bold : FontWeight.normal,
+                      color: headerColor,
+                    ),
+                  ),
+                ],
               ),
-            )
-          else
-            for (final task in tasks)
-              _WeekTaskTile(task: task),
-        ],
+            ),
+            const Divider(height: 1),
+            if (tasks.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text('–', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+              )
+            else
+              for (final task in tasks)
+                _WeekTaskTile(task: task, date: normalDate),
+          ],
+        ),
       ),
     );
   }
@@ -303,10 +366,12 @@ class _DayColumn extends ConsumerWidget {
 
 class _WeekTaskTile extends ConsumerWidget {
   final Task task;
-  const _WeekTaskTile({required this.task});
+  final DateTime date;
+  const _WeekTaskTile({required this.task, required this.date});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isCompleted = task.isCompletedOn(date);
     return InkWell(
       onTap: () => _showEditTaskSheet(context, ref, task),
       child: Padding(
@@ -317,8 +382,8 @@ class _WeekTaskTile extends ConsumerWidget {
               width: 24,
               height: 24,
               child: Checkbox(
-                value: task.isCompleted,
-                onChanged: (_) => ref.read(tasksProvider.notifier).toggle(task.id),
+                value: isCompleted,
+                onChanged: (_) => ref.read(tasksProvider.notifier).toggleOnDate(task.id, date),
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -329,8 +394,8 @@ class _WeekTaskTile extends ConsumerWidget {
                 task.title,
                 style: TextStyle(
                   fontSize: 12,
-                  decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                  color: task.isCompleted ? AppColors.textTertiary : null,
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                  color: isCompleted ? AppColors.textTertiary : null,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -350,7 +415,8 @@ class _SummaryCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final tasks = ref.watch(filteredTasksProvider);
-    final completed = tasks.where((t) => t.isCompleted).length;
+    final date = ref.watch(dateProvider);
+    final completed = tasks.where((t) => t.isCompletedOn(date)).length;
     final total = tasks.length;
     final allDone = total > 0 && completed == total;
 
@@ -401,7 +467,8 @@ class _TasksSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final tasks = ref.watch(filteredTasksProvider).where((t) => !t.isCompleted).toList();
+    final date = ref.watch(dateProvider);
+    final tasks = ref.watch(filteredTasksProvider).where((t) => !t.isCompletedOn(date)).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,7 +515,8 @@ class _CompletedTasksSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final completed = ref.watch(filteredTasksProvider).where((t) => t.isCompleted).toList();
+    final date = ref.watch(dateProvider);
+    final completed = ref.watch(filteredTasksProvider).where((t) => t.isCompletedOn(date)).toList();
 
     if (completed.isEmpty) return const SizedBox.shrink();
 
@@ -485,6 +553,9 @@ class _TaskTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
+    final date = ref.watch(dateProvider);
+    final effectiveDate = DateTime(date.year, date.month, date.day);
+    final isCompleted = task.isCompletedOn(effectiveDate);
     final targets = ref.watch(semesterGoalsProvider);
     final goals = ref.watch(futureGoalsProvider);
 
@@ -498,14 +569,14 @@ class _TaskTile extends ConsumerWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       leading: Checkbox(
-        value: task.isCompleted,
-        onChanged: (_) => ref.read(tasksProvider.notifier).toggle(task.id),
+        value: isCompleted,
+        onChanged: (_) => ref.read(tasksProvider.notifier).toggleOnDate(task.id, effectiveDate),
       ),
       title: Text(
         task.title,
         style: TextStyle(
-          decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-          color: task.isCompleted ? AppColors.textTertiary : null,
+          decoration: isCompleted ? TextDecoration.lineThrough : null,
+          color: isCompleted ? AppColors.textTertiary : null,
         ),
       ),
       subtitle: Column(

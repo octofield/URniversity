@@ -4,10 +4,12 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/future_goal.dart';
+import '../l10n/app_strings.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import 'future_screen.dart';
 import 'semester_goal_detail_screen.dart';
@@ -386,6 +388,23 @@ class _GoalTreeTile extends ConsumerWidget {
                 ),
               ),
             ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onPressed: () => showEditFutureGoalSheet(context, ref, goal),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 16),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onPressed: () async {
+                if (await _confirmDelete(context, s)) {
+                  ref.read(trashProvider.notifier).addFutureGoal(goal);
+                  ref.read(futureGoalsProvider.notifier).remove(goal.id);
+                }
+              },
+            ),
             const Padding(
               padding: EdgeInsets.only(right: AppSpacing.sm),
               child: Icon(Icons.arrow_forward_ios,
@@ -443,6 +462,26 @@ class _CategoryBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
+  return await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      content: Text('${s.delete}？'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          child: Text(s.delete),
+        ),
+      ],
+    ),
+  ) ?? false;
 }
 
 void _showTaskSelectorForGoal(

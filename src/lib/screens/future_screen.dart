@@ -367,17 +367,8 @@ class _GoalCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(stringsProvider);
     final allGoals = ref.watch(futureGoalsProvider);
     final children = allGoals.where((g) => g.parentId == goal.id).toList();
-    final notifier = ref.read(futureGoalsProvider.notifier);
-    final done = children.where((c) => c.isDone).length;
-    final total = children.length;
-    final progress = total > 0 ? done / total : 0.0;
-    final primaryCat = goal.categories.isNotEmpty
-        ? goal.categories.first
-        : FutureCategories.other;
-    final catC = catColor(primaryCat);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -390,114 +381,119 @@ class _GoalCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Summary row — taps to open detail screen
-          InkWell(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FutureGoalDetailScreen(goalId: goal.id),
+          _FutureGoalCardRow(goal: goal, indent: 0),
+          for (final child in children) ...[
+            const Divider(height: 1),
+            _FutureGoalCardRow(goal: child, indent: 1),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FutureGoalCardRow extends ConsumerWidget {
+  final FutureGoal goal;
+  final int indent;
+  const _FutureGoalCardRow({required this.goal, required this.indent});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final allGoals = ref.watch(futureGoalsProvider);
+    final children = allGoals.where((g) => g.parentId == goal.id).toList();
+    final notifier = ref.read(futureGoalsProvider.notifier);
+    final done = children.where((c) => c.isDone).length;
+    final total = children.length;
+    final progress = total > 0 ? done / total : 0.0;
+    final primaryCat = goal.categories.isNotEmpty
+        ? goal.categories.first
+        : FutureCategories.other;
+    final catC = catColor(primaryCat);
+
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FutureGoalDetailScreen(goalId: goal.id),
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md + indent * 20.0, AppSpacing.sm, AppSpacing.md, AppSpacing.sm,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: catC.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
+              child: Icon(catIcon(primaryCat), color: catC, size: 20),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: catC.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                  Text(goal.title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  if (goal.startSemester != null || goal.endSemester != null)
+                    Text(
+                      [
+                        if (goal.startSemester != null) goal.startSemester!,
+                        if (goal.startSemester != null && goal.endSemester != null) '→',
+                        if (goal.endSemester != null) goal.endSemester!,
+                      ].join(' '),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary),
                     ),
-                    child: Icon(catIcon(primaryCat), color: catC, size: 20),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(goal.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                        if (goal.startSemester != null ||
-                            goal.endSemester != null)
-                          Text(
-                            [
-                              if (goal.startSemester != null)
-                                goal.startSemester!,
-                              if (goal.startSemester != null &&
-                                  goal.endSemester != null)
-                                '→',
-                              if (goal.endSemester != null)
-                                goal.endSemester!,
-                            ].join(' '),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: AppColors.primary),
-                          ),
-                        if (goal.notes != null)
-                          Text(goal.notes!,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                      color: AppColors.textSecondary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                        if (total > 0) ...[
-                          const SizedBox(height: 4),
-                          Text(s.goalProgress(done, total),
-                              style:
-                                  Theme.of(context).textTheme.bodySmall),
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.full),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 4,
-                              color: catC,
-                              backgroundColor: AppColors.surfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ],
+                  if (goal.notes != null)
+                    Text(goal.notes!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  if (total > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(s.goalProgress(done, total),
+                        style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 4,
+                        color: catC,
+                        backgroundColor: AppColors.surfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    onPressed: () =>
-                        showEditFutureGoalSheet(context, ref, goal),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      ref.read(trashProvider.notifier).addFutureGoal(goal);
-                      notifier.remove(goal.id);
-                    },
-                  ),
-                  const Icon(Icons.arrow_forward_ios,
-                      size: 13, color: AppColors.textTertiary),
+                  ],
                 ],
               ),
             ),
-          ),
-          // Sub-goal tree (shown when there are children)
-          if (total > 0) ...[
-            const Divider(height: 1),
-            GoalSubtreeView(parentId: goal.id),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(width: AppSpacing.xs),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onPressed: () => showEditFutureGoalSheet(context, ref, goal),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                ref.read(trashProvider.notifier).addFutureGoal(goal);
+                notifier.remove(goal.id);
+              },
+            ),
+            const Icon(Icons.arrow_forward_ios,
+                size: 13, color: AppColors.textTertiary),
           ],
-        ],
+        ),
       ),
     );
   }

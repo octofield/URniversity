@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class _Absent {
   const _Absent();
 }
@@ -17,6 +19,9 @@ class RecurrenceRule {
   bool get isNone => type == RecurrenceType.none;
 }
 
+String _dateKey(DateTime date) =>
+    '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
 class Task {
   final String id;
   final String title;
@@ -28,6 +33,8 @@ class Task {
   final RecurrenceRule? recurrence;
   final String? linkedTargetId;
   final String? linkedGoalId;
+  // Dates on which a recurring task was completed ("yyyy-MM-dd")
+  final List<String> completedDates;
 
   const Task({
     required this.id,
@@ -40,25 +47,42 @@ class Task {
     this.recurrence,
     this.linkedTargetId,
     this.linkedGoalId,
+    this.completedDates = const [],
   });
 
-  factory Task.fromJson(Map<String, dynamic> j) => Task(
-    id: j['id'] as String,
-    title: j['title'] as String,
-    content: j['content'] as String?,
-    dueTime: j['due_time'] != null ? DateTime.parse(j['due_time'] as String) : null,
-    priority: j['priority'] as int? ?? 1,
-    isCompleted: j['is_completed'] as bool? ?? false,
-    createdAt: DateTime.parse(j['created_at'] as String),
-    recurrence: j['recurrence_type'] != null
-        ? RecurrenceRule(
-            type: RecurrenceType.values.byName(j['recurrence_type'] as String),
-            interval: j['recurrence_interval'] as int? ?? 1,
-          )
-        : null,
-    linkedTargetId: j['linked_target_id'] as String?,
-    linkedGoalId: j['linked_goal_id'] as String?,
-  );
+  bool isCompletedOn(DateTime date) {
+    if (recurrence == null || recurrence!.isNone) return isCompleted;
+    return completedDates.contains(_dateKey(date));
+  }
+
+  factory Task.fromJson(Map<String, dynamic> j) {
+    List<String> completedDates = const [];
+    try {
+      final raw = j['completed_dates'];
+      if (raw is String && raw.isNotEmpty) {
+        completedDates = (jsonDecode(raw) as List).cast<String>();
+      }
+    } catch (_) {}
+
+    return Task(
+      id: j['id'] as String,
+      title: j['title'] as String,
+      content: j['content'] as String?,
+      dueTime: j['due_time'] != null ? DateTime.parse(j['due_time'] as String) : null,
+      priority: j['priority'] as int? ?? 1,
+      isCompleted: j['is_completed'] as bool? ?? false,
+      createdAt: DateTime.parse(j['created_at'] as String),
+      recurrence: j['recurrence_type'] != null
+          ? RecurrenceRule(
+              type: RecurrenceType.values.byName(j['recurrence_type'] as String),
+              interval: j['recurrence_interval'] as int? ?? 1,
+            )
+          : null,
+      linkedTargetId: j['linked_target_id'] as String?,
+      linkedGoalId: j['linked_goal_id'] as String?,
+      completedDates: completedDates,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -72,6 +96,7 @@ class Task {
     'recurrence_interval': (recurrence != null && !recurrence!.isNone) ? recurrence!.interval : null,
     'linked_target_id': linkedTargetId,
     'linked_goal_id': linkedGoalId,
+    'completed_dates': completedDates.isNotEmpty ? jsonEncode(completedDates) : null,
   };
 
   Task copyWith({
@@ -83,6 +108,7 @@ class Task {
     Object? recurrence = _absent,
     Object? linkedTargetId = _absent,
     Object? linkedGoalId = _absent,
+    List<String>? completedDates,
   }) {
     return Task(
       id: id,
@@ -95,6 +121,7 @@ class Task {
       recurrence: recurrence is _Absent ? this.recurrence : recurrence as RecurrenceRule?,
       linkedTargetId: linkedTargetId is _Absent ? this.linkedTargetId : linkedTargetId as String?,
       linkedGoalId: linkedGoalId is _Absent ? this.linkedGoalId : linkedGoalId as String?,
+      completedDates: completedDates ?? this.completedDates,
     );
   }
 }
