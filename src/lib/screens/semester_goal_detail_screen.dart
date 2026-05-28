@@ -143,8 +143,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: AppColors.textTertiary)),
             ),
-          for (final child in children)
-            _MilestoneCard(milestone: child),
+          SemMilestoneSubtreeView(parentId: goalId),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.add, color: AppColors.primary),
@@ -259,11 +258,38 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
   }
 }
 
-// ─── Milestone card (same visual format as parent, indented) ─────────────────
+// ─── Recursive milestone tree ─────────────────────────────────────────────────
 
-class _MilestoneCard extends ConsumerWidget {
+class SemMilestoneSubtreeView extends ConsumerWidget {
+  final String parentId;
+  final int depth;
+  const SemMilestoneSubtreeView({
+    super.key,
+    required this.parentId,
+    this.depth = 0,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final children = ref.watch(semesterGoalsProvider)
+        .where((g) => g.parentId == parentId)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final child in children)
+          _SemMilestoneTile(milestone: child, depth: depth),
+      ],
+    );
+  }
+}
+
+class _SemMilestoneTile extends ConsumerWidget {
   final SemesterGoal milestone;
-  const _MilestoneCard({required this.milestone});
+  final int depth;
+  const _SemMilestoneTile({required this.milestone, required this.depth});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -272,115 +298,140 @@ class _MilestoneCard extends ConsumerWidget {
     final children = allGoals.where((g) => g.parentId == milestone.id).toList();
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
-    final primaryCat = milestone.categories.isNotEmpty
-        ? milestone.categories.first
-        : 'other';
+    final primaryCat =
+        milestone.categories.isNotEmpty ? milestone.categories.first : 'other';
     final catC = catColor(primaryCat);
 
-    return Container(
-      margin: const EdgeInsets.only(left: 20, bottom: AppSpacing.xs),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border, width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md, vertical: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () => ref
-                  .read(semesterGoalsProvider.notifier)
-                  .toggleDone(milestone.id),
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: catC.withValues(
-                      alpha: milestone.isDone ? 0.25 : 0.15),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                child: Icon(
-                  milestone.isDone ? Icons.check : catIcon(primaryCat),
-                  color: catC,
-                  size: 16,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: EdgeInsets.only(
+            left: (depth + 1) * 20.0,
+            bottom: AppSpacing.xs,
+          ),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border, width: 1),
+          ),
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SemesterGoalDetailScreen(goalId: milestone.id),
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    milestone.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      decoration: milestone.isDone
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color:
-                          milestone.isDone ? AppColors.textTertiary : null,
-                    ),
-                  ),
-                  if (milestone.notes != null)
-                    Text(
-                      milestone.notes!,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  if (total > 0) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(s.goalProgress(done, total),
-                        style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: AppSpacing.xs),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                      child: LinearProgressIndicator(
-                        value: done / total,
-                        minHeight: 3,
+                  GestureDetector(
+                    onTap: () => ref
+                        .read(semesterGoalsProvider.notifier)
+                        .toggleDone(milestone.id),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: catC.withValues(
+                            alpha: milestone.isDone ? 0.25 : 0.15),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(
+                        milestone.isDone ? Icons.check : catIcon(primaryCat),
                         color: catC,
-                        backgroundColor: AppColors.surfaceVariant,
+                        size: 16,
                       ),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          milestone.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            decoration: milestone.isDone
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: milestone.isDone
+                                ? AppColors.textTertiary
+                                : null,
+                          ),
+                        ),
+                        if (milestone.notes != null)
+                          Text(
+                            milestone.notes!,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        if (total > 0) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(s.goalProgress(done, total),
+                              style: Theme.of(context).textTheme.bodySmall),
+                          const SizedBox(height: AppSpacing.xs),
+                          ClipRRect(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.full),
+                            child: LinearProgressIndicator(
+                              value: done / total,
+                              minHeight: 3,
+                              color: catC,
+                              backgroundColor: AppColors.surfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        onPressed: () =>
+                            showEditSemesterGoalSheet(context, ref, milestone),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        onPressed: () async {
+                          if (await _confirmDelete(context, s)) {
+                            ref
+                                .read(trashProvider.notifier)
+                                .addSemesterGoal(milestone);
+                            ref
+                                .read(semesterGoalsProvider.notifier)
+                                .remove(milestone.id);
+                          }
+                        },
+                      ),
+                      const Icon(Icons.arrow_forward_ios,
+                          size: 12, color: AppColors.textTertiary),
+                    ],
+                  ),
                 ],
               ),
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () =>
-                      showEditSemesterGoalSheet(context, ref, milestone),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () async {
-                    final s = ref.read(stringsProvider);
-                    if (await _confirmDelete(context, s)) {
-                      ref.read(trashProvider.notifier).addSemesterGoal(milestone);
-                      ref.read(semesterGoalsProvider.notifier).remove(milestone.id);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
+        SemMilestoneSubtreeView(parentId: milestone.id, depth: depth + 1),
+      ],
     );
   }
 }

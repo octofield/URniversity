@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/task.dart';
 import 'date_provider.dart';
+import 'settings_provider.dart';
 
 class TasksNotifier extends StateNotifier<List<Task>> {
   TasksNotifier() : super([]);
@@ -110,7 +111,7 @@ final tasksProvider = StateNotifierProvider<TasksNotifier, List<Task>>(
 );
 
 // 0 = all tasks, 1 = daily view, 2 = weekly view
-final taskViewProvider = StateProvider<int>((ref) => 0);
+final taskViewProvider = StateProvider<int>((ref) => ref.read(defaultTaskViewProvider));
 
 DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 
@@ -163,6 +164,9 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   return [...recurring, ...withDue, ...withoutDue];
 });
+
+final taskTargetFilterProvider = StateProvider<Set<String>>((ref) => const {});
+final taskGoalFilterProvider = StateProvider<Set<String>>((ref) => const {});
 
 final tasksForDateProvider = Provider.family<List<Task>, DateTime>((ref, date) {
   final all = ref.watch(tasksProvider);

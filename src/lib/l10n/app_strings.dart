@@ -114,6 +114,7 @@ abstract class AppStrings {
   String get dailyTasks;
   String get weeklyTasks;
   String get allTasks;
+  String get defaultTaskView;
   String get createdAtLabel;
   String get completedTasks;
   String get delete;
@@ -123,4 +124,5 @@ abstract class AppStrings {
   String get addLinkedTarget;
   String get addLinkedGoal;
   String get selectTask;
+  String get reset;
 }
