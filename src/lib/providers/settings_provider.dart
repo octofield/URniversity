@@ -80,6 +80,11 @@ final settingsProvider = StateNotifierProvider<SettingsNotifier, DateDisplayForm
   (ref) => SettingsNotifier(),
 );
 
+// ── Default task view ─────────────────────────────────────────────────────────
+
+// 0 = all, 1 = daily, 2 = weekly
+final defaultTaskViewProvider = StateProvider<int>((ref) => 0);
+
 // ── Semester settings ─────────────────────────────────────────────────────────
 
 class SemesterSettings {

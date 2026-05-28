@@ -14,6 +14,7 @@ class SettingsScreen extends ConsumerWidget {
     final currentLang = ref.watch(languageProvider);
     final currentFmt = ref.watch(settingsProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
+    final defaultView = ref.watch(defaultTaskViewProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(s.settings)),
@@ -30,6 +31,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text(formatDate(DateTime.now(), currentFmt)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showDateFormatDialog(context, ref, s, currentFmt),
+          ),
+          ListTile(
+            title: Text(s.defaultTaskView),
+            subtitle: Text(_taskViewLabel(defaultView, s)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showDefaultTaskViewDialog(context, ref, s, defaultView),
           ),
           ListTile(
             title: Text(s.semesterSettings),
@@ -92,6 +99,38 @@ String _semesterSettingsLabel(SemesterSettings settings, dynamic s) {
   };
   final months = settings.startMonths.join(', ');
   return '$countLabel  ·  $months';
+}
+
+String _taskViewLabel(int view, dynamic s) {
+  switch (view) {
+    case 1:  return s.dailyTasks;
+    case 2:  return s.weeklyTasks;
+    default: return s.allTasks;
+  }
+}
+
+void _showDefaultTaskViewDialog(BuildContext context, WidgetRef ref,
+    dynamic s, int current) {
+  showDialog(
+    context: context,
+    builder: (ctx) => SimpleDialog(
+      title: Text(s.defaultTaskView),
+      children: [
+        for (final entry in [(0, s.allTasks), (1, s.dailyTasks), (2, s.weeklyTasks)])
+          ListTile(
+            title: Text(entry.$2),
+            leading: Icon(
+              entry.$1 == current ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: entry.$1 == current ? AppColors.primary : null,
+            ),
+            onTap: () {
+              ref.read(defaultTaskViewProvider.notifier).state = entry.$1;
+              Navigator.pop(ctx);
+            },
+          ),
+      ],
+    ),
+  );
 }
 
 void _showLanguageDialog(BuildContext context, WidgetRef ref,

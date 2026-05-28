@@ -9,6 +9,7 @@ class SemesterGoal {
   final String? futureGoalId;
   final String? notes;
   final bool isDone;
+  final int sortOrder;
 
   const SemesterGoal({
     required this.id,
@@ -19,6 +20,7 @@ class SemesterGoal {
     this.futureGoalId,
     this.notes,
     this.isDone = false,
+    this.sortOrder = 0,
   });
 
   factory SemesterGoal.fromJson(Map<String, dynamic> j) {
@@ -39,6 +41,7 @@ class SemesterGoal {
       futureGoalId: j['future_goal_id'] as String?,
       notes: j['notes'] as String?,
       isDone: j['is_done'] as bool? ?? false,
+      sortOrder: j['sort_order'] as int? ?? 0,
     );
   }
 
@@ -51,6 +54,7 @@ class SemesterGoal {
     'future_goal_id': futureGoalId,
     'notes': notes,
     'is_done': isDone,
+    'sort_order': sortOrder,
   };
 
   SemesterGoal copyWith({
@@ -61,6 +65,7 @@ class SemesterGoal {
     Object? futureGoalId = _sgSentinel,
     Object? notes = _sgSentinel,
     bool? isDone,
+    int? sortOrder,
   }) => SemesterGoal(
     id: id,
     parentId: parentId == _sgSentinel ? this.parentId : parentId as String?,
@@ -70,6 +75,7 @@ class SemesterGoal {
     futureGoalId: futureGoalId == _sgSentinel ? this.futureGoalId : futureGoalId as String?,
     notes: notes == _sgSentinel ? this.notes : notes as String?,
     isDone: isDone ?? this.isDone,
+    sortOrder: sortOrder ?? this.sortOrder,
   );
 }
 

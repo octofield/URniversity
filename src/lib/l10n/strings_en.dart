@@ -112,6 +112,7 @@ class StringsEn implements AppStrings {
   @override String get dailyTasks => 'Today';
   @override String get weeklyTasks => 'This Week';
   @override String get allTasks => 'All Tasks';
+  @override String get defaultTaskView => 'Default Task View';
   @override String get createdAtLabel => 'Created';
   @override String get completedTasks => 'Completed Tasks';
   @override String get delete => 'Delete';
@@ -123,4 +124,5 @@ class StringsEn implements AppStrings {
   @override String get addLinkedTarget => 'Link Target';
   @override String get addLinkedGoal => 'Link Goal';
   @override String get selectTask => 'Select Task';
+  @override String get reset => 'Reset';
 }

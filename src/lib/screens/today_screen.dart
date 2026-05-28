@@ -4,6 +4,8 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
+import '../models/future_goal.dart';
+import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/inspirations_provider.dart';
@@ -468,12 +470,36 @@ class _TasksSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final date = ref.watch(dateProvider);
-    final tasks = ref.watch(filteredTasksProvider).where((t) => !t.isCompletedOn(date)).toList();
+    final taskView = ref.watch(taskViewProvider);
+    final targetFilter = ref.watch(taskTargetFilterProvider);
+    final goalFilter = ref.watch(taskGoalFilterProvider);
+    final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
+    final expandedTargetFilter = _expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
+    final expandedGoalFilter = _expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
+    final tasks = ref.watch(filteredTasksProvider)
+        .where((t) => !t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(s.tasks, style: Theme.of(context).textTheme.titleLarge),
+        Row(
+          children: [
+            Text(s.tasks, style: Theme.of(context).textTheme.titleLarge),
+            const Spacer(),
+            if (taskView == 0)
+              IconButton(
+                icon: Icon(
+                  isFiltered ? Icons.filter_list : Icons.filter_list_outlined,
+                  color: isFiltered ? AppColors.primary : AppColors.textTertiary,
+                  size: 20,
+                ),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: () => _showTaskFilterDialog(context, ref, s),
+              ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.sm),
         Container(
           clipBehavior: Clip.antiAlias,
@@ -509,6 +535,217 @@ class _TasksSection extends ConsumerWidget {
   }
 }
 
+bool _passesFilter(Task t, Set<String> targetIds, Set<String> goalIds) {
+  if (targetIds.isEmpty && goalIds.isEmpty) return true;
+  if (targetIds.isNotEmpty && t.linkedTargetId != null && targetIds.contains(t.linkedTargetId)) return true;
+  if (goalIds.isNotEmpty && t.linkedGoalId != null && goalIds.contains(t.linkedGoalId)) return true;
+  return false;
+}
+
+Set<String> _expandSemGoalIds(Set<String> selected, List<SemesterGoal> all) {
+  if (selected.isEmpty) return selected;
+  final expanded = Set<String>.from(selected);
+  void collect(String parentId) {
+    for (final g in all.where((g) => g.parentId == parentId)) {
+      if (expanded.add(g.id)) collect(g.id);
+    }
+  }
+  for (final id in List<String>.from(selected)) { collect(id); }
+  return expanded;
+}
+
+Set<String> _expandFutureGoalIds(Set<String> selected, List<FutureGoal> all) {
+  if (selected.isEmpty) return selected;
+  final expanded = Set<String>.from(selected);
+  void collect(String parentId) {
+    for (final g in all.where((g) => g.parentId == parentId)) {
+      if (expanded.add(g.id)) collect(g.id);
+    }
+  }
+  for (final id in List<String>.from(selected)) { collect(id); }
+  return expanded;
+}
+
+List<({SemesterGoal goal, int depth})> _buildTargetTree(List<SemesterGoal> all) {
+  final result = <({SemesterGoal goal, int depth})>[];
+  void add(String? parentId, int depth) {
+    for (final g in all.where((g) => g.parentId == parentId)) {
+      result.add((goal: g, depth: depth));
+      add(g.id, depth + 1);
+    }
+  }
+  add(null, 0);
+  return result;
+}
+
+List<({FutureGoal goal, int depth})> _buildGoalTree(List<FutureGoal> all) {
+  final result = <({FutureGoal goal, int depth})>[];
+  void add(String? parentId, int depth) {
+    for (final g in all.where((g) => g.parentId == parentId)) {
+      result.add((goal: g, depth: depth));
+      add(g.id, depth + 1);
+    }
+  }
+  add(null, 0);
+  return result;
+}
+
+void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
+  showDialog(
+    context: context,
+    builder: (dlgCtx) => DefaultTabController(
+      length: 2,
+      child: Consumer(
+        builder: (_, dlgRef, _) {
+          final allTargets = dlgRef.watch(semesterGoalsProvider);
+          final allGoals = dlgRef.watch(futureGoalsProvider);
+          final targetTree = _buildTargetTree(allTargets);
+          final goalTree = _buildGoalTree(allGoals);
+          final targetFilter = dlgRef.watch(taskTargetFilterProvider);
+          final goalFilter = dlgRef.watch(taskGoalFilterProvider);
+
+          return AlertDialog(
+            titlePadding: EdgeInsets.zero,
+            title: TabBar(
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+              tabs: [Tab(text: s.targets), Tab(text: s.goals)],
+            ),
+            content: SizedBox(
+              height: 320,
+              width: double.maxFinite,
+              child: TabBarView(
+                children: [
+                  // Targets tab
+                  targetTree.isEmpty
+                      ? Center(
+                          child: Text(s.noTargets,
+                              style: const TextStyle(color: AppColors.textTertiary)),
+                        )
+                      : ListView(
+                          children: [
+                            for (final item in targetTree)
+                              CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.only(
+                                  left: 8.0 + item.depth * 20.0,
+                                ),
+                                value: targetFilter.contains(item.goal.id),
+                                title: Text(item.goal.title),
+                                subtitle: Text(item.goal.semester,
+                                    style: const TextStyle(fontSize: 12)),
+                                onChanged: (v) {
+                                  final next = Set<String>.from(
+                                      dlgRef.read(taskTargetFilterProvider));
+                                  if (v == true) {
+                                    next.add(item.goal.id);
+                                    void addDesc(String pid) {
+                                      for (final g in allTargets.where((g) => g.parentId == pid)) {
+                                        next.add(g.id);
+                                        addDesc(g.id);
+                                      }
+                                    }
+                                    addDesc(item.goal.id);
+                                  } else {
+                                    next.remove(item.goal.id);
+                                    void removeDesc(String pid) {
+                                      for (final g in allTargets.where((g) => g.parentId == pid)) {
+                                        next.remove(g.id);
+                                        removeDesc(g.id);
+                                      }
+                                    }
+                                    removeDesc(item.goal.id);
+                                    String? pid = item.goal.parentId;
+                                    while (pid != null) {
+                                      next.remove(pid);
+                                      pid = allTargets.where((g) => g.id == pid).firstOrNull?.parentId;
+                                    }
+                                  }
+                                  dlgRef
+                                      .read(taskTargetFilterProvider.notifier)
+                                      .state = next;
+                                },
+                              ),
+                          ],
+                        ),
+                  // Goals tab
+                  goalTree.isEmpty
+                      ? Center(
+                          child: Text(s.noGoals,
+                              style: const TextStyle(color: AppColors.textTertiary)),
+                        )
+                      : ListView(
+                          children: [
+                            for (final item in goalTree)
+                              CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.only(
+                                  left: 8.0 + item.depth * 20.0,
+                                ),
+                                value: goalFilter.contains(item.goal.id),
+                                title: Text(item.goal.title),
+                                subtitle: item.goal.startSemester != null
+                                    ? Text(item.goal.startSemester!,
+                                        style: const TextStyle(fontSize: 12))
+                                    : null,
+                                onChanged: (v) {
+                                  final next = Set<String>.from(
+                                      dlgRef.read(taskGoalFilterProvider));
+                                  if (v == true) {
+                                    next.add(item.goal.id);
+                                    void addDesc(String pid) {
+                                      for (final g in allGoals.where((g) => g.parentId == pid)) {
+                                        next.add(g.id);
+                                        addDesc(g.id);
+                                      }
+                                    }
+                                    addDesc(item.goal.id);
+                                  } else {
+                                    next.remove(item.goal.id);
+                                    void removeDesc(String pid) {
+                                      for (final g in allGoals.where((g) => g.parentId == pid)) {
+                                        next.remove(g.id);
+                                        removeDesc(g.id);
+                                      }
+                                    }
+                                    removeDesc(item.goal.id);
+                                    String? pid = item.goal.parentId;
+                                    while (pid != null) {
+                                      next.remove(pid);
+                                      pid = allGoals.where((g) => g.id == pid).firstOrNull?.parentId;
+                                    }
+                                  }
+                                  dlgRef
+                                      .read(taskGoalFilterProvider.notifier)
+                                      .state = next;
+                                },
+                              ),
+                          ],
+                        ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  dlgRef.read(taskTargetFilterProvider.notifier).state = const {};
+                  dlgRef.read(taskGoalFilterProvider.notifier).state = const {};
+                },
+                child: Text(s.reset),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dlgCtx),
+                child: Text(MaterialLocalizations.of(dlgCtx).okButtonLabel),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
 class _CompletedTasksSection extends ConsumerWidget {
   const _CompletedTasksSection();
 
@@ -516,7 +753,13 @@ class _CompletedTasksSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final date = ref.watch(dateProvider);
-    final completed = ref.watch(filteredTasksProvider).where((t) => t.isCompletedOn(date)).toList();
+    final targetFilter = ref.watch(taskTargetFilterProvider);
+    final goalFilter = ref.watch(taskGoalFilterProvider);
+    final expandedTargetFilter = _expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
+    final expandedGoalFilter = _expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
+    final completed = ref.watch(filteredTasksProvider)
+        .where((t) => t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+        .toList();
 
     if (completed.isEmpty) return const SizedBox.shrink();
 

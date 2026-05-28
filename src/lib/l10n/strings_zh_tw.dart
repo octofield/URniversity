@@ -112,6 +112,7 @@ class StringsZhTw implements AppStrings {
   @override String get dailyTasks => '當日任務';
   @override String get weeklyTasks => '當週任務';
   @override String get allTasks => '所有任務';
+  @override String get defaultTaskView => '預設任務視角';
   @override String get createdAtLabel => '建立時間';
   @override String get completedTasks => '已完成的任務';
   @override String get delete => '刪除';
@@ -123,4 +124,5 @@ class StringsZhTw implements AppStrings {
   @override String get addLinkedTarget => '新增連結目標';
   @override String get addLinkedGoal => '新增連結願景';
   @override String get selectTask => '選擇任務';
+  @override String get reset => '重置';
 }

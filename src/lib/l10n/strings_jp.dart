@@ -112,6 +112,7 @@ class StringsJp implements AppStrings {
   @override String get dailyTasks => '今日';
   @override String get weeklyTasks => '今週';
   @override String get allTasks => 'すべてのタスク';
+  @override String get defaultTaskView => 'デフォルトのタスクビュー';
   @override String get createdAtLabel => '作成日時';
   @override String get completedTasks => '完了したタスク';
   @override String get delete => '削除';
@@ -123,4 +124,5 @@ class StringsJp implements AppStrings {
   @override String get addLinkedTarget => 'ターゲットをリンク';
   @override String get addLinkedGoal => 'ゴールをリンク';
   @override String get selectTask => 'タスクを選択';
+  @override String get reset => 'リセット';
 }

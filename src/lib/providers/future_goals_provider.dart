@@ -12,7 +12,7 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
     if (_userId == userId) return;
     _userId = userId;
     try {
-      final rows = await _db.from('future_goals').select().eq('user_id', userId);
+      final rows = await _db.from('future_goals').select().eq('user_id', userId).order('sort_order');
       state = (rows as List<dynamic>)
           .map((r) => FutureGoal.fromJson(r as Map<String, dynamic>))
           .toList();
@@ -46,6 +46,9 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
     String? endSemester,
     String? notes,
   }) {
+    final maxOrder = state
+        .where((g) => g.parentId == parentId)
+        .fold(0, (prev, g) => g.sortOrder > prev ? g.sortOrder : prev);
     final goal = FutureGoal(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       parentId: parentId,
@@ -54,6 +57,7 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
       startSemester: startSemester,
       endSemester: endSemester,
       notes: notes,
+      sortOrder: maxOrder + 1000,
     );
     state = [...state, goal];
     _upsert(goal);
@@ -79,6 +83,7 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
             endSemester: endSemester,
             notes: notes,
             isDone: g.isDone,
+            sortOrder: g.sortOrder,
           )
         else
           g,
@@ -116,6 +121,30 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
     for (final id in toRemove) {
       _delete(id);
     }
+  }
+
+  bool isAncestor(String potentialAncestorId, String targetId) {
+    String? current = targetId;
+    while (current != null) {
+      final goal = state.where((g) => g.id == current).firstOrNull;
+      if (goal == null) return false;
+      if (goal.parentId == potentialAncestorId) return true;
+      current = goal.parentId;
+    }
+    return false;
+  }
+
+  void reparent(String draggedId, String? newParentId, int newSortOrder) {
+    if (draggedId == newParentId) return;
+    if (newParentId != null && isAncestor(draggedId, newParentId)) return;
+    state = [
+      for (final g in state)
+        if (g.id == draggedId)
+          g.copyWith(parentId: newParentId, sortOrder: newSortOrder)
+        else g,
+    ];
+    final updated = state.where((g) => g.id == draggedId).firstOrNull;
+    if (updated != null) _upsert(updated);
   }
 
   void restore(FutureGoal goal) {

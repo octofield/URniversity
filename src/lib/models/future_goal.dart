@@ -29,6 +29,7 @@ class FutureGoal {
   final String? endSemester;
   final String? notes;
   final bool isDone;
+  final int sortOrder;
 
   const FutureGoal({
     required this.id,
@@ -39,6 +40,7 @@ class FutureGoal {
     this.endSemester,
     this.notes,
     this.isDone = false,
+    this.sortOrder = 0,
   });
 
   factory FutureGoal.fromJson(Map<String, dynamic> j) => FutureGoal(
@@ -50,6 +52,7 @@ class FutureGoal {
     endSemester: j['end_semester'] as String?,
     notes: j['notes'] as String?,
     isDone: j['is_done'] as bool? ?? false,
+    sortOrder: j['sort_order'] as int? ?? 0,
   );
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +64,7 @@ class FutureGoal {
     'end_semester': endSemester,
     'notes': notes,
     'is_done': isDone,
+    'sort_order': sortOrder,
   };
 
   FutureGoal copyWith({
@@ -71,6 +75,7 @@ class FutureGoal {
     Object? endSemester = _sentinel,
     Object? notes = _sentinel,
     bool? isDone,
+    int? sortOrder,
   }) {
     return FutureGoal(
       id: id,
@@ -81,6 +86,7 @@ class FutureGoal {
       endSemester: endSemester == _sentinel ? this.endSemester : endSemester as String?,
       notes: notes == _sentinel ? this.notes : notes as String?,
       isDone: isDone ?? this.isDone,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 }
