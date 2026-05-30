@@ -150,4 +150,19 @@ abstract class AppStrings {
   String get versionLabel;
   String get developerMode;
   String get devTimeOverride;
+
+  // Account actions
+  String get logout;
+  String get deleteAccount;
+  String get exitGuestMode;
+  String get feedbackTitle;
+  String get feedbackBug;
+  String get feedbackSuggestion;
+  String get feedbackAnonymousNote;
+  String get feedbackBugHint;
+  String get feedbackSuggestionHint;
+  String get feedbackSubmit;
+  String get feedbackErrorMinLength;
+  String get feedbackErrorCooldown;
+  String get feedbackErrorFailed;
 }

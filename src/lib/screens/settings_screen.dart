@@ -79,6 +79,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ref.read(showDayCounterProvider.notifier).state = v,
           ),
           ListTile(
+            title: Text(s.feedbackTitle),
+            leading: const Icon(Icons.feedback_outlined),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showDialog(
+              context: context,
+              builder: (_) => _FeedbackDialog(s: s, isDevMode: ref.read(devModeProvider).enabled),
+            ),
+          ),
+          ListTile(
             title: Text(s.trash),
             leading: const Icon(Icons.delete_outline),
             trailing: const Icon(Icons.chevron_right),
@@ -144,18 +153,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           if (isGuest)
             ListTile(
-              title: const Text('退出訪客模式', style: TextStyle(color: AppColors.error)),
+              title: Text(s.exitGuestMode, style: const TextStyle(color: AppColors.error)),
               leading: const Icon(Icons.logout, color: AppColors.error),
               onTap: () => _confirmExitGuest(context, ref),
             )
           else ...[
             ListTile(
-              title: const Text('登出', style: TextStyle(color: AppColors.error)),
+              title: Text(s.logout, style: const TextStyle(color: AppColors.error)),
               leading: const Icon(Icons.logout, color: AppColors.error),
               onTap: () => _confirmLogout(context),
             ),
             ListTile(
-              title: const Text('刪除帳號', style: TextStyle(color: AppColors.error)),
+              title: Text(s.deleteAccount, style: const TextStyle(color: AppColors.error)),
               leading: const Icon(Icons.delete_forever_outlined, color: AppColors.error),
               onTap: () => _showDeleteAccountDialog(context, ref),
             ),
@@ -192,7 +201,7 @@ void _confirmExitGuest(BuildContext context, WidgetRef ref) {
 
 void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
   final user = Supabase.instance.client.auth.currentUser;
-  final isGoogle = (user?.appMetadata['provider'] as String?) == 'google';
+  final isGoogle = user?.identities?.any((i) => i.provider == 'google') ?? false;
 
   if (isGoogle) {
     showDialog(
@@ -522,6 +531,130 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               : const Text('確認刪除'),
         ),
       ],
+    );
+  }
+}
+
+class _FeedbackDialog extends StatefulWidget {
+  final dynamic s;
+  final bool isDevMode;
+  const _FeedbackDialog({required this.s, required this.isDevMode});
+
+  @override
+  State<_FeedbackDialog> createState() => _FeedbackDialogState();
+}
+
+class _FeedbackDialogState extends State<_FeedbackDialog> {
+  static DateTime? _lastSubmitTime;
+  static const _cooldownMinutes = 5;
+  static const _maxLength = 1000;
+  static const _minLength = 10;
+
+  String _type = 'bug';
+  final _ctrl = TextEditingController();
+  String? _error;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final msg = _ctrl.text.trim();
+    final s = widget.s;
+    if (msg.length < _minLength) {
+      setState(() => _error = s.feedbackErrorMinLength);
+      return;
+    }
+    final last = _lastSubmitTime;
+    if (last != null && !widget.isDevMode) {
+      final diff = DateTime.now().difference(last).inMinutes;
+      if (diff < _cooldownMinutes) {
+        setState(() => _error = s.feedbackErrorCooldown);
+        return;
+      }
+    }
+
+    setState(() { _loading = true; _error = null; });
+    try {
+      await Supabase.instance.client.from('feedbacks').insert({
+        'type': _type,
+        'message': msg.substring(0, msg.length.clamp(0, _maxLength)),
+      });
+      _lastSubmitTime = DateTime.now();
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) setState(() { _loading = false; _error = s.feedbackErrorFailed; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.s;
+    final length = _ctrl.text.length;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.feedbackTitle, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              s.feedbackAnonymousNote,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            SegmentedButton<String>(
+              segments: [
+                ButtonSegment(value: 'bug', label: Text(s.feedbackBug), icon: const Icon(Icons.bug_report_outlined)),
+                ButtonSegment(value: 'suggestion', label: Text(s.feedbackSuggestion), icon: const Icon(Icons.lightbulb_outline)),
+              ],
+              selected: {_type},
+              onSelectionChanged: (v) => setState(() => _type = v.first),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _ctrl,
+              maxLines: 8,
+              maxLength: _maxLength,
+              onChanged: (_) => setState(() => _error = null),
+              decoration: InputDecoration(
+                hintText: _type == 'bug' ? s.feedbackBugHint : s.feedbackSuggestionHint,
+                helperText: length < _minLength ? s.feedbackErrorMinLength : null,
+                errorText: _error,
+                alignLabelWithHint: true,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: (length < _minLength || _loading) ? null : _submit,
+                  child: _loading
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(s.feedbackSubmit),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
