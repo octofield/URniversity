@@ -154,7 +154,7 @@ class _ProfileCard extends ConsumerWidget {
                     if (!isGuest)
                       _InfoRow(
                         label: '登入方式',
-                        value: (user?.appMetadata['provider'] as String?) == 'google' ? 'Google' : '電子郵件',
+                        value: (user?.identities?.any((i) => i.provider == 'google') ?? false) ? 'Google' : '電子郵件',
                       ),
                   ],
                 ),

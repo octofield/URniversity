@@ -141,4 +141,17 @@ class StringsEn implements AppStrings {
   @override String get versionLabel => 'Version';
   @override String get developerMode => 'Developer Mode';
   @override String get devTimeOverride => 'Custom Date';
+  @override String get logout => 'Log Out';
+  @override String get deleteAccount => 'Delete Account';
+  @override String get exitGuestMode => 'Exit Guest Mode';
+  @override String get feedbackTitle => 'Feedback & Bug Report';
+  @override String get feedbackBug => 'Bug Report';
+  @override String get feedbackSuggestion => 'Feature Suggestion';
+  @override String get feedbackAnonymousNote => 'Feedback is anonymous. No personal information is collected.';
+  @override String get feedbackBugHint => 'Describe what happened…';
+  @override String get feedbackSuggestionHint => 'Describe the feature you\'d like to see…';
+  @override String get feedbackSubmit => 'Submit';
+  @override String get feedbackErrorMinLength => 'Please enter at least 10 characters';
+  @override String get feedbackErrorCooldown => 'Please wait 5 minutes before submitting again';
+  @override String get feedbackErrorFailed => 'Submission failed. Please try again later.';
 }

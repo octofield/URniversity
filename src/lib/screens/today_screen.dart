@@ -808,6 +808,12 @@ class _TaskTile extends ConsumerWidget {
         ? goals.where((g) => g.id == task.linkedGoalId).firstOrNull
         : null;
 
+    final hasSubtitle = task.content != null ||
+        task.dueTime != null ||
+        (task.recurrence != null && !task.recurrence!.isNone) ||
+        linkedTarget != null ||
+        linkedGoal != null;
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       leading: Checkbox(
@@ -821,7 +827,7 @@ class _TaskTile extends ConsumerWidget {
           color: isCompleted ? AppColors.textTertiary : null,
         ),
       ),
-      subtitle: Column(
+      subtitle: hasSubtitle ? Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -883,7 +889,7 @@ class _TaskTile extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
         ],
-      ),
+      ) : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

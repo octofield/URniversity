@@ -141,4 +141,17 @@ class StringsZhTw implements AppStrings {
   @override String get versionLabel => '版本';
   @override String get developerMode => '開發者模式';
   @override String get devTimeOverride => '自訂系統日期';
+  @override String get logout => '登出';
+  @override String get deleteAccount => '刪除帳號';
+  @override String get exitGuestMode => '退出訪客模式';
+  @override String get feedbackTitle => '回饋與問題回報';
+  @override String get feedbackBug => '問題回報';
+  @override String get feedbackSuggestion => '功能建議';
+  @override String get feedbackAnonymousNote => '回饋為匿名，不會記錄任何個人資訊。';
+  @override String get feedbackBugHint => '描述問題發生的情況…';
+  @override String get feedbackSuggestionHint => '描述你希望加入的功能…';
+  @override String get feedbackSubmit => '送出';
+  @override String get feedbackErrorMinLength => '請至少輸入 10 個字元';
+  @override String get feedbackErrorCooldown => '請等待 5 分鐘後再回報';
+  @override String get feedbackErrorFailed => '送出失敗，請稍後再試';
 }

@@ -141,4 +141,17 @@ class StringsJp implements AppStrings {
   @override String get versionLabel => 'バージョン';
   @override String get developerMode => '開発者モード';
   @override String get devTimeOverride => 'カスタム日付';
+  @override String get logout => 'ログアウト';
+  @override String get deleteAccount => 'アカウント削除';
+  @override String get exitGuestMode => 'ゲストモード終了';
+  @override String get feedbackTitle => 'フィードバック・バグ報告';
+  @override String get feedbackBug => 'バグ報告';
+  @override String get feedbackSuggestion => '機能提案';
+  @override String get feedbackAnonymousNote => 'フィードバックは匿名です。個人情報は収集されません。';
+  @override String get feedbackBugHint => '問題の内容を説明してください…';
+  @override String get feedbackSuggestionHint => '追加してほしい機能を説明してください…';
+  @override String get feedbackSubmit => '送信';
+  @override String get feedbackErrorMinLength => '10文字以上入力してください';
+  @override String get feedbackErrorCooldown => '5分後に再度送信してください';
+  @override String get feedbackErrorFailed => '送信に失敗しました。後でもう一度お試しください。';
 }
