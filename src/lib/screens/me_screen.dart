@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/avatars.dart';
-import '../core/taiwan_universities.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -13,6 +12,7 @@ import '../providers/inspirations_provider.dart';
 import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/universities_provider.dart';
 import 'inspirations_screen.dart';
 import 'journal_edit_screen.dart';
 import 'journals_screen.dart';
@@ -256,12 +256,14 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   }
 
   Future<void> _pickSchool() async {
-    final result = await _openSearchPicker(context, '選擇學校', taiwanUniversities, _school);
+    final unis = widget.ref.read(universitiesProvider).universities;
+    final result = await _openSearchPicker(context, '選擇學校', unis, _school);
     if (result != null) setState(() { _school = result; _dept = ''; });
   }
 
   Future<void> _pickDept() async {
-    final result = await _openSearchPicker(context, '選擇系所', commonDepartments, _dept);
+    final depts = widget.ref.read(universitiesProvider).departmentsFor(_school);
+    final result = await _openSearchPicker(context, '選擇系所', depts, _dept);
     if (result != null) setState(() => _dept = result);
   }
 
