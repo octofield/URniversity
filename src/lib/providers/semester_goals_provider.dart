@@ -94,6 +94,15 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
     state = [];
   }
 
+  Future<void> mergeToUser(String userId) async {
+    _userId = userId;
+    for (final goal in state) {
+      try {
+        await _db.from('semester_goals').upsert({...goal.toJson(), 'user_id': userId});
+      } catch (_) {}
+    }
+  }
+
   void _upsert(SemesterGoal goal) {
     if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;

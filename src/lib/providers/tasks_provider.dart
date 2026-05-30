@@ -51,6 +51,15 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     state = [];
   }
 
+  Future<void> mergeToUser(String userId) async {
+    _userId = userId;
+    for (final task in state) {
+      try {
+        await _db.from('tasks').upsert({...task.toJson(), 'user_id': userId});
+      } catch (_) {}
+    }
+  }
+
   void _upsert(Task task) {
     if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;

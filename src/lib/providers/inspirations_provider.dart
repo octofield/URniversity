@@ -53,6 +53,15 @@ class InspirationsNotifier extends StateNotifier<List<Inspiration>> {
     state = [];
   }
 
+  Future<void> mergeToUser(String userId) async {
+    _userId = userId;
+    for (final item in state) {
+      try {
+        await _db.from('inspirations').upsert({...item.toJson(), 'user_id': userId});
+      } catch (_) {}
+    }
+  }
+
   void add(String title, {String? content}) {
     final item = Inspiration(
       id: DateTime.now().millisecondsSinceEpoch.toString(),

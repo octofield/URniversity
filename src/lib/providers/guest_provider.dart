@@ -42,3 +42,9 @@ class _GuestModeNotifier extends StateNotifier<bool> {
 final guestModeProvider = StateNotifierProvider<_GuestModeNotifier, bool>(
   (ref) => _GuestModeNotifier(),
 );
+
+// True when user chose to merge guest data into the account on login.
+final shouldMergeGuestDataProvider = StateProvider<bool>((ref) => false);
+
+// True when the user taps "登入" from guest mode — _AuthGate shows LoginScreen.
+final pendingGuestLoginProvider = StateProvider<bool>((ref) => false);
