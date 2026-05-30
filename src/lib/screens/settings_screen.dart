@@ -84,7 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => showDialog(
               context: context,
-              builder: (_) => _FeedbackDialog(s: s, isDevMode: ref.read(devModeProvider).enabled),
+              builder: (_) => _FeedbackDialog(s: s),
             ),
           ),
           ListTile(
@@ -537,8 +537,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
 
 class _FeedbackDialog extends StatefulWidget {
   final dynamic s;
-  final bool isDevMode;
-  const _FeedbackDialog({required this.s, required this.isDevMode});
+  const _FeedbackDialog({required this.s});
 
   @override
   State<_FeedbackDialog> createState() => _FeedbackDialogState();
@@ -569,7 +568,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
       return;
     }
     final last = _lastSubmitTime;
-    if (last != null && !widget.isDevMode) {
+    if (last != null) {
       final diff = DateTime.now().difference(last).inMinutes;
       if (diff < _cooldownMinutes) {
         setState(() => _error = s.feedbackErrorCooldown);

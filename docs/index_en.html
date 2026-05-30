@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URniversity — College Life Planner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      background: #faf8f5;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(150deg, #b08858 0%, #a07850 55%, #8a6840 100%);
+      color: #fff;
+      padding: 56px 24px 48px;
+      text-align: center;
+    }
+
+    .brand-link { text-decoration: none; color: inherit; }
+    .brand-link:hover h1 { text-decoration: underline; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .app-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+    }
+
+    header h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header > p { font-size: 1.1rem; opacity: 0.9; }
+
+    .lang-row {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.875rem;
+    }
+
+    .lang-row a { color: rgba(255,255,255,0.65); text-decoration: none; }
+    .lang-row a.active { color: #fff; font-weight: 600; }
+    .lang-row a:hover { color: #fff; text-decoration: underline; }
+
+    .cta-btn {
+      display: inline-block;
+      margin-top: 24px;
+      background: #fff;
+      color: #a07850;
+      font-weight: 700;
+      padding: 12px 36px;
+      border-radius: 24px;
+      text-decoration: none;
+      font-size: 1rem;
+    }
+
+    .cta-btn:hover { opacity: 0.88; }
+
+    .badge-row {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 0.85rem;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px;
+    }
+
+    .section-title {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #a07850;
+      margin-bottom: 24px;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 56px;
+    }
+
+    .feature-card {
+      background: #fff;
+      border: 1px solid #e8e0d8;
+      border-radius: 12px;
+      padding: 24px 20px;
+    }
+
+    .feature-card .icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: 0.875rem; color: #666; }
+
+    .auth-section {
+      background: #fff;
+      border: 1px solid #e8e0d8;
+      border-radius: 12px;
+      padding: 28px 24px;
+      margin-bottom: 56px;
+    }
+
+    .auth-section ul { list-style: none; margin-top: 12px; }
+
+    .auth-section li {
+      padding: 6px 0;
+      font-size: 0.95rem;
+      color: #444;
+    }
+
+    .auth-section li::before {
+      content: "✓  ";
+      color: #a07850;
+      font-weight: 700;
+    }
+
+    footer {
+      border-top: 1px solid #e8e0d8;
+      text-align: center;
+      padding: 28px 24px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    footer a { color: #a07850; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://urniversity.netlify.app" target="_blank" class="brand-link">
+    <div class="brand">
+      <img src="app_icon.png" alt="URniversity" class="app-icon">
+      <h1>URniversity</h1>
+    </div>
+  </a>
+  <p>Manage your college life — from daily tasks to future goals, all in one</p>
+  <a href="https://urniversity.netlify.app" target="_blank" class="cta-btn">Try It Now</a>
+  <nav class="lang-row">
+    <a href="index.html">Traditional Chinese</a>
+    <a href="index_en.html" class="active">English</a>
+    <a href="index_jp.html">Japanese</a>
+  </nav>
+  <div class="badge-row">
+    <span class="badge">Free to use</span>
+    <span class="badge">Traditional Chinese · English · Japanese</span>
+    <span class="badge">Web / Android / iOS</span>
+  </div>
+</header>
+
+<main>
+  <p class="section-title">Features</p>
+  <div class="features">
+    <div class="feature-card">
+      <div class="icon">✅</div>
+      <h3>Task Management</h3>
+      <p>Track daily to-dos with recurring tasks, due times, and priority levels</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🎯</div>
+      <h3>Semester Targets</h3>
+      <p>Set and track semester-level goals with milestones and sub-targets</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🌟</div>
+      <h3>Future Goals</h3>
+      <p>Plan exchanges, internships, competitions, and more — build a clear vision of your future</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">💡</div>
+      <h3>Inspirations</h3>
+      <p>Capture ideas the moment they come — never let a good thought slip away</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📔</div>
+      <h3>Journal</h3>
+      <p>Log your daily life and reflections, and watch yourself grow over time</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">☁️</div>
+      <h3>Cloud Sync</h3>
+      <p>Sign in to sync your data across all your devices seamlessly</p>
+    </div>
+  </div>
+
+  <p class="section-title">Sign-in Options</p>
+  <div class="auth-section">
+    <ul>
+      <li>One-tap Google Sign-In</li>
+      <li>Email + Password</li>
+      <li>Guest Mode (no account required, data stays on device)</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <p>
+    &copy; 2026 URniversity &nbsp;|&nbsp;
+    <a href="privacy_en.html">Privacy Policy</a> &nbsp;|&nbsp;
+    Contact: <a href="mailto:octofield.universe@gmail.com">octofield.universe@gmail.com</a>
+  </p>
+</footer>
+
+</body>
+</html>
