@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/avatars.dart';
+import '../core/taiwan_universities.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -150,6 +151,11 @@ class _ProfileCard extends ConsumerWidget {
                     _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : '—'),
                     _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : '—'),
                     _InfoRow(label: s.grade, value: displayGrade != null ? _gradeLabel(displayGrade) : '—'),
+                    if (!isGuest)
+                      _InfoRow(
+                        label: '登入方式',
+                        value: (user?.appMetadata['provider'] as String?) == 'google' ? 'Google' : '電子郵件',
+                      ),
                   ],
                 ),
               ),
@@ -215,9 +221,9 @@ class _EditProfileDialog extends StatefulWidget {
 
 class _EditProfileDialogState extends State<_EditProfileDialog> {
   late TextEditingController _usernameCtrl;
-  late TextEditingController _schoolCtrl;
-  late TextEditingController _deptCtrl;
-  int? _selectedGrade;
+  late String _school;
+  late String _dept;
+  late int _selectedGrade;
   int? _selectedAvatar;
 
   @override
@@ -225,8 +231,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     super.initState();
     final p = widget.profile;
     _usernameCtrl = TextEditingController(text: p?.username ?? '');
-    _schoolCtrl = TextEditingController(text: p?.school ?? '');
-    _deptCtrl = TextEditingController(text: p?.department ?? '');
+    _school = p?.school ?? '';
+    _dept = p?.department ?? '';
     _selectedGrade = p?.grade ?? 1;
     _selectedAvatar = p?.avatarIndex;
   }
@@ -234,25 +240,29 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   @override
   void dispose() {
     _usernameCtrl.dispose();
-    _schoolCtrl.dispose();
-    _deptCtrl.dispose();
     super.dispose();
   }
 
   void _save() {
-    int? gradeSetYear;
-    if (_selectedGrade != null) {
-      gradeSetYear = academicYear(widget.effectiveNow, widget.semSettings);
-    }
     widget.ref.read(profileProvider.notifier).updateInfo(
       username: _usernameCtrl.text.trim(),
-      school: _schoolCtrl.text.trim(),
-      department: _deptCtrl.text.trim(),
+      school: _school,
+      department: _dept,
       grade: _selectedGrade,
-      gradeSetYear: gradeSetYear,
+      gradeSetYear: academicYear(widget.effectiveNow, widget.semSettings),
       avatarIndex: _selectedAvatar,
     );
     Navigator.pop(context);
+  }
+
+  Future<void> _pickSchool() async {
+    final result = await _openSearchPicker(context, '選擇學校', taiwanUniversities, _school);
+    if (result != null) setState(() { _school = result; _dept = ''; });
+  }
+
+  Future<void> _pickDept() async {
+    final result = await _openSearchPicker(context, '選擇系所', commonDepartments, _dept);
+    if (result != null) setState(() => _dept = result);
   }
 
   @override
@@ -267,19 +277,18 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           children: [
             TextField(controller: _usernameCtrl, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: s.usernameLabel)),
             const SizedBox(height: 12),
-            TextField(controller: _schoolCtrl, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: s.school)),
+            _PickerTile(label: s.school, value: _school, onTap: _pickSchool),
             const SizedBox(height: 12),
-            TextField(controller: _deptCtrl, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: s.department)),
+            _PickerTile(label: s.department, value: _dept, onTap: _pickDept),
             const SizedBox(height: 12),
-            DropdownButtonFormField<int?>(
+            DropdownButtonFormField<int>(
               initialValue: _selectedGrade,
               decoration: InputDecoration(labelText: s.grade),
               items: [
-                const DropdownMenuItem<int?>(value: null, child: Text('—')),
                 for (int i = 1; i <= 7; i++)
-                  DropdownMenuItem<int?>(value: i, child: Text(_gradeLabel(i))),
+                  DropdownMenuItem<int>(value: i, child: Text(_gradeLabel(i))),
               ],
-              onChanged: (v) => setState(() => _selectedGrade = v),
+              onChanged: (v) => setState(() => _selectedGrade = v ?? 1),
             ),
             const SizedBox(height: 16),
             Text('頭像', style: Theme.of(context).textTheme.labelMedium),
@@ -898,6 +907,141 @@ void _showMergeChoiceDialog(BuildContext context, WidgetRef ref) {
       ],
     ),
   );
+}
+
+// ─── Search Picker ────────────────────────────────────────────────────────────
+
+class _PickerTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  const _PickerTile({required this.label, required this.value, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+        ),
+        child: Text(
+          value.isEmpty ? '—' : value,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: value.isEmpty ? AppColors.textTertiary : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<String?> _openSearchPicker(
+  BuildContext context,
+  String title,
+  List<String> options,
+  String current,
+) async {
+  String query = '';
+  final result = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSt) {
+          final filtered = options
+              .where((o) => o.contains(query))
+              .toList();
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.75,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: TextField(
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: '搜尋 $title',
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: (v) => setSt(() => query = v),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final option in filtered)
+                        ListTile(
+                          title: Text(option),
+                          trailing: option == current ? const Icon(Icons.check, color: AppColors.primary) : null,
+                          onTap: () => Navigator.pop(ctx, option),
+                        ),
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.edit_outlined),
+                        title: const Text('其他（自行輸入）'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final custom = await _showCustomInputDialog(context, title, current);
+                          if (custom != null && context.mounted) {
+                            Navigator.pop(context, custom);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+  return result;
+}
+
+Future<String?> _showCustomInputDialog(BuildContext context, String title, String initial) async {
+  final ctrl = TextEditingController(text: initial);
+  final result = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('輸入$title'),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        decoration: InputDecoration(labelText: title),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+          child: const Text('確定'),
+        ),
+      ],
+    ),
+  );
+  ctrl.dispose();
+  return result?.isEmpty == true ? null : result;
 }
 
 Future<bool> _confirmDelete(BuildContext context, dynamic s) async {
