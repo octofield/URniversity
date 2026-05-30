@@ -171,19 +171,28 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: AppSpacing.sm),
               Consumer(
-                builder: (ctx, ref, _) => TextButton(
-                  onPressed: _loading
-                      ? null
-                      : () async {
-                          setState(() => _loading = true);
-                          await ref.read(guestModeProvider.notifier).enable();
-                          if (mounted) setState(() => _loading = false);
-                        },
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textTertiary,
-                  ),
-                  child: const Text('以訪客身份體驗'),
-                ),
+                builder: (ctx, ref, _) {
+                  final isGuest = ref.watch(guestModeProvider);
+                  final pending = ref.watch(pendingGuestLoginProvider);
+                  if (isGuest && pending) {
+                    return TextButton(
+                      onPressed: () => ref.read(pendingGuestLoginProvider.notifier).state = false,
+                      style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+                      child: const Text('返回訪客模式'),
+                    );
+                  }
+                  return TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () async {
+                            setState(() => _loading = true);
+                            await ref.read(guestModeProvider.notifier).enable();
+                            if (mounted) setState(() => _loading = false);
+                          },
+                    style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+                    child: const Text('以訪客身份體驗'),
+                  );
+                },
               ),
             ],
           ),

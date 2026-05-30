@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/avatars.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -116,48 +117,62 @@ class _ProfileCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: AppColors.primary,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-            child: avatarUrl == null
-                ? Text(initial, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.textOnPrimary))
-                : null,
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: (username?.isNotEmpty == true || (!isGuest && googleName != null))
-                        ? AppColors.textPrimary
-                        : AppColors.textTertiary,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppAvatars.build(
+                avatarIndex: profile?.avatarIndex,
+                avatarUrl: avatarUrl,
+                initial: initial,
+                radius: 32,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: (username?.isNotEmpty == true || (!isGuest && googleName != null))
+                            ? AppColors.textPrimary
+                            : AppColors.textTertiary,
+                      ),
+                    ),
+                    if (!isGuest && user?.email != null)
+                      Text(user!.email!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                    const SizedBox(height: 4),
+                    // School / Department / Grade info rows
+                    _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : '—'),
+                    _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : '—'),
+                    _InfoRow(label: s.grade, value: displayGrade != null ? _gradeLabel(displayGrade) : '—'),
+                  ],
                 ),
-                if (!isGuest && user?.email != null)
-                  Text(user!.email!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
-                const SizedBox(height: 4),
-                // School / Department / Grade info rows
-                _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : '—'),
-                _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : '—'),
-                _InfoRow(label: s.grade, value: displayGrade != null ? _gradeLabel(displayGrade) : '—'),
-              ],
-            ),
+              ),
+              TextButton(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => _EditProfileDialog(profile: profile, ref: ref, s: s, effectiveNow: effectiveNow, semSettings: semSettings),
+                ),
+                child: Text(s.accountSettings),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => showDialog(
-              context: context,
-              builder: (_) => _EditProfileDialog(profile: profile, ref: ref, s: s, effectiveNow: effectiveNow, semSettings: semSettings),
+          if (isGuest) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.login, size: 18),
+                label: const Text('登入 / 建立帳號'),
+                onPressed: () => _showMergeChoiceDialog(context, ref),
+              ),
             ),
-            child: Text(s.accountSettings),
-          ),
+          ],
         ],
       ),
     );
@@ -203,6 +218,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   late TextEditingController _schoolCtrl;
   late TextEditingController _deptCtrl;
   int? _selectedGrade;
+  int? _selectedAvatar;
 
   @override
   void initState() {
@@ -212,6 +228,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     _schoolCtrl = TextEditingController(text: p?.school ?? '');
     _deptCtrl = TextEditingController(text: p?.department ?? '');
     _selectedGrade = p?.grade ?? 1;
+    _selectedAvatar = p?.avatarIndex;
   }
 
   @override
@@ -233,6 +250,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       department: _deptCtrl.text.trim(),
       grade: _selectedGrade,
       gradeSetYear: gradeSetYear,
+      avatarIndex: _selectedAvatar,
     );
     Navigator.pop(context);
   }
@@ -245,6 +263,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(controller: _usernameCtrl, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: s.usernameLabel)),
             const SizedBox(height: 12),
@@ -261,6 +280,46 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   DropdownMenuItem<int?>(value: i, child: Text(_gradeLabel(i))),
               ],
               onChanged: (v) => setState(() => _selectedGrade = v),
+            ),
+            const SizedBox(height: 16),
+            Text('頭像', style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                // First option = no preset (uses Google avatar or initials)
+                GestureDetector(
+                  onTap: () => setState(() => _selectedAvatar = null),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _selectedAvatar == null ? AppColors.primary : AppColors.border,
+                        width: 2.5,
+                      ),
+                    ),
+                    child: const Icon(Icons.person_outline, size: 22, color: AppColors.textTertiary),
+                  ),
+                ),
+                for (int i = 0; i < AppAvatars.presets.length; i++)
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedAvatar = i),
+                    child: Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selectedAvatar == i ? AppColors.primary : Colors.transparent,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: AppAvatars.build(avatarIndex: i, avatarUrl: null, initial: '', radius: 18),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
@@ -598,21 +657,11 @@ class _JournalTile extends ConsumerWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
+                AppAvatars.build(
+                  avatarIndex: profile?.avatarIndex,
+                  avatarUrl: avatarUrl,
+                  initial: initial,
                   radius: 14,
-                  backgroundColor: AppColors.primary,
-                  backgroundImage:
-                      avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                  child: avatarUrl == null
-                      ? Text(
-                          initial,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textOnPrimary,
-                          ),
-                        )
-                      : null,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -738,21 +787,11 @@ class JournalDetailScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
+                AppAvatars.build(
+                  avatarIndex: profile?.avatarIndex,
+                  avatarUrl: avatarUrl,
+                  initial: initial,
                   radius: 24,
-                  backgroundColor: AppColors.primary,
-                  backgroundImage:
-                      avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                  child: avatarUrl == null
-                      ? Text(
-                          initial,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textOnPrimary,
-                          ),
-                        )
-                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -828,6 +867,38 @@ class JournalDetailScreen extends ConsumerWidget {
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
+
+void _showMergeChoiceDialog(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('登入 / 建立帳號'),
+      content: const Text('登入後，目前的訪客資料要如何處理？'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            ref.read(shouldMergeGuestDataProvider.notifier).state = false;
+            ref.read(pendingGuestLoginProvider.notifier).state = true;
+          },
+          child: const Text('捨棄資料'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            ref.read(shouldMergeGuestDataProvider.notifier).state = true;
+            ref.read(pendingGuestLoginProvider.notifier).state = true;
+          },
+          child: const Text('整合進帳號'),
+        ),
+      ],
+    ),
+  );
+}
 
 Future<bool> _confirmDelete(BuildContext context, dynamic s) async {
   return await showDialog<bool>(

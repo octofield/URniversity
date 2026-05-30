@@ -49,6 +49,15 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
     state = [];
   }
 
+  Future<void> mergeToUser(String userId) async {
+    _userId = userId;
+    for (final goal in state) {
+      try {
+        await _db.from('future_goals').upsert({...goal.toJson(), 'user_id': userId});
+      } catch (_) {}
+    }
+  }
+
   void _upsert(FutureGoal goal) {
     if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;

@@ -173,6 +173,8 @@ class SemesterSettingsNotifier extends StateNotifier<SemesterSettings> {
     updated[semIdx] = month;
     state = state.copyWith(startMonths: updated);
   }
+
+  void reset() => state = SemesterSettings.defaultSettings;
 }
 
 final semesterSettingsProvider =
