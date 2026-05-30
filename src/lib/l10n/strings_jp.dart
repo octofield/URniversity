@@ -41,11 +41,15 @@ class StringsJp implements AppStrings {
   @override String get addInspiration => 'インスピレーションを追加';
   @override String get inspirationDetails => '詳細（任意）';
 
-  @override String get concentration => '集中';
-  @override String concentrationToday(String t) => '今日：$t';
-  @override String concentrationSession(String t) => 'セッション：$t';
-  @override String get start => '開始';
-  @override String get stop => '停止';
+  @override String get me => 'マイ';
+  @override String get usernameLabel => 'ユーザー名';
+  @override String get accountSettings => 'アカウント設定';
+  @override String get editUsername => 'ユーザー名を編集';
+  @override String get journal => '日記';
+  @override String get noJournal => '日記がありません';
+  @override String get addJournal => '日記を追加';
+  @override String get editJournal => '日記を編集';
+  @override String get journalContent => '内容';
 
   @override String get semester => '学期';
   @override String get future => '未来';
@@ -125,4 +129,16 @@ class StringsJp implements AppStrings {
   @override String get addLinkedGoal => 'ゴールをリンク';
   @override String get selectTask => 'タスクを選択';
   @override String get reset => 'リセット';
+  @override String get school => '学校';
+  @override String get department => '学部・学科';
+  @override String get grade => '学年';
+  @override String get allInspirations => 'すべてのインスピレーション';
+  @override String get completed => '完了';
+  @override String get pending => '進行中';
+  @override String get allJournals => 'すべての日記';
+  @override String get writeJournal => '日記を書く';
+  @override String get showJournalDayCounter => '日記の日数を表示';
+  @override String get versionLabel => 'バージョン';
+  @override String get developerMode => '開発者モード';
+  @override String get devTimeOverride => 'カスタム日付';
 }

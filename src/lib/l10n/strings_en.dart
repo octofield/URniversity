@@ -41,11 +41,15 @@ class StringsEn implements AppStrings {
   @override String get addInspiration => 'Add Inspiration';
   @override String get inspirationDetails => 'Details (optional)';
 
-  @override String get concentration => 'Concentration';
-  @override String concentrationToday(String t) => 'Today: $t';
-  @override String concentrationSession(String t) => 'Session: $t';
-  @override String get start => 'Start';
-  @override String get stop => 'Stop';
+  @override String get me => 'Me';
+  @override String get usernameLabel => 'Username';
+  @override String get accountSettings => 'Account Settings';
+  @override String get editUsername => 'Edit Username';
+  @override String get journal => 'Journal';
+  @override String get noJournal => 'No journal entries yet';
+  @override String get addJournal => 'New Entry';
+  @override String get editJournal => 'Edit Entry';
+  @override String get journalContent => 'Content';
 
   @override String get semester => 'Semester';
   @override String get future => 'Future';
@@ -125,4 +129,16 @@ class StringsEn implements AppStrings {
   @override String get addLinkedGoal => 'Link Goal';
   @override String get selectTask => 'Select Task';
   @override String get reset => 'Reset';
+  @override String get school => 'School';
+  @override String get department => 'Department';
+  @override String get grade => 'Year';
+  @override String get allInspirations => 'All Inspirations';
+  @override String get completed => 'Completed';
+  @override String get pending => 'Active';
+  @override String get allJournals => 'All Journals';
+  @override String get writeJournal => 'Write Journal';
+  @override String get showJournalDayCounter => 'Journal Day Counter';
+  @override String get versionLabel => 'Version';
+  @override String get developerMode => 'Developer Mode';
+  @override String get devTimeOverride => 'Custom Date';
 }
