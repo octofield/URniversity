@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-FLUTTER_VERSION="3.32.0"
+FLUTTER_VERSION="3.44.0"
 FLUTTER_DIR="$HOME/flutter"
 
 # Install Flutter SDK if not cached
