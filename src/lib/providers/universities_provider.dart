@@ -29,9 +29,8 @@ class UniversitiesNotifier extends StateNotifier<UniversitiesState> {
     _load();
   }
 
-  static const _uniKey  = 'universities_v2';
-  static const _deptKey = 'university_depts_v2';
-  static const _timeKey = 'universities_cache_time_v2';
+  static const _uniKey  = 'universities_v3';
+  static const _timeKey = 'universities_cache_time_v3';
   static const _ttlMs   = 86400000; // 24 hours
 
   Future<void> _load() async {
@@ -40,44 +39,30 @@ class UniversitiesNotifier extends StateNotifier<UniversitiesState> {
     final cachedTime = prefs.getInt(_timeKey) ?? 0;
     final age = DateTime.now().millisecondsSinceEpoch - cachedTime;
     if (age < _ttlMs) {
-      final uniJson  = prefs.getString(_uniKey);
-      final deptJson = prefs.getString(_deptKey);
-      if (uniJson != null && deptJson != null) {
-        final raw = jsonDecode(deptJson) as Map<String, dynamic>;
+      final uniJson = prefs.getString(_uniKey);
+      if (uniJson != null) {
         state = UniversitiesState(
           universities: List<String>.from(jsonDecode(uniJson) as List),
-          universityDepts: raw.map((k, v) => MapEntry(k, List<String>.from(v as List))),
+          universityDepts: universityDepartments,
         );
         return;
       }
     }
 
     try {
+      // Only fetch university names from Supabase (small list, no truncation risk).
+      // Departments (5000+ rows) always use the hardcoded map compiled into the binary.
       final uniRows = await Supabase.instance.client
           .from('universities')
           .select('name')
           .order('sort_order');
 
-      // Fetch departments joined with university name
-      final deptRows = await Supabase.instance.client
-          .from('departments')
-          .select('name, universities!inner(name)')
-          .order('sort_order');
-
       final unis = (uniRows as List).map((r) => r['name'] as String).toList();
 
-      final Map<String, List<String>> deptMap = {};
-      for (final row in deptRows as List) {
-        final uniName = (row['universities'] as Map)['name'] as String;
-        final deptName = row['name'] as String;
-        (deptMap[uniName] ??= []).add(deptName);
-      }
-
-      if (unis.isNotEmpty && deptMap.isNotEmpty) {
+      if (unis.isNotEmpty) {
         await prefs.setString(_uniKey, jsonEncode(unis));
-        await prefs.setString(_deptKey, jsonEncode(deptMap));
         await prefs.setInt(_timeKey, DateTime.now().millisecondsSinceEpoch);
-        state = UniversitiesState(universities: unis, universityDepts: deptMap);
+        state = UniversitiesState(universities: unis, universityDepts: universityDepartments);
       }
     } catch (_) {
       // Network error: keep hardcoded fallback
