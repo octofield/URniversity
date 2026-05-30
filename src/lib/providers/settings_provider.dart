@@ -85,6 +85,49 @@ final settingsProvider = StateNotifierProvider<SettingsNotifier, DateDisplayForm
 // 0 = all, 1 = daily, 2 = weekly
 final defaultTaskViewProvider = StateProvider<int>((ref) => 0);
 
+// ── Day counter toggle ────────────────────────────────────────────────────────
+
+final showDayCounterProvider = StateProvider<bool>((ref) => true);
+
+// ── Developer mode ────────────────────────────────────────────────────────────
+
+class DevModeState {
+  final bool enabled;
+  final DateTime? customTime;
+  const DevModeState({this.enabled = false, this.customTime});
+}
+
+class DevModeNotifier extends StateNotifier<DevModeState> {
+  DevModeNotifier() : super(const DevModeState());
+  void enable() => state = DevModeState(enabled: true, customTime: state.customTime);
+  void disable() => state = const DevModeState();
+  void setCustomTime(DateTime? t) => state = DevModeState(enabled: state.enabled, customTime: t);
+}
+
+final devModeProvider = StateNotifierProvider<DevModeNotifier, DevModeState>(
+  (ref) => DevModeNotifier(),
+);
+
+// Effective "now" — returns customTime if dev mode is active, else real time
+final effectiveNowProvider = Provider<DateTime>((ref) {
+  final dev = ref.watch(devModeProvider);
+  if (dev.enabled && dev.customTime != null) return dev.customTime!;
+  return DateTime.now();
+});
+
+// The academic-year number for a given date (the calendar year of the last
+// semester-1 start before or on that date).
+int academicYear(DateTime date, SemesterSettings settings) {
+  final sem1Month = settings.startMonths[0];
+  return date.month >= sem1Month ? date.year : date.year - 1;
+}
+
+// Compute the grade displayed to the user, accounting for elapsed academic years.
+int computedGrade(int baseGrade, int gradeSetYear, DateTime effectiveNow, SemesterSettings settings) {
+  final currentYear = academicYear(effectiveNow, settings);
+  return (baseGrade + (currentYear - gradeSetYear)).clamp(1, 7);
+}
+
 // ── Semester settings ─────────────────────────────────────────────────────────
 
 class SemesterSettings {
@@ -130,6 +173,8 @@ class SemesterSettingsNotifier extends StateNotifier<SemesterSettings> {
     updated[semIdx] = month;
     state = state.copyWith(startMonths: updated);
   }
+
+  void reset() => state = SemesterSettings.defaultSettings;
 }
 
 final semesterSettingsProvider =

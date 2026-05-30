@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/task.dart';
 import 'date_provider.dart';
@@ -9,6 +11,27 @@ class TasksNotifier extends StateNotifier<List<Task>> {
 
   String? _userId;
   SupabaseClient get _db => Supabase.instance.client;
+  static const _localKey = 'guest_tasks';
+  bool get _isGuest => _userId == 'guest';
+
+  Future<void> loadGuest() async {
+    _userId = 'guest';
+    final p = await SharedPreferences.getInstance();
+    final json = p.getString(_localKey);
+    if (json != null) {
+      state = (jsonDecode(json) as List)
+          .map((j) => Task.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } else {
+      state = [];
+    }
+  }
+
+  void _persistLocally() {
+    SharedPreferences.getInstance().then((p) {
+      p.setString(_localKey, jsonEncode(state.map((t) => t.toJson()).toList()));
+    });
+  }
 
   Future<void> load(String userId) async {
     if (_userId == userId) return;
@@ -28,7 +51,17 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     state = [];
   }
 
+  Future<void> mergeToUser(String userId) async {
+    _userId = userId;
+    for (final task in state) {
+      try {
+        await _db.from('tasks').upsert({...task.toJson(), 'user_id': userId});
+      } catch (_) {}
+    }
+  }
+
   void _upsert(Task task) {
+    if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;
     _db.from('tasks')
         .upsert({...task.toJson(), 'user_id': _userId})
@@ -36,6 +69,7 @@ class TasksNotifier extends StateNotifier<List<Task>> {
   }
 
   void _delete(String id) {
+    if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;
     _db.from('tasks').delete().eq('id', id).catchError((_) {});
   }

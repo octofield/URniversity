@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/future_goal.dart';
 
@@ -7,6 +9,27 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
 
   String? _userId;
   SupabaseClient get _db => Supabase.instance.client;
+  static const _localKey = 'guest_future_goals';
+  bool get _isGuest => _userId == 'guest';
+
+  Future<void> loadGuest() async {
+    _userId = 'guest';
+    final p = await SharedPreferences.getInstance();
+    final json = p.getString(_localKey);
+    if (json != null) {
+      state = (jsonDecode(json) as List)
+          .map((j) => FutureGoal.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } else {
+      state = [];
+    }
+  }
+
+  void _persistLocally() {
+    SharedPreferences.getInstance().then((p) {
+      p.setString(_localKey, jsonEncode(state.map((g) => g.toJson()).toList()));
+    });
+  }
 
   Future<void> load(String userId) async {
     if (_userId == userId) return;
@@ -26,7 +49,17 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
     state = [];
   }
 
+  Future<void> mergeToUser(String userId) async {
+    _userId = userId;
+    for (final goal in state) {
+      try {
+        await _db.from('future_goals').upsert({...goal.toJson(), 'user_id': userId});
+      } catch (_) {}
+    }
+  }
+
   void _upsert(FutureGoal goal) {
+    if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;
     _db.from('future_goals')
         .upsert({...goal.toJson(), 'user_id': _userId})
@@ -34,6 +67,7 @@ class FutureGoalsNotifier extends StateNotifier<List<FutureGoal>> {
   }
 
   void _delete(String id) {
+    if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;
     _db.from('future_goals').delete().eq('id', id).catchError((_) {});
   }

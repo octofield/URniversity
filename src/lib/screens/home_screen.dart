@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/settings_provider.dart';
+import '../providers/date_provider.dart';
 import 'today_screen.dart' show TodayScreen, showAddTaskSheet, showAddInspirationSheet;
+
 import 'semester_screen.dart';
 import 'semester_goal_detail_screen.dart' show showAddSemesterGoalSheet;
 import 'future_screen.dart';
+import 'me_screen.dart';
+import 'journal_edit_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +25,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
 
+    // When dev mode changes the effective date, sync the task-date calendar
+    ref.listen<DateTime>(effectiveNowProvider, (_, next) {
+      ref.read(dateProvider.notifier).goToToday(next);
+    });
+
     return Scaffold(
       body: Stack(
         children: [
@@ -30,9 +39,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               TodayScreen(),
               SemesterScreen(),
               FutureScreen(),
+              MeScreen(),
             ],
           ),
-          if (_index == 0)
+          if (_index < 3)
             Positioned(
               left: 16,
               bottom: 16,
@@ -73,6 +83,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         2 => FloatingActionButton(
             onPressed: () => showAddFutureGoalSheet(context, ref),
             child: const Icon(Icons.add)),
+        3 => FloatingActionButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const JournalEditScreen()),
+            ),
+            child: const Icon(Icons.edit_note)),
         _ => null,
       },
       bottomNavigationBar: NavigationBar(
@@ -93,6 +109,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: const Icon(Icons.flag_outlined),
             selectedIcon: const Icon(Icons.flag, color: AppColors.primary),
             label: s.goals,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.person_outlined),
+            selectedIcon: const Icon(Icons.person, color: AppColors.primary),
+            label: s.me,
           ),
         ],
       ),
