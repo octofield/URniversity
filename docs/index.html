@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URniversity — 大學生活規劃工具</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      background: #faf8f5;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(150deg, #b08858 0%, #a07850 55%, #8a6840 100%);
+      color: #fff;
+      padding: 56px 24px 48px;
+      text-align: center;
+    }
+
+    .brand-link { text-decoration: none; color: inherit; }
+    .brand-link:hover h1 { text-decoration: underline; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .app-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+    }
+
+    header h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header > p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    .lang-row {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.875rem;
+    }
+
+    .lang-row a { color: rgba(255,255,255,0.65); text-decoration: none; }
+    .lang-row a.active { color: #fff; font-weight: 600; }
+    .lang-row a:hover { color: #fff; text-decoration: underline; }
+
+    .cta-btn {
+      display: inline-block;
+      margin-top: 24px;
+      background: #fff;
+      color: #a07850;
+      font-weight: 700;
+      padding: 12px 36px;
+      border-radius: 24px;
+      text-decoration: none;
+      font-size: 1rem;
+    }
+
+    .cta-btn:hover { opacity: 0.88; }
+
+    .badge-row {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 0.85rem;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px;
+    }
+
+    .section-title {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #a07850;
+      margin-bottom: 24px;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 56px;
+    }
+
+    .feature-card {
+      background: #fff;
+      border: 1px solid #e8e0d8;
+      border-radius: 12px;
+      padding: 24px 20px;
+    }
+
+    .feature-card .icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: 0.875rem; color: #666; }
+
+    .auth-section {
+      background: #fff;
+      border: 1px solid #e8e0d8;
+      border-radius: 12px;
+      padding: 28px 24px;
+      margin-bottom: 56px;
+    }
+
+    .auth-section ul { list-style: none; margin-top: 12px; }
+
+    .auth-section li {
+      padding: 6px 0;
+      font-size: 0.95rem;
+      color: #444;
+    }
+
+    .auth-section li::before {
+      content: "✓  ";
+      color: #a07850;
+      font-weight: 700;
+    }
+
+    footer {
+      border-top: 1px solid #e8e0d8;
+      text-align: center;
+      padding: 28px 24px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    footer a { color: #a07850; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://urniversity.netlify.app" target="_blank" class="brand-link">
+    <div class="brand">
+      <img src="app_icon.png" alt="URniversity" class="app-icon">
+      <h1>URniversity</h1>
+    </div>
+  </a>
+  <p>規劃你的大學生活，從每日任務到未來願景，一次掌握</p>
+  <a href="https://urniversity.netlify.app" target="_blank" class="cta-btn">立即體驗</a>
+  <nav class="lang-row">
+    <a href="index.html" class="active">繁體中文</a>
+    <a href="index_en.html">英文</a>
+    <a href="index_jp.html">日文</a>
+  </nav>
+  <div class="badge-row">
+    <span class="badge">免費使用</span>
+    <span class="badge">支援繁體中文 · 英文 · 日文</span>
+    <span class="badge">Web / Android / iOS</span>
+  </div>
+</header>
+
+<main>
+  <p class="section-title">核心功能</p>
+  <div class="features">
+    <div class="feature-card">
+      <div class="icon">✅</div>
+      <h3>任務管理</h3>
+      <p>記錄每日待辦，支援重複任務、截止時間與優先度設定</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🎯</div>
+      <h3>學期目標</h3>
+      <p>按學期追蹤目標，設定子目標與里程碑</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🌟</div>
+      <h3>未來願景</h3>
+      <p>規劃交換、實習、競賽等長期目標，建立清晰的未來藍圖</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">💡</div>
+      <h3>靈感記錄</h3>
+      <p>隨時記下想法與靈感，不讓任何好點子溜走</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📔</div>
+      <h3>日記</h3>
+      <p>記錄每一天的生活與心情，追蹤自己的成長</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">☁️</div>
+      <h3>雲端同步</h3>
+      <p>登入後資料自動同步，跨裝置無縫使用</p>
+    </div>
+  </div>
+
+  <p class="section-title">登入方式</p>
+  <div class="auth-section">
+    <ul>
+      <li>Google 帳號</li>
+      <li>電子郵件 + 密碼</li>
+      <li>訪客模式（無需帳號，資料存於本地）</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <p>
+    &copy; 2026 URniversity &nbsp;|&nbsp;
+    <a href="privacy.html">隱私權政策</a> &nbsp;|&nbsp;
+    聯絡：<a href="mailto:octofield.universe@gmail.com">octofield.universe@gmail.com</a>
+  </p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — URniversity</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      background: #faf8f5;
+      color: #1a1a1a;
+      line-height: 1.7;
+    }
+
+    header {
+      background: linear-gradient(150deg, #b08858 0%, #a07850 55%, #8a6840 100%);
+      color: #fff;
+      padding: 36px 24px 28px;
+      text-align: center;
+    }
+
+    .brand-link { text-decoration: none; color: inherit; }
+    .brand-link:hover h1 { text-decoration: underline; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    .app-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+    }
+
+    header h1 { font-size: 1.7rem; font-weight: 700; }
+    header > p { margin-top: 4px; opacity: 0.85; font-size: 0.95rem; }
+
+    .lang-row {
+      margin-top: 14px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.875rem;
+    }
+
+    .lang-row a { color: rgba(255,255,255,0.65); text-decoration: none; }
+    .lang-row a.active { color: #fff; font-weight: 600; }
+    .lang-row a:hover { color: #fff; text-decoration: underline; }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 64px;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #a07850;
+      margin: 36px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e8e0d8;
+    }
+
+    p { margin-bottom: 12px; font-size: 0.95rem; color: #333; }
+    ul { margin: 8px 0 12px 20px; font-size: 0.95rem; color: #333; }
+    ul li { margin-bottom: 6px; }
+
+    .updated { font-size: 0.85rem; color: #888; margin-bottom: 32px; }
+
+    a { color: #a07850; }
+
+    footer {
+      border-top: 1px solid #e8e0d8;
+      text-align: center;
+      padding: 24px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    footer a { color: #a07850; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="https://urniversity.netlify.app" target="_blank" class="brand-link">
+    <div class="brand">
+      <img src="app_icon.png" alt="URniversity" class="app-icon">
+      <h1>Privacy Policy</h1>
+    </div>
+  </a>
+  <p>URniversity</p>
+  <nav class="lang-row">
+    <a href="privacy.html">繁中</a>
+    <a href="privacy_en.html" class="active">English</a>
+    <a href="privacy_jp.html">日本語</a>
+  </nav>
+</header>
+
+<main>
+  <p class="updated">Last updated: May 30, 2026</p>
+
+  <p>URniversity ("the App") is committed to protecting your privacy. This policy describes what data we collect, how we use it, and your rights regarding that data.</p>
+
+  <h2>1. Data We Collect</h2>
+
+  <p><strong>When signing in with Google</strong>, we receive the following from Google:</p>
+  <ul>
+    <li>Email address</li>
+    <li>Display name</li>
+    <li>Google User ID (used solely to identify your account; never shared externally)</li>
+  </ul>
+
+  <p><strong>When signing in with email and password</strong>, we collect:</p>
+  <ul>
+    <li>Email address (passwords are stored in encrypted form and cannot be read by us)</li>
+  </ul>
+
+  <p><strong>When using Guest Mode</strong>, all data is stored locally on your device only and is never sent to any server.</p>
+
+  <p><strong>User-generated content</strong> created within the App, including:</p>
+  <ul>
+    <li>Tasks, semester targets, future goals, inspirations, and journal entries</li>
+    <li>App settings (language, date format, semester configuration, etc.)</li>
+  </ul>
+  <p>This content is linked to your account and stored in our database.</p>
+
+  <p><strong>Feedback submissions</strong>: Feedback sent through the in-app feedback feature is <strong>anonymous</strong>. It contains no account information — only the feedback type, message text, and submission timestamp.</p>
+
+  <h2>2. How We Use Your Data</h2>
+  <ul>
+    <li>To authenticate and identify your account</li>
+    <li>To sync your content between your device and the cloud</li>
+    <li>To receive and review feedback in order to improve the App</li>
+  </ul>
+  <p>We do not use your personal data for advertising and will never sell it to any third party.</p>
+
+  <h2>3. Data Storage and Security</h2>
+  <p>Your data is stored using <a href="https://supabase.com" target="_blank">Supabase</a>, a cloud database service. Supabase servers are located in the United States and operate under industry-standard security practices.</p>
+  <p>We enforce Row Level Security (RLS) policies to ensure that each user can only access their own data.</p>
+
+  <h2>4. Third-Party Services</h2>
+  <p>The App integrates the following third-party services, each governed by their own privacy policy:</p>
+  <ul>
+    <li><strong>Google Sign-In</strong> (Google LLC): <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a></li>
+    <li><strong>Supabase</strong> (Supabase Inc.): <a href="https://supabase.com/privacy" target="_blank">Supabase Privacy Policy</a></li>
+  </ul>
+
+  <h2>5. Data Retention and Deletion</h2>
+  <p>You may permanently delete your account and all associated data at any time via <strong>Settings → Delete Account</strong> within the App. This action is irreversible.</p>
+  <p>Anonymous feedback data is not linked to any account, is not affected by account deletion, and contains no personally identifiable information.</p>
+
+  <h2>6. Children's Privacy</h2>
+  <p>The App is not directed at children under the age of 13 and does not knowingly collect personal data from children. If you believe we have inadvertently collected such data, please contact us using the information below.</p>
+
+  <h2>7. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated "Last updated" date at the top. We encourage you to review this policy periodically.</p>
+
+  <h2>8. Contact Us</h2>
+  <p>If you have any questions about this Privacy Policy, please contact us at:</p>
+  <p><a href="mailto:octofield.universe@gmail.com">octofield.universe@gmail.com</a></p>
+</main>
+
+<footer>
+  <a href="index_en.html">← Back to Home</a>
+</footer>
+
+</body>
+</html>
