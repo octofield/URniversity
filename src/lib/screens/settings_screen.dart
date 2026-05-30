@@ -2,19 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_colors.dart';
+import '../providers/guest_provider.dart';
 import '../providers/settings_provider.dart';
 import 'trash_screen.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  int _versionTaps = 0;
+
+  void _onVersionTap() {
+    setState(() {
+      _versionTaps++;
+      if (_versionTaps >= 7) {
+        _versionTaps = 0;
+        final dev = ref.read(devModeProvider);
+        if (dev.enabled) {
+          ref.read(devModeProvider.notifier).disable();
+        } else {
+          ref.read(devModeProvider.notifier).enable();
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final currentLang = ref.watch(languageProvider);
     final currentFmt = ref.watch(settingsProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
     final defaultView = ref.watch(defaultTaskViewProvider);
+    final showDayCounter = ref.watch(showDayCounterProvider);
+    final dev = ref.watch(devModeProvider);
+    final isGuest = ref.watch(guestModeProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(s.settings)),
@@ -44,6 +70,13 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showSemesterSettingsDialog(context, ref, s, semSettings),
           ),
+          SwitchListTile(
+            title: Text(s.showJournalDayCounter),
+            value: showDayCounter,
+            activeThumbColor: AppColors.primary,
+            onChanged: (v) =>
+                ref.read(showDayCounterProvider.notifier).state = v,
+          ),
           ListTile(
             title: Text(s.trash),
             leading: const Icon(Icons.delete_outline),
@@ -53,12 +86,73 @@ class SettingsScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const TrashScreen()),
             ),
           ),
-          const Divider(),
-          ListTile(
-            title: const Text('登出', style: TextStyle(color: AppColors.error)),
-            leading: const Icon(Icons.logout, color: AppColors.error),
-            onTap: () => _confirmLogout(context),
+          GestureDetector(
+            onTap: _onVersionTap,
+            behavior: HitTestBehavior.opaque,
+            child: ListTile(
+              title: Text(s.versionLabel),
+              subtitle: const Text('alpha-1.0'),
+              trailing: dev.enabled
+                  ? const Icon(Icons.code, color: AppColors.primary)
+                  : null,
+            ),
           ),
+          // Developer mode section — visible only after unlocking
+          if (dev.enabled) ...[
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Text(
+                s.developerMode,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule, color: AppColors.primary),
+              title: Text(s.devTimeOverride),
+              subtitle: Text(
+                dev.customTime != null
+                    ? formatDate(dev.customTime!, DateDisplayFormat.yyyymmdd)
+                    : '—',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: dev.customTime ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2035),
+                );
+                if (picked != null) {
+                  ref.read(devModeProvider.notifier).setCustomTime(picked);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh, color: AppColors.primary),
+              title: Text(s.reset),
+              onTap: () =>
+                  ref.read(devModeProvider.notifier).setCustomTime(null),
+            ),
+          ],
+          const Divider(),
+          if (isGuest)
+            ListTile(
+              title: const Text('退出訪客模式', style: TextStyle(color: AppColors.error)),
+              leading: const Icon(Icons.logout, color: AppColors.error),
+              onTap: () => ref.read(guestModeProvider.notifier).disable(),
+            )
+          else
+            ListTile(
+              title: const Text('登出', style: TextStyle(color: AppColors.error)),
+              leading: const Icon(Icons.logout, color: AppColors.error),
+              onTap: () => _confirmLogout(context),
+            ),
         ],
       ),
     );

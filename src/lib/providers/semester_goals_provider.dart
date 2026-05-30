@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/semester_goal.dart';
 import 'settings_provider.dart';
@@ -52,6 +54,27 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
 
   String? _userId;
   SupabaseClient get _db => Supabase.instance.client;
+  static const _localKey = 'guest_sem_goals';
+  bool get _isGuest => _userId == 'guest';
+
+  Future<void> loadGuest() async {
+    _userId = 'guest';
+    final p = await SharedPreferences.getInstance();
+    final json = p.getString(_localKey);
+    if (json != null) {
+      state = (jsonDecode(json) as List)
+          .map((j) => SemesterGoal.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } else {
+      state = [];
+    }
+  }
+
+  void _persistLocally() {
+    SharedPreferences.getInstance().then((p) {
+      p.setString(_localKey, jsonEncode(state.map((g) => g.toJson()).toList()));
+    });
+  }
 
   Future<void> load(String userId) async {
     if (_userId == userId) return;
@@ -72,6 +95,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
   }
 
   void _upsert(SemesterGoal goal) {
+    if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;
     _db.from('semester_goals')
         .upsert({...goal.toJson(), 'user_id': _userId})
@@ -79,6 +103,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
   }
 
   void _delete(String id) {
+    if (_isGuest) { _persistLocally(); return; }
     if (_userId == null) return;
     _db.from('semester_goals').delete().eq('id', id).catchError((_) {});
   }

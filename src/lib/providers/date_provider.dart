@@ -8,7 +8,7 @@ class DateNotifier extends StateNotifier<DateTime> {
   void prev() => state = state.subtract(const Duration(days: 1));
   void next() => state = state.add(const Duration(days: 1));
   void setDate(DateTime date) => state = _stripTime(date);
-  void goToToday() => state = _stripTime(DateTime.now());
+  void goToToday([DateTime? now]) => state = _stripTime(now ?? DateTime.now());
 }
 
 final dateProvider = StateNotifierProvider<DateNotifier, DateTime>(

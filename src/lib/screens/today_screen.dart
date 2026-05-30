@@ -39,9 +39,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   void _prevWeek() => setState(() => _weekStart = _weekStart.subtract(const Duration(days: 7)));
   void _nextWeek() => setState(() => _weekStart = _weekStart.add(const Duration(days: 7)));
 
-  bool get _isCurrentWeek {
-    final today = DateTime.now();
-    final monday = _mondayOf(today);
+  bool _isCurrentWeek(DateTime effectiveNow) {
+    final monday = _mondayOf(effectiveNow);
     return _weekStart.year == monday.year &&
         _weekStart.month == monday.month &&
         _weekStart.day == monday.day;
@@ -53,7 +52,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final taskView = ref.watch(taskViewProvider);
     final selectedDate = ref.watch(dateProvider);
     final dateFormat = ref.watch(settingsProvider);
-    final now = DateTime.now();
+    final now = ref.watch(effectiveNowProvider);
     final isToday = selectedDate.year == now.year &&
         selectedDate.month == now.month &&
         selectedDate.day == now.day;
@@ -145,7 +144,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ),
                   if (!isToday)
                     TextButton(
-                      onPressed: () => ref.read(dateProvider.notifier).goToToday(),
+                      onPressed: () => ref.read(dateProvider.notifier).goToToday(now),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
@@ -177,11 +176,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     visualDensity: VisualDensity.compact,
                     onPressed: _nextWeek,
                   ),
-                  if (!_isCurrentWeek)
+                  if (!_isCurrentWeek(now))
                     TextButton(
                       onPressed: () {
-                        setState(() => _weekStart = _mondayOf(DateTime.now()));
-                        ref.read(dateProvider.notifier).goToToday();
+                        setState(() => _weekStart = _mondayOf(now));
+                        ref.read(dateProvider.notifier).goToToday(now);
                       },
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
