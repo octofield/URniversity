@@ -41,7 +41,6 @@ build/
 **/ios/Pods/
 
 # Web
-lib/generated_plugin_registrant.dart
 
 # Secrets (never commit these)
 .env
