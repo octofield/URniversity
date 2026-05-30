@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../providers/guest_provider.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -166,6 +168,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Text('註冊'),
                   ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Consumer(
+                builder: (ctx, ref, _) => TextButton(
+                  onPressed: _loading
+                      ? null
+                      : () async {
+                          setState(() => _loading = true);
+                          await ref.read(guestModeProvider.notifier).enable();
+                          if (mounted) setState(() => _loading = false);
+                        },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textTertiary,
+                  ),
+                  child: const Text('以訪客身份體驗'),
+                ),
               ),
             ],
           ),

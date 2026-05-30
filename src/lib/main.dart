@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/guest_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/sync_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
+  await preloadGuestMode();
   runApp(const ProviderScope(child: App()));
 }
 
@@ -52,6 +54,7 @@ class _AuthGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(guestModeProvider)) return const HomeScreen();
     final authState = ref.watch(authStateProvider);
     return authState.when(
       loading: () {

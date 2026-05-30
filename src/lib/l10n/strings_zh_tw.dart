@@ -41,11 +41,15 @@ class StringsZhTw implements AppStrings {
   @override String get addInspiration => '新增靈感';
   @override String get inspirationDetails => '詳細（選填）';
 
-  @override String get concentration => '專注';
-  @override String concentrationToday(String t) => '今日：$t';
-  @override String concentrationSession(String t) => '本次：$t';
-  @override String get start => '開始';
-  @override String get stop => '停止';
+  @override String get me => '我的';
+  @override String get usernameLabel => '使用者名稱';
+  @override String get accountSettings => '帳號設定';
+  @override String get editUsername => '編輯使用者名稱';
+  @override String get journal => '日記';
+  @override String get noJournal => '尚無日記';
+  @override String get addJournal => '新增日記';
+  @override String get editJournal => '編輯日記';
+  @override String get journalContent => '內容';
 
   @override String get semester => '學期';
   @override String get future => '未來';
@@ -125,4 +129,16 @@ class StringsZhTw implements AppStrings {
   @override String get addLinkedGoal => '新增連結願景';
   @override String get selectTask => '選擇任務';
   @override String get reset => '重置';
+  @override String get school => '學校';
+  @override String get department => '系所';
+  @override String get grade => '年級';
+  @override String get allInspirations => '所有靈感';
+  @override String get completed => '已完成';
+  @override String get pending => '進行中';
+  @override String get allJournals => '所有日記';
+  @override String get writeJournal => '撰寫日記';
+  @override String get showJournalDayCounter => '日記顯示天數';
+  @override String get versionLabel => '版本';
+  @override String get developerMode => '開發者模式';
+  @override String get devTimeOverride => '自訂系統日期';
 }

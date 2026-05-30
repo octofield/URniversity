@@ -38,11 +38,16 @@ abstract class AppStrings {
   String get addInspiration;
   String get inspirationDetails;
 
-  String get concentration;
-  String concentrationToday(String t);
-  String concentrationSession(String t);
-  String get start;
-  String get stop;
+  // Me page
+  String get me;
+  String get usernameLabel;
+  String get accountSettings;
+  String get editUsername;
+  String get journal;
+  String get noJournal;
+  String get addJournal;
+  String get editJournal;
+  String get journalContent;
 
   String get semester;
   String get future;
@@ -125,4 +130,24 @@ abstract class AppStrings {
   String get addLinkedGoal;
   String get selectTask;
   String get reset;
+
+  // Me page — profile fields
+  String get school;
+  String get department;
+  String get grade;
+
+  // Inspirations full page
+  String get allInspirations;
+  String get completed;
+  String get pending;
+
+  // Journal full page & editor
+  String get allJournals;
+  String get writeJournal;
+
+  // Journal day counter & developer mode
+  String get showJournalDayCounter;
+  String get versionLabel;
+  String get developerMode;
+  String get devTimeOverride;
 }
