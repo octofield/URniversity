@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URniversity · 期末報告</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft JhengHei','PingFang TC','Segoe UI',sans-serif;background:#0F0E17;color:#FFFFFE;overflow:hidden;width:100vw;height:100vh}
+
+:root{
+  --accent:#06B6D4;--accent2:#22D3EE;--accent3:#67E8F9;
+  --accent-glow:rgba(6,182,212,.3);
+  --green:#10B981;--red:#EF4444;
+  --dark:#0F0E17;--dark2:#1A1932;
+  --gray:#A7A9BE;--light:#FFFFFE;
+}
+
+.lc{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
+.lc-96 svg{width:96px;height:96px}.lc-80 svg{width:80px;height:80px}.lc-64 svg{width:64px;height:64px}
+.lc-48 svg{width:48px;height:48px}.lc-40 svg{width:40px;height:40px}.lc-36 svg{width:36px;height:36px}
+.lc-32 svg{width:32px;height:32px}.lc-28 svg{width:28px;height:28px}.lc-24 svg{width:24px;height:24px}
+.lc-20 svg{width:20px;height:20px}.lc-18 svg{width:18px;height:18px}
+
+.slide-container{width:100vw;height:100vh;position:relative}
+.slide{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:36px 60px;opacity:0;pointer-events:none;transition:opacity .4s ease;overflow:hidden}
+.slide.active{opacity:1;pointer-events:auto}
+.slide .an{opacity:0;transform:translateY(40px);transition:none}
+.slide.active .an.show{opacity:1;transform:translateY(0);transition:opacity .45s cubic-bezier(.25,.46,.45,.94),transform .45s cubic-bezier(.25,.46,.45,.94)}
+
+.deco{position:absolute;border-radius:50%;pointer-events:none}
+.deco-cyan{background:radial-gradient(circle,rgba(6,182,212,.15),transparent)}
+.deco-teal{background:radial-gradient(circle,rgba(20,184,166,.12),transparent)}
+.deco-sky{background:radial-gradient(circle,rgba(14,165,233,.1),transparent)}
+.deco-emerald{background:radial-gradient(circle,rgba(16,185,129,.1),transparent)}
+.deco-rose{background:radial-gradient(circle,rgba(244,63,94,.1),transparent)}
+.deco-violet{background:radial-gradient(circle,rgba(139,92,246,.08),transparent)}
+
+.t-hero{font-size:7.5rem;font-weight:900;line-height:1.1;text-align:center}
+.t-huge{font-size:5.5rem;font-weight:900;line-height:1.15;text-align:center}
+.t-big{font-size:4rem;font-weight:800;line-height:1.25;text-align:center}
+.t-mid{font-size:3rem;font-weight:700;line-height:1.35;text-align:center}
+.t-body{font-size:2.4rem;font-weight:400;line-height:1.6;text-align:center}
+.t-sm{font-size:1.8rem;font-weight:400;line-height:1.5;text-align:center}
+
+.c-cyan{color:#06B6D4}.c-sky{color:#0EA5E9}.c-emerald{color:#10B981}.c-rose{color:#F43F5E}
+.c-purple{color:#A78BFA}.c-teal{color:#14B8A6}.c-orange{color:#F97316}.c-amber{color:#F59E0B}
+.c-gray{color:#A7A9BE}.c-white{color:#fff}.c-red{color:#EF4444}.c-dark{color:#FFFFFE}
+.c-green{color:#10B981}
+
+.bg-cyan{background:rgba(6,182,212,.12);padding:6px 20px;border-radius:10px}
+.bg-rose{background:rgba(244,63,94,.12);padding:6px 20px;border-radius:10px}
+.bg-emerald{background:rgba(16,185,129,.12);padding:6px 20px;border-radius:10px}
+.bg-teal{background:rgba(20,184,166,.12);padding:6px 20px;border-radius:10px}
+.bg-sky{background:rgba(14,165,233,.12);padding:6px 20px;border-radius:10px}
+.bg-purple{background:rgba(167,139,250,.12);padding:6px 20px;border-radius:10px}
+
+.ul-cyan{text-decoration:underline;text-decoration-color:#06B6D4;text-decoration-thickness:4px;text-underline-offset:8px}
+.ul-rose{text-decoration:underline;text-decoration-color:#F43F5E;text-decoration-thickness:4px;text-underline-offset:8px}
+.bold{font-weight:900}.italic{font-style:italic}
+.line{width:70px;height:4px;border-radius:2px;background:linear-gradient(90deg,#06B6D4,#22D3EE);margin:14px auto}
+
+.bg-s1{background:radial-gradient(ellipse at 50% 30%,#1A1932 0%,#0F0E17 100%)}
+.bg-s2{background:radial-gradient(ellipse at 30% 60%,#1A1932 0%,#0F0E17 100%)}
+.bg-s3{background:radial-gradient(ellipse at 70% 40%,#1A1932 0%,#0F0E17 100%)}
+.bg-s4{background:radial-gradient(ellipse at 40% 70%,#1A1932 0%,#0F0E17 100%)}
+.bg-s5{background:radial-gradient(ellipse at 50% 50%,#1A1932 0%,#0F0E17 100%)}
+
+/* Code rain */
+.code-rain-container{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;opacity:.08}
+.code-col{position:absolute;top:-100%;font-family:'Courier New',monospace;font-size:14px;color:#06B6D4;writing-mode:vertical-rl;animation:codefall linear infinite}
+@keyframes codefall{0%{top:-100%}100%{top:120%}}
+
+/* Terminal */
+.terminal{background:#1e1e3e;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);border:1px solid rgba(6,182,212,.2)}
+.terminal-bar{height:36px;background:#2d2d5a;display:flex;align-items:center;padding:0 14px;gap:8px}
+.terminal-bar span.dot{width:12px;height:12px;border-radius:50%}
+.terminal-body{padding:18px 22px;font-family:'Courier New',monospace;font-size:15px;line-height:1.8;color:#A7A9BE}
+.t-green{color:#10B981}.t-blue{color:#22D3EE}.t-yellow{color:#F59E0B}.t-pink{color:#F472B6}
+.t-cursor{display:inline-block;width:10px;height:20px;background:#22D3EE;animation:blink 1s step-end infinite;vertical-align:middle}
+@keyframes blink{50%{opacity:0}}
+
+/* Feature cards */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:95%;max-width:960px}
+.feat-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:22px 20px;border-radius:18px;background:rgba(255,255,255,.04);border:1.5px solid rgba(6,182,212,.12);box-shadow:0 4px 18px rgba(0,0,0,.3);backdrop-filter:blur(10px)}
+.feat-card h3{font-size:1.65rem;font-weight:800}
+.feat-card p{font-size:1.25rem;color:#A7A9BE;line-height:1.5}
+
+/* Challenge cards */
+.chal-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;width:96%;max-width:1000px}
+.chal-card{flex:1;min-width:240px;max-width:310px;display:flex;flex-direction:column;gap:12px;padding:24px 22px;border-radius:20px;background:rgba(255,255,255,.04);border:2px solid rgba(6,182,212,.1);box-shadow:0 4px 20px rgba(0,0,0,.3);backdrop-filter:blur(10px)}
+.chal-num{font-size:3.8rem;font-weight:900;line-height:1}
+
+/* Tech badges */
+.tech-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap}
+.tech-badge{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;border-radius:36px;font-size:1.8rem;font-weight:800}
+
+/* VS comparison */
+.vs-row{display:flex;align-items:stretch;gap:0;width:92%;max-width:900px}
+.vs-card{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 24px;border-radius:20px}
+.vs-divider{display:flex;align-items:center;justify-content:center;width:60px;flex-shrink:0}
+.vs-tag{font-size:1.4rem;font-weight:900;padding:4px 16px;border-radius:10px}
+.complexity{font-size:4.5rem;font-weight:900;line-height:1}
+.code-snippet{font-family:'Courier New',monospace;font-size:1.3rem;padding:14px 20px;border-radius:10px;text-align:left;width:100%;line-height:1.7}
+
+/* Data table */
+.perf-table{border-collapse:collapse;width:88%;max-width:800px}
+.perf-table th,.perf-table td{padding:14px 24px;text-align:center;border:1px solid rgba(6,182,212,.12)}
+.perf-table thead th{background:rgba(6,182,212,.1);color:#22D3EE;font-size:1.05rem;font-weight:800}
+.perf-table tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+.perf-table td{font-size:1rem;color:#D1D5DB}
+.td-set{color:#10B981;font-weight:700}.td-list{color:#F43F5E;font-weight:700}.td-mult{color:#F59E0B;font-weight:700}
+
+/* Bar compare */
+.bar-wrap{width:88%;max-width:700px}
+.bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.bar-label{font-size:1rem;font-weight:700;width:80px;text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:20px;border-radius:10px;background:rgba(255,255,255,.06);overflow:hidden}
+.bar-fill{height:100%;border-radius:10px;transition:width 1.4s ease}
+.bar-val{font-size:.95rem;font-weight:700;width:70px;flex-shrink:0}
+
+/* Deep bench (Slide 7) */
+.btab{padding:7px 15px;border-radius:18px;border:1.5px solid rgba(6,182,212,.2);background:rgba(255,255,255,.03);color:#A7A9BE;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit}
+.btab.act{background:rgba(6,182,212,.12);color:#22D3EE;border-color:rgba(6,182,212,.4)}
+.sc-btn{padding:8px 18px;border-radius:10px;border:1.5px solid rgba(6,182,212,.25);background:rgba(6,182,212,.06);color:#22D3EE;font-size:.85rem;font-weight:800;cursor:pointer;font-family:inherit;transition:background .2s}
+.sc-btn:hover{background:rgba(6,182,212,.15)}
+.rn-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 20px;border-radius:10px;border:2px solid #06B6D4;background:rgba(6,182,212,.1);color:#22D3EE;font-size:.88rem;font-weight:800;cursor:pointer;transition:all .2s;font-family:inherit}
+.rn-btn:disabled{opacity:.4;cursor:default}
+.stat-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.82rem}
+
+/* Float particles */
+.float-p{position:absolute;border-radius:50%;pointer-events:none;animation:floatP 5s ease-in-out infinite}
+@keyframes floatP{0%,100%{transform:translateY(0) scale(1);opacity:.15}50%{transform:translateY(-18px) scale(1.15);opacity:.28}}
+
+/* Gradient text */
+.grad-text{background:linear-gradient(135deg,#06B6D4,#22D3EE,#67E8F9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* Closing icon circle */
+.close-circle{width:140px;height:140px;border-radius:50%;background:linear-gradient(135deg,rgba(6,182,212,.15),rgba(34,211,238,.08));border:2.5px solid rgba(6,182,212,.3);display:flex;align-items:center;justify-content:center}
+
+/* Page indicator */
+#page-indicator{position:fixed;bottom:22px;right:28px;font-size:.85rem;color:rgba(167,169,190,.5);font-weight:600;z-index:100;letter-spacing:.05em}
+</style>
+</head>
+<body>
+
+<div id="page-indicator">1 / 8</div>
+
+<div class="slide-container">
+
+<!-- ====== Slide 1: 標題 ====== -->
+<div class="slide bg-s5 active" id="s0">
+  <div class="deco deco-emerald" style="width:500px;height:500px;top:-200px;right:-150px"></div>
+  <div class="deco deco-cyan" style="width:400px;height:400px;bottom:-120px;left:-120px"></div>
+
+  <div class="code-rain-container">
+    <div class="code-col" style="left:4%;animation-duration:8s;animation-delay:0s">final tasks = ref.watch(tasksProvider);</div>
+    <div class="code-col" style="left:14%;animation-duration:10s;animation-delay:1.5s">class SemesterGoal extends Model {}</div>
+    <div class="code-col" style="left:26%;animation-duration:7s;animation-delay:0.8s">await supabase.from('tasks').insert(data);</div>
+    <div class="code-col" style="left:40%;animation-duration:9s;animation-delay:2s">bool _isRecurring(Task t) => t.recurrence != null;</div>
+    <div class="code-col" style="left:54%;animation-duration:11s;animation-delay:0.5s">Set&lt;String&gt; filterIds = {};</div>
+    <div class="code-col" style="left:67%;animation-duration:8.5s;animation-delay:3s">void collect(String id) { result.add(goal); }</div>
+    <div class="code-col" style="left:80%;animation-duration:9.5s;animation-delay:1s">return [...recurring, ...withDue];</div>
+    <div class="code-col" style="left:92%;animation-duration:7.5s;animation-delay:2.5s">final sw = Stopwatch()..start();</div>
+  </div>
+
+  <div class="float-p" style="width:14px;height:14px;background:#06B6D4;top:18%;left:8%;animation-delay:0s"></div>
+  <div class="float-p" style="width:10px;height:10px;background:#22D3EE;top:30%;right:12%;animation-delay:1.8s"></div>
+  <div class="float-p" style="width:8px;height:8px;background:#14B8A6;bottom:25%;left:20%;animation-delay:3.2s"></div>
+
+  <div class="an" style="margin-bottom:8px">
+    <span class="tech-badge" style="background:rgba(6,182,212,.1);color:#22D3EE;font-size:1.2rem">
+      <span class="lc lc-24 c-cyan"><i data-lucide="graduation-cap"></i></span>
+      DSAP期末專題報告
+    </span>
+  </div>
+
+  <div class="an t-hero grad-text" style="margin-top:8px;letter-spacing:-1px">URniversity</div>
+
+  <div class="an line"></div>
+
+  <div class="an t-mid c-gray" style="margin-top:4px">規劃你的大學生活</div>
+
+  <div class="an" style="margin-top:20px">
+    <div class="terminal" style="max-width:560px">
+      <div class="terminal-bar">
+        <span class="dot" style="background:#ff5f57"></span>
+        <span class="dot" style="background:#febc2e"></span>
+        <span class="dot" style="background:#28c840"></span>
+        <span style="font-size:13px;color:#A7A9BE;margin-left:10px;font-family:sans-serif">urniversity-app</span>
+      </div>
+      <div class="terminal-body">
+        <div><span class="t-green">$</span> <span class="t-blue">flutter</span> run --release</div>
+        <div><span class="lc lc-16" style="color:#F59E0B;vertical-align:middle"><i data-lucide="zap"></i></span> <span class="t-yellow">Building...</span></div>
+        <div><span class="t-green">✓</span> 任務 · 目標 · 願景 <span class="t-pink">三層架構</span></div>
+        <div><span class="t-green">✓</span> Supabase 資料庫連線成功</div>
+        <div><span class="t-green">$</span> <span class="t-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="an t-sm c-gray italic" style="margin-top:14px">Flutter + Riverpod + Supabase + Netlify + Google OAuth</div>
+</div>
+
+<!-- ====== Slide 2: 成果展示 - 三層架構 ====== -->
+<div class="slide bg-s3" id="s1">
+  <div class="deco deco-sky" style="width:450px;height:450px;top:-150px;left:-120px"></div>
+
+  <div class="an">
+    <span class="lc lc-56 c-cyan"><i data-lucide="layers"></i></span>
+  </div>
+  <div class="an t-huge c-dark" style="margin-top:10px">成果展示</div>
+  <div class="an line"></div>
+  <div class="an t-mid c-gray">三層架構可互相連接 · 想要什麼樣的未來？</div>
+
+  <div class="an" style="margin-top:22px;display:flex;gap:22px;justify-content:center;flex-wrap:wrap;width:96%;max-width:980px">
+
+    <div style="flex:1;min-width:240px;max-width:300px;display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 22px;border-radius:22px;background:rgba(6,182,212,.06);border:2px solid rgba(6,182,212,.25);box-shadow:0 6px 24px rgba(0,0,0,.3)">
+      <span class="lc lc-48 c-cyan"><i data-lucide="check-square"></i></span>
+      <div style="font-size:2rem;font-weight:900;color:#22D3EE">Today</div>
+      <div style="font-size:.95rem;color:#A7A9BE;text-align:center;line-height:1.6">每日任務管理<br>循環設定 · 截止時間<br>自動分組排序</div>
+    </div>
+
+    <div style="flex:1;min-width:240px;max-width:300px;display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 22px;border-radius:22px;background:rgba(16,185,129,.06);border:2px solid rgba(16,185,129,.25);box-shadow:0 6px 24px rgba(0,0,0,.3)">
+      <span class="lc lc-48 c-emerald"><i data-lucide="target"></i></span>
+      <div style="font-size:2rem;font-weight:900;color:#10B981">Semester</div>
+      <div style="font-size:.95rem;color:#A7A9BE;text-align:center;line-height:1.6">學期目標管理<br>樹形子目標結構<br>進度條視覺化</div>
+    </div>
+
+    <div style="flex:1;min-width:240px;max-width:300px;display:flex;flex-direction:column;align-items:center;gap:12px;padding:28px 22px;border-radius:22px;background:rgba(167,139,250,.06);border:2px solid rgba(167,139,250,.25);box-shadow:0 6px 24px rgba(0,0,0,.3)">
+      <span class="lc lc-48 c-purple"><i data-lucide="star"></i></span>
+      <div style="font-size:2rem;font-weight:900;color:#A78BFA">Future</div>
+      <div style="font-size:.95rem;color:#A7A9BE;text-align:center;line-height:1.6">未來願景規劃<br>交換 · 實習 · 競賽<br>時間軸 · 類別篩選</div>
+    </div>
+
+  </div>
+
+  <div class="an t-sm c-gray italic" style="margin-top:18px">登入 · 雲端同步 · 支援繁體中文 / 英文 / 日文</div>
+</div>
+
+<!-- ====== Slide 3: 六大功能 ====== -->
+<div class="slide bg-s2" id="s2">
+  <div class="deco deco-rose" style="width:500px;height:500px;bottom:-180px;right:-150px"></div>
+
+  <div class="an t-huge c-dark">六大核心功能</div>
+  <div class="an line"></div>
+
+  <div class="an feat-grid" style="margin-top:18px">
+
+    <div class="feat-card" style="border-left:4px solid #06B6D4">
+      <span class="lc lc-32 c-cyan"><i data-lucide="check-square-2"></i></span>
+      <h3 class="c-cyan">任務管理</h3>
+      <p>支援循環規則（每日／每週／每月）、截止時間、優先級，依類型自動分組排序</p>
+    </div>
+
+    <div class="feat-card" style="border-left:4px solid #10B981">
+      <span class="lc lc-32 c-emerald"><i data-lucide="target"></i></span>
+      <h3 class="c-emerald">學期目標</h3>
+      <p>一個學期內要完成什麼目標，支援訂定子目標，拖曳排序，完成率即時更新</p>
+    </div>
+
+    <div class="feat-card" style="border-left:4px solid #A78BFA">
+      <span class="lc lc-32 c-purple"><i data-lucide="star"></i></span>
+      <h3 class="c-purple">未來願景</h3>
+      <p>規劃交換、實習、競賽等願景，時間軸視覺化，多類別管理</p>
+    </div>
+
+    <div class="feat-card" style="border-left:4px solid #F59E0B">
+      <span class="lc lc-32 c-amber"><i data-lucide="lightbulb"></i></span>
+      <h3 class="c-amber">靈感記錄</h3>
+      <p>這是什麼閃現？</p>
+    </div>
+
+    <div class="feat-card" style="border-left:4px solid #F472B6">
+      <span class="lc lc-32" style="color:#F472B6"><i data-lucide="notebook-pen"></i></span>
+      <h3 style="color:#F472B6">日記</h3>
+      <p>記錄每天發生了什麼，回顧個人成長歷程</p>
+    </div>
+
+    <div class="feat-card" style="border-left:4px solid #0EA5E9">
+      <span class="lc lc-32 c-sky"><i data-lucide="cloud"></i></span>
+      <h3 class="c-sky">雲端同步</h3>
+      <p>登入後跨裝置同步，Google一鍵登入</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== Slide 4: 探索過程 - 技術選型 ====== -->
+<div class="slide bg-s4" id="s3">
+  <div class="deco deco-cyan" style="width:500px;height:500px;top:-180px;left:-150px"></div>
+  <div class="float-p" style="width:12px;height:12px;background:#06B6D4;top:20%;right:10%;animation-delay:1s"></div>
+  <div class="float-p" style="width:8px;height:8px;background:#22D3EE;bottom:20%;left:15%;animation-delay:2.5s"></div>
+
+  <div class="an">
+    <span class="lc lc-56 c-cyan"><i data-lucide="wrench"></i></span>
+  </div>
+  <div class="an t-huge c-dark" style="margin-top:10px">探索過程</div>
+  <div class="an line"></div>
+  <div class="an t-mid c-gray">選取各項技術與框架 · 設計到上線</div>
+
+  <div class="an tech-row" style="margin-top:24px">
+    <div class="tech-badge" style="background:rgba(6,182,212,.1);color:#22D3EE">
+      <span class="lc lc-28"><i data-lucide="smartphone" style="color:#22D3EE"></i></span>
+      Flutter
+    </div>
+    <div class="tech-badge" style="background:rgba(167,139,250,.1);color:#A78BFA">
+      <span class="lc lc-28"><i data-lucide="layers" style="color:#A78BFA"></i></span>
+      Riverpod
+    </div>
+    <div class="tech-badge" style="background:rgba(16,185,129,.1);color:#10B981">
+      <span class="lc lc-28"><i data-lucide="database" style="color:#10B981"></i></span>
+      Supabase
+    </div>
+    <div class="tech-badge" style="background:rgba(0,173,159,.1);color:#00C4B7">
+      <span class="lc lc-28"><i data-lucide="cloud-upload" style="color:#00C4B7"></i></span>
+      Netlify
+    </div>
+    <div class="tech-badge" style="background:rgba(234,67,53,.1);color:#F87171">
+      <span class="lc lc-28"><i data-lucide="log-in" style="color:#F87171"></i></span>
+      Google OAuth
+    </div>
+  </div>
+
+  <div class="an" style="margin-top:24px">
+    <div style="display:flex;flex-direction:column;gap:14px;align-items:flex-start;background:rgba(255,255,255,.04);border-radius:18px;padding:26px 36px;border:1.5px solid rgba(6,182,212,.12);max-width:640px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">跨平台 → Flutter</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">狀態管理 → Riverpod</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">資料庫 → Supabase</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">資料隔離 → Row Level Security</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">即時回饋 → Resend API → Edge Function</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">自動部署 → Netlify</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="lc lc-28 c-cyan"><i data-lucide="check-circle-2"></i></span>
+        <span style="font-size:1.2rem;color:#D1D5DB">快捷登入 → Google OAuth</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== Slide 5: 三大挑戰 ====== -->
+<div class="slide bg-s1" id="s4">
+  <div class="deco deco-violet" style="width:600px;height:600px;top:50%;left:50%;margin-top:-300px;margin-left:-300px"></div>
+
+  <div class="an">
+    <span class="lc lc-56 c-amber"><i data-lucide="triangle-alert"></i></span>
+  </div>
+  <div class="an t-huge c-dark" style="margin-top:8px">開發挑戰</div>
+  <div class="an line" style="background:linear-gradient(90deg,#F59E0B,#F97316)"></div>
+
+  <div class="an chal-row" style="margin-top:20px">
+
+    <div class="chal-card" style="border-top:4px solid #06B6D4">
+      <div class="chal-num c-cyan">01</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="lc lc-22 c-cyan"><i data-lucide="git-branch"></i></span>
+        <span style="font-size:1.15rem;font-weight:800;color:#22D3EE">目標可以無限嵌套</span>
+      </div>
+      <div style="font-size:.92rem;color:#A7A9BE;line-height:1.6">
+        子目標無限嵌套（n-ary tree）<br>
+        刪除時遞迴移除所有子孫<br>
+        支援拖曳移動重新排序
+        移動前需祖先檢查，防止循環依賴
+      </div>
+      <div style="font-family:'Courier New',monospace;font-size:.82rem;color:#67E8F9;background:rgba(6,182,212,.06);padding:8px 12px;border-radius:8px;line-height:1.6">
+        void collect(String id) {<br>
+        &nbsp;&nbsp;result.add(goal);<br>
+        &nbsp;&nbsp;for(child in children)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;collect(child.id); // DFS<br>
+        }
+      </div>
+    </div>
+
+    <div class="chal-card" style="border-top:4px solid #F59E0B">
+      <div class="chal-num c-amber">02</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="lc lc-22 c-amber"><i data-lucide="repeat"></i></span>
+        <span style="font-size:1.15rem;font-weight:800;color:#F59E0B">循環任務日期判定</span>
+      </div>
+      <div style="font-size:.92rem;color:#A7A9BE;line-height:1.6">
+        支援 4 種規則：<br>
+        每日 / 每週 / 每月 / 每 N 天<br>
+        每次渲染動態計算哪些任務屬於當天
+        不溯及既往
+      </div>
+      <div style="font-family:'Courier New',monospace;font-size:.82rem;color:#FCD34D;background:rgba(245,158,11,.06);padding:8px 12px;border-radius:8px;line-height:1.6">
+        bool _recurringAppliesTo(<br>
+        &nbsp;&nbsp;Task task, DateTime date)<br>
+        // 依規則計算當天是否適用
+      </div>
+    </div>
+
+    <div class="chal-card" style="border-top:4px solid #A78BFA">
+      <div class="chal-num c-purple">03</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="lc lc-22 c-purple"><i data-lucide="cloud-lightning"></i></span>
+        <span style="font-size:1.15rem;font-weight:800;color:#A78BFA">雲端整合</span>
+      </div>
+      <div style="font-size:.92rem;color:#A7A9BE;line-height:1.6">
+        Google OAuth 在共享子域<br>
+        octofield.github.io 的授權問題無法解決<br>
+        回饋系統：Supabase 收到回饋即觸發<br>
+        Edge Function → Resend Email
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+        <span class="lc lc-16 c-purple"><i data-lucide="arrow-right"></i></span>
+        <span style="font-size:.85rem;color:#C4B5FD">建立獨立 GitHub Pages 說明頁面</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== Slide 6: 效能分析 - 陣列去重情境 ====== -->
+<div class="slide bg-s3" id="s5">
+  <div class="deco deco-emerald" style="width:450px;height:450px;top:-150px;right:-120px"></div>
+
+  <div class="an">
+    <span class="lc lc-48 c-cyan"><i data-lucide="bar-chart-2"></i></span>
+  </div>
+  <div class="an t-huge c-dark" style="margin-top:6px">效能分析：陣列去重</div>
+  <div class="an line"></div>
+
+  <!-- Context: concrete data flow -->
+  <div class="an" style="width:92%;max-width:860px;margin-bottom:12px">
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(6,182,212,.12);border-radius:14px;padding:14px 24px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:.88rem;color:#A7A9BE;font-weight:700;letter-spacing:.04em">情境：Today 頁面「按目標篩選任務」</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <!-- Tasks -->
+        <div style="font-size:.8rem;font-family:'Courier New',monospace;color:#D1D5DB;background:rgba(255,255,255,.05);padding:6px 12px;border-radius:8px;line-height:1.8">
+          tasks[0].targetId = <span style="color:#22D3EE">"goal_A"</span><br>
+          tasks[1].targetId = <span style="color:#A78BFA">"goal_B"</span><br>
+          tasks[2].targetId = <span style="color:#22D3EE">"goal_A"</span>&nbsp;<span style="color:#6B7280">← 重複</span><br>
+          tasks[3].targetId = <span style="color:#10B981">"goal_C"</span><br>
+          tasks[4].targetId = <span style="color:#A78BFA">"goal_B"</span>&nbsp;<span style="color:#6B7280">← 重複</span>
+        </div>
+        <div style="font-size:1.4rem;color:#6B7280">→</div>
+        <div style="font-size:.8rem;color:#A7A9BE;text-align:center">去重<br><span style="font-size:.72rem">（不能有重複選項）</span></div>
+        <div style="font-size:1.4rem;color:#6B7280">→</div>
+        <!-- Result -->
+        <div style="font-size:.8rem;font-family:'Courier New',monospace;color:#D1D5DB;background:rgba(16,185,129,.06);padding:6px 12px;border-radius:8px;border:1px solid rgba(16,185,129,.2);line-height:1.8">
+          過濾選單顯示：<br>
+          <span style="color:#22D3EE">goal_A</span>&nbsp;
+          <span style="color:#A78BFA">goal_B</span>&nbsp;
+          <span style="color:#10B981">goal_C</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="an vs-row" style="gap:16px">
+
+    <div class="vs-card" style="background:rgba(16,185,129,.05);border:2px solid rgba(16,185,129,.25);border-radius:20px">
+      <div class="vs-tag" style="background:rgba(16,185,129,.15);color:#10B981">方案 A（採用）</div>
+      <div style="font-family:'Courier New',monospace;font-size:1.45rem;font-weight:900;color:#10B981">[...new Set(arr)]</div>
+      <div class="complexity c-emerald">O(n)</div>
+      <div style="font-size:.92rem;color:#A7A9BE;text-align:center;line-height:1.6">
+        建立 Hash 表一次<br>
+        每個元素 O(1) 插入<br>
+        整體線性掃描完成
+      </div>
+      <div class="code-snippet" style="background:rgba(16,185,129,.08);color:#6EE7B7;font-size:.95rem">
+        const unique =<br>
+        &nbsp;&nbsp;[...new Set(ids)];<br>
+        <span style="color:#A7A9BE;font-size:.82rem">// Hash 建表 → O(n)</span>
+      </div>
+    </div>
+
+    <div class="vs-divider">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <div style="font-size:2rem;font-weight:900;color:#4B5563">VS</div>
+        <svg width="2" height="110" viewBox="0 0 2 110"><line x1="1" y1="0" x2="1" y2="110" stroke="rgba(107,114,128,.3)" stroke-width="2" stroke-dasharray="6,4"/></svg>
+      </div>
+    </div>
+
+    <div class="vs-card" style="background:rgba(244,63,94,.05);border:2px solid rgba(244,63,94,.2);border-radius:20px">
+      <div class="vs-tag" style="background:rgba(244,63,94,.12);color:#F43F5E">方案 B（未採用）</div>
+      <div style="font-family:'Courier New',monospace;font-size:1.45rem;font-weight:900;color:#F43F5E">filter + indexOf</div>
+      <div class="complexity c-rose">O(n²)</div>
+      <div style="font-size:.92rem;color:#A7A9BE;text-align:center;line-height:1.6">
+        每個元素都重新掃描<br>
+        整個陣列逐一比對<br>
+        資料量大時急劇劣化
+      </div>
+      <div class="code-snippet" style="background:rgba(244,63,94,.06);color:#FCA5A5;font-size:.95rem">
+        arr.filter(<br>
+        &nbsp;&nbsp;(x,i) =&gt; arr.indexOf(x)===i<br>
+        )<span style="color:#A7A9BE;font-size:.82rem"> // 線性×n → O(n²)</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="an" style="margin-top:14px;display:flex;align-items:center;gap:10px;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.15);border-radius:10px;padding:10px 22px">
+    <span class="lc lc-22 c-cyan"><i data-lucide="arrow-right-circle"></i></span>
+    <span style="font-size:.88rem;color:#A7A9BE">看起來只是一行程式的差異——下一頁用實際 Benchmark 量出兩者的效能鴻溝</span>
+  </div>
+</div>
+
+<!-- ====== Slide 7: 陣列去重深度效能分析 ====== -->
+<div class="slide bg-s2" id="s6">
+  <div class="deco deco-cyan" style="width:400px;height:400px;top:-140px;right:-100px"></div>
+
+  <div class="an t-big c-dark" style="margin-bottom:2px">陣列去重：深度效能分析</div>
+  <div class="an line" style="margin:6px auto"></div>
+
+  <div class="an" style="display:flex;gap:6px;justify-content:center;margin-bottom:8px">
+    <button class="btab act" id="bTab0" onclick="switchBTab(0)">折線圖 · 黃金交叉</button>
+    <button class="btab" id="bTab1" onclick="switchBTab(1)">百萬壓測</button>
+    <button class="btab" id="bTab2" onclick="switchBTab(2)">Hash 衝突</button>
+    <button class="btab" id="bTab3" onclick="switchBTab(3)">快取 &amp; 記憶體</button>
+  </div>
+
+  <!-- Panel 0: Line Chart -->
+  <div id="bP0" class="an" style="width:96%;max-width:1000px;display:flex;flex-direction:column;gap:7px;align-items:center">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center">
+      <button class="rn-btn" id="chartBtn" onclick="runChart()">
+        <span class="lc lc-18"><i data-lucide="play-circle" style="color:#22D3EE"></i></span>執行分析
+      </button>
+      <div style="display:flex;gap:14px;font-size:.78rem;color:#A7A9BE">
+        <span><span style="display:inline-block;width:16px;height:3px;background:#10B981;vertical-align:middle;margin-right:4px;border-radius:2px"></span>Set O(n)</span>
+        <span><span style="display:inline-block;width:16px;height:3px;background:#EF4444;vertical-align:middle;margin-right:4px;border-radius:2px"></span>filter+indexOf O(n²)</span>
+        <span style="color:#F59E0B">⇵ 黃金交叉</span>
+      </div>
+      <span id="chartSt" style="font-size:.78rem;color:#6B7280;min-width:130px"></span>
+    </div>
+    <canvas id="myChart" width="940" height="255" style="background:rgba(255,255,255,.02);border-radius:10px;border:1px solid rgba(6,182,212,.1)"></canvas>
+    <div id="crossNote" style="opacity:0;transition:opacity .5s;width:100%;text-align:center;font-size:.85rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:7px 16px">
+      黃金交叉：n ≈ <strong id="crossN" style="color:#F59E0B">?</strong>
+      &nbsp;·&nbsp; 小於此值 <span style="color:#10B981">Linear 更快</span>（Hash 建表開銷 &gt; 掃描成本）；大於此值 <span style="color:#22D3EE">Set 更快</span>（O(1) 查找）
+    </div>
+  </div>
+
+  <!-- Panel 1: Scale -->
+  <div id="bP1" class="an" style="display:none;width:96%;max-width:900px;flex-direction:column;gap:10px;align-items:center">
+    <div style="font-size:.82rem;color:#A7A9BE;text-align:center">Set 在百萬規模仍穩定；filter+indexOf 在此規模需要數十分鐘</div>
+    <div style="display:flex;gap:10px">
+      <button class="sc-btn" onclick="runScale(100000)">n = 10 萬</button>
+      <button class="sc-btn" onclick="runScale(500000)">n = 50 萬</button>
+      <button class="sc-btn" onclick="runScale(1000000)">n = 100 萬</button>
+    </div>
+    <div id="scaleResult" style="width:100%;min-height:70px;font-size:.88rem"></div>
+    <div style="padding:8px 18px;border-radius:8px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);font-size:.82rem;text-align:center">
+      <span class="c-rose">filter+indexOf 在 n=100 萬理論耗時（O(n²) 推算）：</span>
+      <strong class="c-amber"> ~17 分鐘</strong>
+    </div>
+  </div>
+
+  <!-- Panel 2: Hash Collision -->
+  <div id="bP2" class="an" style="display:none;width:96%;max-width:920px;flex-direction:column;gap:10px;align-items:center">
+    <div style="display:flex;gap:10px">
+      <button class="sc-btn" onclick="runHashDemo('normal')">正常輸入</button>
+      <button class="sc-btn" onclick="runHashDemo('adversarial')">Hash DoS 輸入</button>
+      <button class="sc-btn" onclick="runHashDemo('fnv')">FNV-1a vs DJB2</button>
+    </div>
+    <div style="display:flex;gap:18px;width:100%;align-items:flex-start">
+      <div style="flex:1.3">
+        <div style="font-size:.75rem;color:#A7A9BE;margin-bottom:4px;text-align:center">32-bucket 分佈（紅色 = 碰撞熱點）</div>
+        <canvas id="hashCanvas" width="520" height="170" style="background:rgba(255,255,255,.02);border-radius:8px;border:1px solid rgba(6,182,212,.1);width:100%"></canvas>
+      </div>
+      <div id="hashStats" style="flex:1;font-size:.82rem;line-height:1.85;color:#D1D5DB;background:rgba(255,255,255,.03);border-radius:10px;padding:12px 16px;border:1px solid rgba(255,255,255,.06)">
+        <span style="color:#6B7280">點擊上方按鈕開始</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 3: Cache & Memory -->
+  <div id="bP3" class="an" style="display:none;width:96%;max-width:920px;flex-direction:column;gap:10px;align-items:center">
+    <button class="rn-btn" onclick="runCacheMem()">
+      <span class="lc lc-18"><i data-lucide="cpu" style="color:#22D3EE"></i></span>執行測量（n = 50 萬）
+    </button>
+    <div id="cacheMemResult" style="display:flex;gap:16px;width:100%"></div>
+  </div>
+</div>
+
+<!-- ====== Slide 8: 結語 ====== -->
+<div class="slide bg-s5" id="s7">
+  <div class="deco deco-cyan" style="width:600px;height:600px;top:50%;left:50%;margin-top:-300px;margin-left:-300px"></div>
+  <div class="float-p" style="width:16px;height:16px;background:#06B6D4;top:15%;left:15%;animation-delay:0s"></div>
+  <div class="float-p" style="width:10px;height:10px;background:#22D3EE;bottom:20%;right:18%;animation-delay:2s"></div>
+  <div class="float-p" style="width:12px;height:12px;background:#14B8A6;top:60%;left:10%;animation-delay:3.5s"></div>
+
+  <div class="an close-circle">
+    <span class="lc lc-64 c-cyan"><i data-lucide="rocket"></i></span>
+  </div>
+
+  <div class="an t-hero grad-text" style="margin-top:20px">URniversity</div>
+  <div class="an line"></div>
+
+  <div class="an t-mid c-gray" style="max-width:700px;line-height:1.7">
+    專案持續開發中<br>
+    <span class="c-dark">這次的專題讓我體會到：</span>
+  </div>
+
+  <div class="an" style="margin-top:20px;display:flex;flex-direction:column;gap:12px;max-width:680px">
+    <div style="display:flex;align-items:center;gap:14px;background:rgba(6,182,212,.06);border-radius:14px;padding:14px 22px;border-left:4px solid #06B6D4">
+      <span class="lc lc-24 c-cyan"><i data-lucide="cpu"></i></span>
+      <span style="font-size:1.1rem;color:#D1D5DB">資料結構和演算法的選擇會直接影響用戶每一次操作的體驗</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;background:rgba(16,185,129,.06);border-radius:14px;padding:14px 22px;border-left:4px solid #10B981">
+      <span class="lc lc-24 c-emerald"><i data-lucide="git-branch"></i></span>
+      <span style="font-size:1.1rem;color:#D1D5DB">複雜UI互動的底層核心與遞迴高度相關</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;background:rgba(167,139,250,.06);border-radius:14px;padding:14px 22px;border-left:4px solid #A78BFA">
+      <span class="lc lc-24 c-purple"><i data-lucide="globe"></i></span>
+      <span style="font-size:1.1rem;color:#D1D5DB">理解從前端到後端、網站部署的完整流程</span>
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+lucide.createIcons();
+
+const slides = document.querySelectorAll('.slide');
+const total = slides.length;
+let cur = 0;
+const indicator = document.getElementById('page-indicator');
+
+// ── Dedup helpers ──────────────────────────────────────────
+function genArr(n) {
+  var pool = Math.max(2, Math.floor(n * 0.6));
+  var a = [];
+  for (var i = 0; i < n; i++) a.push('item_' + (i % pool));
+  return a;
+}
+function dedupLinear(arr) { return arr.filter(function(x,i){return arr.indexOf(x)===i;}); }
+function dedupHash(arr)   { return Array.from(new Set(arr)); }
+function meas(fn, arr, reps) {
+  var t = performance.now();
+  for (var r = 0; r < reps; r++) fn(arr.slice());
+  return (performance.now() - t) / reps;
+}
+function fmtMs(ms) {
+  if (ms < 1000) return ms.toFixed(0) + ' ms';
+  if (ms < 60000) return (ms/1000).toFixed(1) + ' 秒';
+  return (ms/60000).toFixed(1) + ' 分鐘';
+}
+
+// ── Tab switching ───────────────────────────────────────────
+function switchBTab(idx) {
+  for (var i = 0; i < 4; i++) {
+    document.getElementById('bTab' + i).className = 'btab' + (i === idx ? ' act' : '');
+    var p = document.getElementById('bP' + i);
+    if (p) p.style.display = i === idx ? 'flex' : 'none';
+  }
+}
+
+// ── Tab 0: Line Chart ───────────────────────────────────────
+var chartRunning = false;
+function runChart() {
+  if (chartRunning) return;
+  chartRunning = true;
+  var btn = document.getElementById('chartBtn');
+  btn.disabled = true;
+  document.getElementById('chartSt').textContent = '分析中…';
+  document.getElementById('crossNote').style.opacity = '0';
+
+  var nsL = [10, 30, 80, 200, 500, 1000, 2000, 5000];
+  var nsH = [10, 30, 80, 200, 500, 1000, 2000, 5000, 15000, 50000];
+  var linData = [], hashData = [];
+
+  var queue = [];
+  nsH.forEach(function(n){ queue.push({n:n,type:'hash'}); });
+  nsL.forEach(function(n){ queue.push({n:n,type:'linear'}); });
+
+  function next(qi) {
+    if (qi >= queue.length) {
+      drawLineChart(linData, hashData);
+      document.getElementById('chartSt').textContent = '完成！';
+      chartRunning = false;
+      btn.disabled = false;
+      btn.innerHTML = '<span class="lc lc-18"><i data-lucide="refresh-cw" style="color:#22D3EE"></i></span>重新執行';
+      lucide.createIcons();
+      return;
+    }
+    var item = queue[qi];
+    document.getElementById('chartSt').textContent = item.type + ' n=' + item.n + '…';
+    setTimeout(function() {
+      var arr = genArr(item.n);
+      var reps = item.n < 200 ? 300 : item.n < 2000 ? 30 : item.n < 20000 ? 3 : 1;
+      var t = meas(item.type === 'linear' ? dedupLinear : dedupHash, arr, reps);
+      if (item.type === 'linear') linData.push({n:item.n,t:t});
+      else hashData.push({n:item.n,t:t});
+      if (linData.length + hashData.length > 6) drawLineChart(linData, hashData);
+      next(qi + 1);
+    }, 25);
+  }
+  next(0);
+}
+
+function drawLineChart(linData, hashData) {
+  var cvs = document.getElementById('myChart');
+  if (!cvs) return;
+  var ctx = cvs.getContext('2d');
+  var W = cvs.width, H = cvs.height;
+  var pL=68, pR=28, pT=28, pB=48;
+  var cW = W-pL-pR, cH = H-pT-pB;
+  ctx.clearRect(0,0,W,H);
+
+  var allData = linData.concat(hashData);
+  if (allData.length < 3) return;
+  var allNs = hashData.map(function(d){return d.n;}).sort(function(a,b){return a-b;});
+  var maxT = Math.max.apply(null, allData.map(function(d){return d.t;})) * 1.18;
+  if (maxT < 0.01) maxT = 0.01;
+  var logMin = Math.log10(allNs[0]), logMax = Math.log10(allNs[allNs.length-1]);
+  function xp(n){ return pL + (Math.log10(n)-logMin)/(logMax-logMin)*cW; }
+  function yp(t){ return pT + cH - Math.min(t/maxT,1)*cH; }
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+  allNs.forEach(function(n){ ctx.beginPath(); ctx.moveTo(xp(n),pT); ctx.lineTo(xp(n),pT+cH); ctx.stroke(); });
+  [0,.25,.5,.75,1].forEach(function(f){ var y=pT+cH*(1-f); ctx.beginPath(); ctx.moveTo(pL,y); ctx.lineTo(pL+cW,y); ctx.stroke(); });
+
+  // Axes
+  ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(pL,pT); ctx.lineTo(pL,pT+cH); ctx.lineTo(pL+cW,pT+cH); ctx.stroke();
+
+  // X labels
+  ctx.fillStyle='#A7A9BE'; ctx.font='11px monospace'; ctx.textAlign='center';
+  allNs.forEach(function(n){
+    var lb = n>=10000?(n/1000)+'K':n>=1000?(n/1000)+'K':String(n);
+    ctx.fillText(lb, xp(n), pT+cH+16);
+  });
+  ctx.fillText('資料筆數 n（對數刻度）', pL+cW/2, pT+cH+36);
+
+  // Y labels
+  ctx.textAlign='right';
+  [0,.25,.5,.75,1].forEach(function(f){
+    var v=maxT*f; if(v===0) return;
+    ctx.fillText(v<1?v.toFixed(2)+'ms':v.toFixed(1)+'ms', pL-6, pT+cH*(1-f)+4);
+  });
+
+  // Hash line (green)
+  var hs = hashData.slice().sort(function(a,b){return a.n-b.n;});
+  if (hs.length>1){
+    ctx.strokeStyle='#10B981'; ctx.lineWidth=3;
+    ctx.beginPath();
+    hs.forEach(function(d,i){ i===0?ctx.moveTo(xp(d.n),yp(d.t)):ctx.lineTo(xp(d.n),yp(d.t)); });
+    ctx.stroke();
+    ctx.fillStyle='#10B981';
+    hs.forEach(function(d){ ctx.beginPath(); ctx.arc(xp(d.n),yp(d.t),4,0,Math.PI*2); ctx.fill(); });
+  }
+
+  // Linear line (red)
+  var ls = linData.slice().sort(function(a,b){return a.n-b.n;});
+  if (ls.length>1){
+    ctx.strokeStyle='#EF4444'; ctx.lineWidth=3;
+    ctx.beginPath();
+    ls.forEach(function(d,i){ i===0?ctx.moveTo(xp(d.n),yp(d.t)):ctx.lineTo(xp(d.n),yp(d.t)); });
+    ctx.stroke();
+    ctx.fillStyle='#EF4444';
+    ls.forEach(function(d){ ctx.beginPath(); ctx.arc(xp(d.n),yp(d.t),4,0,Math.PI*2); ctx.fill(); });
+  }
+
+  // Crossover
+  var cn = null;
+  for (var i=0; i<ls.length; i++){
+    for (var j=0; j<hs.length; j++){
+      if (hs[j].n === ls[i].n && ls[i].t > hs[j].t){ cn = ls[i].n; break; }
+    }
+    if (cn) break;
+  }
+  if (cn){
+    document.getElementById('crossN').textContent = cn.toLocaleString();
+    document.getElementById('crossNote').style.opacity = '1';
+    var cx = xp(cn);
+    // Shade regions
+    ctx.fillStyle='rgba(16,185,129,.04)'; ctx.fillRect(pL,pT,cx-pL,cH);
+    ctx.fillStyle='rgba(6,182,212,.04)';  ctx.fillRect(cx,pT,pL+cW-cx,cH);
+    // Dashed line
+    ctx.strokeStyle='#F59E0B'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(cx,pT); ctx.lineTo(cx,pT+cH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#F59E0B'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('n≈'+cn, cx, pT-8);
+    // Region labels
+    ctx.font='10px sans-serif'; ctx.fillStyle='rgba(16,185,129,.7)'; ctx.textAlign='center';
+    ctx.fillText('Linear 較快', pL+(cx-pL)/2, pT+16);
+    ctx.fillStyle='rgba(6,182,212,.7)';
+    ctx.fillText('Set 較快', cx+(pL+cW-cx)/2, pT+16);
+  }
+
+  // Legend
+  ctx.font='11px sans-serif'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(pL+10,pT+8,200,38); // bg
+  ctx.fillStyle='#10B981'; ctx.fillRect(pL+14,pT+17,18,3); ctx.fillStyle='#D1D5DB'; ctx.fillText('Set 去重 O(n)',pL+38,pT+21);
+  ctx.fillStyle='#EF4444'; ctx.fillRect(pL+14,pT+31,18,3); ctx.fillStyle='#D1D5DB'; ctx.fillText('filter+indexOf O(n²)',pL+38,pT+35);
+}
+
+// ── Tab 1: Scale Test ───────────────────────────────────────
+function runScale(n) {
+  var arr = genArr(n);
+  var t = performance.now(); dedupHash(arr); var ms = performance.now()-t;
+  // Quadratic estimate: assume n=1000≈1ms, so linear(N)=(N/1000)²ms
+  var estMs = Math.round(Math.pow(n/1000,2));
+  var div = document.getElementById('scaleResult');
+  div.innerHTML = (div.innerHTML||'') +
+    '<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:center">' +
+    '<span style="min-width:110px;color:#A7A9BE;font-size:.82rem">n = '+n.toLocaleString()+'</span>' +
+    '<span style="color:#10B981;font-weight:800;min-width:120px">Set: '+ms.toFixed(2)+' ms</span>' +
+    '<span style="color:#EF4444;font-weight:800">Linear 估計: ~'+fmtMs(estMs)+'</span>' +
+    '</div>';
+}
+
+// ── Tab 2: Hash Collision ───────────────────────────────────
+function djb2(s, b) {
+  var h = 5381;
+  for (var i=0; i<s.length; i++) h = ((h<<5)+h+s.charCodeAt(i))&0x7fffffff;
+  return h % b;
+}
+function fnv1a(s, b) {
+  var h = 2166136261;
+  for (var i=0; i<s.length; i++) h = ((h^s.charCodeAt(i))*16777619)>>>0;
+  return h % b;
+}
+
+function runHashDemo(mode) {
+  var B = 32, N = 480, arr = [];
+  if (mode === 'normal') {
+    for (var i=0;i<N;i++) arr.push('key_'+i+'_'+Math.random().toString(36).slice(2,5));
+  } else if (mode === 'adversarial') {
+    // Construct strings that all hash (djb2) to bucket 0
+    var found=0;
+    for (var i=0; found<N; i++) {
+      var s='x'+i+'xx';
+      if (djb2(s,B)===0){ arr.push(s); found++; }
+    }
+  } else {
+    // FNV vs DJB2 mode: show both distributions
+    for (var i=0;i<N;i++) arr.push('entry_'+i);
+  }
+
+  var cvs = document.getElementById('hashCanvas');
+  var ctx = cvs.getContext('2d');
+  var W=cvs.width, H=cvs.height;
+  ctx.clearRect(0,0,W,H);
+
+  var countsA = new Array(B).fill(0);
+  var countsB = mode==='fnv' ? new Array(B).fill(0) : null;
+  arr.forEach(function(s){
+    countsA[djb2(s,B)]++;
+    if (countsB) countsB[fnv1a(s,B)]++;
+  });
+
+  var maxC = Math.max.apply(null, countsA.concat(countsB||[]));
+  var avg = N/B;
+  var bW = (W-32)/B;
+
+  countsA.forEach(function(c,i){
+    var bH = maxC>0 ? (c/maxC)*(H-36) : 0;
+    ctx.fillStyle = c > avg*2.5 ? '#EF4444' : (mode==='fnv' ? '#22D3EE' : '#10B981');
+    ctx.fillRect(16+i*bW, H-28-bH, bW-2, bH);
+  });
+
+  if (countsB) {
+    countsB.forEach(function(c,i){
+      var bH = maxC>0 ? (c/maxC)*(H-36)/2 : 0;
+      ctx.fillStyle = 'rgba(245,158,11,.7)';
+      ctx.fillRect(16+i*bW+1, H-28-bH, bW-3, bH);
+    });
+  }
+
+  ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(16,H-28); ctx.lineTo(W-16,H-28); ctx.stroke();
+  ctx.fillStyle='#A7A9BE'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('32 個 bucket（' + (mode==='adversarial'?'全部堆在少數 bucket':'均勻分佈') + '）', W/2, H-6);
+
+  var coll = countsA.reduce(function(a,c){return a+Math.max(0,c-1);},0);
+  var empty = countsA.filter(function(c){return c===0;}).length;
+  var worst = Math.max.apply(null,countsA);
+  var modeLabel = mode==='normal'?'正常輸入':mode==='adversarial'?'Hash DoS 輸入':'DJB2（青）vs FNV-1a（黃）';
+  var modeColor = mode==='adversarial'?'#EF4444':'#10B981';
+
+  document.getElementById('hashStats').innerHTML =
+    '<div style="color:'+modeColor+';font-weight:800;margin-bottom:6px">'+modeLabel+'</div>'+
+    '<div class="stat-row"><span>總元素</span><strong>'+N+'</strong></div>'+
+    '<div class="stat-row"><span>Bucket 數</span><strong>'+B+'</strong></div>'+
+    '<div class="stat-row"><span>平均每 bucket</span><strong>'+(N/B).toFixed(1)+'</strong></div>'+
+    '<div class="stat-row"><span>最滿 bucket</span><strong style="color:'+(worst>avg*2?'#EF4444':'#10B981')+'">'+(worst)+' 個</strong></div>'+
+    '<div class="stat-row"><span>空 bucket</span><strong>'+empty+'</strong></div>'+
+    '<div class="stat-row"><span>碰撞次數</span><strong style="color:'+(coll>avg*2?'#EF4444':'#10B981')+'">'+coll+'</strong></div>'+
+    (mode==='adversarial'?
+      '<div style="margin-top:8px;font-size:.78rem;color:#F87171">全部堆在 bucket 0<br>每次查找需掃描整條鏈→退化 O(n)</div>':
+    mode==='fnv'?
+      '<div style="margin-top:8px;font-size:.78rem;color:#A7A9BE">兩種 hash function 分佈<br>皆較均勻，碰撞率相近</div>':
+      '<div style="margin-top:8px;font-size:.78rem;color:#6EE7B7">均勻分佈，每 bucket 約 '+(N/B).toFixed(0)+' 個<br>平均查找 O(1) 成立</div>');
+}
+
+// ── Tab 3: Cache & Memory ───────────────────────────────────
+function runCacheMem() {
+  var N = 500000;
+  var arr = new Int32Array(N);
+  for (var i=0;i<N;i++) arr[i]=i;
+
+  // Sequential (cache-friendly)
+  var t1 = performance.now(), s1=0;
+  for (var i=0;i<N;i++) s1+=arr[i];
+  var seqMs = performance.now()-t1;
+
+  // Random (cache-unfriendly)
+  var idx = new Uint32Array(N);
+  for (var i=0;i<N;i++) idx[i]=Math.floor(Math.random()*N);
+  var t2 = performance.now(), s2=0;
+  for (var i=0;i<N;i++) s2+=arr[idx[i]];
+  var randMs = performance.now()-t2;
+
+  // Dedup timing for memory estimation context
+  var arrN = 50000, dedupArr = genArr(arrN);
+  var tm1 = performance.now(); dedupHash(dedupArr); var hashBuildMs = performance.now()-tm1;
+
+  var heapHtml = '';
+  if (performance.memory) {
+    var used = (performance.memory.usedJSHeapSize/1048576).toFixed(1);
+    var lim  = (performance.memory.jsHeapSizeLimit/1048576).toFixed(0);
+    heapHtml = '<div class="stat-row"><span>JS Heap 已用</span><strong>'+used+' MB</strong></div>'+
+               '<div class="stat-row"><span>JS Heap 上限</span><strong>'+lim+' MB</strong></div>';
+  }
+
+  var ratio = (randMs/Math.max(seqMs,0.01)).toFixed(1);
+  var arrKB  = Math.round(arrN*8/1024);
+  var setKB  = Math.round(arrN*40/1024);
+
+  document.getElementById('cacheMemResult').innerHTML =
+    '<div style="flex:1;background:rgba(255,255,255,.03);border-radius:10px;padding:14px 18px;border:1px solid rgba(255,255,255,.06)">'+
+    '<div style="color:#22D3EE;font-weight:800;font-size:.9rem;margin-bottom:8px">快取局部性（N=50萬 Int32）</div>'+
+    '<div class="stat-row"><span style="color:#10B981">順序存取（Linear）</span><strong style="color:#10B981">'+seqMs.toFixed(2)+' ms</strong></div>'+
+    '<div class="stat-row"><span style="color:#EF4444">隨機存取（Hash 近似）</span><strong style="color:#EF4444">'+randMs.toFixed(2)+' ms</strong></div>'+
+    '<div class="stat-row"><span>差距</span><strong class="c-amber">'+ratio+'×</strong></div>'+
+    '<div style="margin-top:8px;font-size:.77rem;color:#6B7280">Array 記憶體連續→CPU L1/L2 快取命中率高<br>Hash table 跳躍存取→快取 Miss 增加</div>'+
+    '</div>'+
+    '<div style="flex:1;background:rgba(255,255,255,.03);border-radius:10px;padding:14px 18px;border:1px solid rgba(255,255,255,.06)">'+
+    '<div style="color:#22D3EE;font-weight:800;font-size:.9rem;margin-bottom:8px">記憶體佔用（n=5萬）</div>'+
+    '<div class="stat-row"><span>Array（連續）</span><strong style="color:#10B981">≈ '+arrKB+' KB</strong></div>'+
+    '<div class="stat-row"><span>Set（含 hash + meta）</span><strong style="color:#EF4444">≈ '+setKB+' KB</strong></div>'+
+    '<div class="stat-row"><span>Set / Array 比</span><strong class="c-amber">≈ 5×</strong></div>'+
+    '<div class="stat-row"><span>Hash 建表時間</span><strong>'+hashBuildMs.toFixed(2)+' ms</strong></div>'+
+    (heapHtml ? '<div style="margin-top:6px;font-size:.77rem;color:#6B7280">瀏覽器回報：</div>'+heapHtml : '')+
+    '<div style="margin-top:8px;font-size:.77rem;color:#6B7280">峰值記憶體在 Set 建立瞬間，<br>結束後 GC 回收</div>'+
+    '</div>';
+}
+
+// ── Slide navigation ────────────────────────────────────────
+function go(n) {
+  if (n < 0 || n >= total || n === cur) return;
+
+  slides[cur].querySelectorAll('.an, .anim-item, [style*="animation"]').forEach(function(item) {
+    var clone = item.cloneNode(true);
+    item.parentNode.replaceChild(clone, item);
+  });
+  lucide.createIcons();
+
+  slides[cur].classList.remove('active');
+  cur = n;
+  slides[cur].classList.add('active');
+  slides[cur].querySelectorAll('.an').forEach(function(e, i) {
+    e.classList.remove('show');
+    setTimeout(function() { e.classList.add('show'); }, 60 + i * 150);
+  });
+
+  indicator.textContent = (cur + 1) + ' / ' + total;
+}
+
+slides[0].querySelectorAll('.an').forEach(function(e, i) {
+  setTimeout(function() { e.classList.add('show'); }, 200 + i * 180);
+});
+
+document.addEventListener('keydown', function(e) {
+  if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End') { e.preventDefault(); go(total - 1); }
+});
+
+var tx = 0, ty = 0;
+document.addEventListener('touchstart', function(e) { tx = e.changedTouches[0].screenX; ty = e.changedTouches[0].screenY; });
+document.addEventListener('touchend', function(e) {
+  var dx = e.changedTouches[0].screenX - tx;
+  var dy = e.changedTouches[0].screenY - ty;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) { dx < 0 ? go(cur + 1) : go(cur - 1); }
+});
+
+var wc = false;
+document.addEventListener('wheel', function(e) {
+  if (wc) return; wc = true; setTimeout(function() { wc = false; }, 800);
+  e.deltaY > 0 ? go(cur + 1) : go(cur - 1);
+});
+</script>
+
+</body>
+</html>

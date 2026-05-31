@@ -105,8 +105,31 @@ Nothing big bruh
 
 ## Final Report
 
-### 專案說明
-<!-- 完整描述你的專案做了什麼 -->
+### Project Explanation
+My project **URniversity** is an app aiming to manage college lives. There is a clear three-layer structure, which consists of **Tasks**, **Targets**, and **Goals**.
+- Tasks: Manage everyday life. Create tasks with period and priority supporting. Cassify tasks using different views and separate targets or goals.
+- Targets: Define semester targets. What to achieve during this semester, GPA, project, club activities, or so on? Users can link tasks to targets to make such targets feasible.
+- Goals: Imagine future goals, such as exchange, internship, certification. What goals to accompish after growing up? Moreover, users can link both tasks and targets to goals to make these goals more practical and touchable. 
 
-### 使用方式
-<!-- 如何編譯、執行、使用你的程式 -->
+Here are also some supplementary systems:
+- Diary: Record users' lives.
+- Inspiration: Catch every inspirations so that users can take advantage of them more properly.
+- Feedback: Should users encounter any issues or have any advice, they can tell me directly and anonymously.  
+
+With these features, I believe college students can form a better future blueprint. I hope the app can help not only myself but also other students in need.
+
+### Usage
+Go to https://urniversity.netlify.app and start exploring my **URniversity** project.  
+Users can login as a guest, with email, or using Google account.  
+Currently no Android / iOS version, only web version available.
+
+### Next
+- Android / iOS / Windows version support
+- Different designs among different screen widths
+- Widgets on distinct devices
+- Better UI experience (More smooth interactions, generalized button positions)
+- Visualization of a future goal
+- Retro system
+- Notification system
+- GPA tracking
+- Inspiration archive
