@@ -14,6 +14,7 @@ import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/universities_provider.dart';
+import '../widgets/hover_lift.dart';
 import 'inspirations_screen.dart';
 import 'journal_edit_screen.dart';
 import 'journals_screen.dart';
@@ -43,7 +44,7 @@ class MeScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                s.appName,
+                s.me,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -152,75 +153,77 @@ class _ProfileCard extends ConsumerWidget {
       displayGrade = computedGrade(profile!.grade!, profile.gradeSetYear!, effectiveNow, semSettings);
     }
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppAvatars.build(
-                avatarIndex: profile?.avatarIndex,
-                avatarUrl: avatarUrl,
-                initial: initial,
-                radius: 32,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: (username?.isNotEmpty == true || (!isGuest && googleName != null))
-                            ? AppColors.textPrimary
-                            : AppColors.textTertiary,
-                      ),
-                    ),
-                    if (!isGuest && user?.email != null)
-                      Text(user!.email!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
-                    const SizedBox(height: 4),
-                    // School / Department / Grade info rows
-                    _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : '—'),
-                    _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : '—'),
-                    _InfoRow(label: s.grade, value: displayGrade != null ? _gradeLabel(displayGrade) : '—'),
-                    if (!isGuest)
-                      _InfoRow(
-                        label: '登入方式',
-                        value: (user?.identities?.any((i) => i.provider == 'google') ?? false) ? 'Google' : '電子郵件',
-                      ),
-                  ],
+    return HoverLift(
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppAvatars.build(
+                  avatarIndex: profile?.avatarIndex,
+                  avatarUrl: avatarUrl,
+                  initial: initial,
+                  radius: 32,
                 ),
-              ),
-              TextButton(
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (_) => _EditProfileDialog(profile: profile, ref: ref, s: s, effectiveNow: effectiveNow, semSettings: semSettings),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: (username?.isNotEmpty == true || (!isGuest && googleName != null))
+                              ? AppColors.textPrimary
+                              : AppColors.textTertiary,
+                        ),
+                      ),
+                      if (!isGuest && user?.email != null)
+                        Text(user!.email!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                      const SizedBox(height: 4),
+                      // School / Department / Grade info rows
+                      _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : '—'),
+                      _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : '—'),
+                      _InfoRow(label: s.grade, value: displayGrade != null ? _gradeLabel(displayGrade) : '—'),
+                      if (!isGuest)
+                        _InfoRow(
+                          label: '登入方式',
+                          value: (user?.identities?.any((i) => i.provider == 'google') ?? false) ? 'Google' : '電子郵件',
+                        ),
+                    ],
+                  ),
                 ),
-                child: Text(s.accountSettings),
+                TextButton(
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => _EditProfileDialog(profile: profile, ref: ref, s: s, effectiveNow: effectiveNow, semSettings: semSettings),
+                  ),
+                  child: Text(s.accountSettings),
+                ),
+              ],
+            ),
+            if (isGuest) ...[
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.login, size: 18),
+                  label: const Text('登入 / 建立帳號'),
+                  onPressed: () => _showMergeChoiceDialog(context, ref),
+                ),
               ),
             ],
-          ),
-          if (isGuest) ...[
-            const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.login, size: 18),
-                label: const Text('登入 / 建立帳號'),
-                onPressed: () => _showMergeChoiceDialog(context, ref),
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }

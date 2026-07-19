@@ -96,6 +96,11 @@ class StringsEn implements AppStrings {
   @override String get more => 'More';
   @override String get progressOverview => 'Progress overview';
   @override String get filters => 'Filters';
+  @override String greetingMorning(String name) => name.isEmpty ? 'Good morning 👋' : 'Good morning, $name 👋';
+  @override String greetingAfternoon(String name) => name.isEmpty ? 'Good afternoon 👋' : 'Good afternoon, $name 👋';
+  @override String greetingEvening(String name) => name.isEmpty ? 'Good evening 👋' : 'Good evening, $name 👋';
+  @override String todayStatus(int total, int done) => total == 0 ? 'Nothing planned for today yet' : '$done of $total tasks done today';
+  @override String get allDoneToday => 'All done for today!';
 
   @override String get semesterSettings => 'Semester Settings';
   @override String get semesterCount => 'Semester System';

@@ -96,6 +96,11 @@ class StringsJp implements AppStrings {
   @override String get more => 'もっと';
   @override String get progressOverview => '進捗まとめ';
   @override String get filters => '絞り込み';
+  @override String greetingMorning(String name) => name.isEmpty ? 'おはよう 👋' : 'おはよう、$name 👋';
+  @override String greetingAfternoon(String name) => name.isEmpty ? 'こんにちは 👋' : 'こんにちは、$name 👋';
+  @override String greetingEvening(String name) => name.isEmpty ? 'こんばんは 👋' : 'こんばんは、$name 👋';
+  @override String todayStatus(int total, int done) => total == 0 ? '今日の予定はまだありません' : '今日は $total 件中 $done 件完了';
+  @override String get allDoneToday => '今日は全部完了！';
 
   @override String get semesterSettings => '学期設定';
   @override String get semesterCount => '学期制';

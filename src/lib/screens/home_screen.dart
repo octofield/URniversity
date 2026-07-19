@@ -45,6 +45,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final body = Stack(
       children: [
+        // Soft top gradient so the page background is not one flat color
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 220,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.primaryLight, AppColors.background],
+                ),
+              ),
+            ),
+          ),
+        ),
         IndexedStack(
           index: _index,
           children: const [

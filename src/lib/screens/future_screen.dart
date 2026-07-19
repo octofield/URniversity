@@ -12,6 +12,8 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
 import 'settings_screen.dart';
 
@@ -237,23 +239,25 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     final parent = group.parent;
     final rootItems = groups.map((g) => g.parent).toList();
 
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildDraggableRow(parent,
-              depth: 0,
-              parentId: null,
-              siblings: rootItems,
-              siblingIndex: groupIdx),
-          ..._buildDescendantRows(parent.id, allGoals, 1),
-        ],
+    return HoverLift(
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildDraggableRow(parent,
+                depth: 0,
+                parentId: null,
+                siblings: rootItems,
+                siblingIndex: groupIdx),
+            ..._buildDescendantRows(parent.id, allGoals, 1),
+          ],
+        ),
       ),
     );
   }
@@ -491,6 +495,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 _FilterChip(
                   label: '${catLabel(cat, s)} (${countFor(cat)})',
                   selected: _catFilter == cat,
+                  color: catColor(cat),
                   onTap: () => setState(
                       () => _catFilter = _catFilter == cat ? null : cat),
                 ),
@@ -529,12 +534,11 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     final isWide = width >= AppBreakpoints.wide;
 
     final goalsList = filtered.isEmpty
-        ? Center(
-            child: Text(s.noGoals,
-                style:
-                    Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textTertiary,
-                )),
+        ? EmptyState(
+            icon: Icons.flag_outlined,
+            message: s.noGoals,
+            actionLabel: s.addGoal,
+            onAction: () => showAddFutureGoalSheet(context, ref),
           )
         : ListView.builder(
             padding: const EdgeInsets.fromLTRB(
@@ -566,7 +570,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(s.appName,
+              Text(s.goals,
                   style:
                       Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -623,6 +627,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                   _FilterChip(
                     label: catLabel(cat, s),
                     selected: _catFilter == cat,
+                    color: catColor(cat),
                     onTap: () => setState(
                         () => _catFilter = _catFilter == cat ? null : cat),
                   ),
@@ -720,9 +725,13 @@ class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color? color;
 
   const _FilterChip(
-      {required this.label, required this.selected, required this.onTap});
+      {required this.label,
+      required this.selected,
+      required this.onTap,
+      this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -730,6 +739,9 @@ class _FilterChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onTap(),
+      backgroundColor: color?.withValues(alpha: 0.08),
+      selectedColor: color?.withValues(alpha: 0.25),
+      checkmarkColor: color,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
@@ -761,87 +773,114 @@ class _FutureGoalCardRow extends ConsumerWidget {
           builder: (_) => FutureGoalDetailScreen(goalId: goal.id),
         ),
       ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          AppSpacing.md + depth * 16.0,
-          AppSpacing.sm, AppSpacing.md, AppSpacing.sm,
-        ),
+      child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Category color bar; softer on child rows
             Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: catC.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Icon(catIcon(primaryCat), color: catC, size: 20),
+              width: 4,
+              color: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
             ),
-            const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(goal.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  if (goal.startSemester != null || goal.endSemester != null)
-                    Text(
-                      [
-                        if (goal.startSemester != null) goal.startSemester!,
-                        if (goal.startSemester != null &&
-                            goal.endSemester != null)
-                          '→',
-                        if (goal.endSemester != null) goal.endSemester!,
-                      ].join(' '),
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.primary),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.md - 4 + depth * 16.0,
+                  AppSpacing.sm, AppSpacing.md, AppSpacing.sm,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: catC.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(catIcon(primaryCat), color: catC, size: 20),
                     ),
-                  if (goal.notes != null)
-                    Text(goal.notes!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  if (total > 0) ...[
-                    const SizedBox(height: 4),
-                    Text(s.goalProgress(done, total),
-                        style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 4,
-                        color: catC,
-                        backgroundColor: AppColors.surfaceVariant,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(goal.title,
+                              style: Theme.of(context).textTheme.titleMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          if (goal.startSemester != null ||
+                              goal.endSemester != null)
+                            Text(
+                              [
+                                if (goal.startSemester != null)
+                                  goal.startSemester!,
+                                if (goal.startSemester != null &&
+                                    goal.endSemester != null)
+                                  '→',
+                                if (goal.endSemester != null)
+                                  goal.endSemester!,
+                              ].join(' '),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppColors.primary),
+                            ),
+                          if (goal.notes != null)
+                            Text(goal.notes!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                        color: AppColors.textSecondary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          if (total > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(s.goalProgress(done, total),
+                                style: Theme.of(context).textTheme.bodySmall),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: progress),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.easeOutCubic,
+                                builder: (_, v, _) => LinearProgressIndicator(
+                                  value: v,
+                                  minHeight: 4,
+                                  color: catC,
+                                  backgroundColor: AppColors.surfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.xs),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      onPressed: () =>
+                          showEditFutureGoalSheet(context, ref, goal),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        ref.read(trashProvider.notifier).addFutureGoal(goal);
+                        notifier.remove(goal.id);
+                      },
+                    ),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 13, color: AppColors.textTertiary),
                   ],
-                ],
+                ),
               ),
             ),
-            const SizedBox(width: AppSpacing.xs),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () => showEditFutureGoalSheet(context, ref, goal),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 18),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                ref.read(trashProvider.notifier).addFutureGoal(goal);
-                notifier.remove(goal.id);
-              },
-            ),
-            const Icon(Icons.arrow_forward_ios,
-                size: 13, color: AppColors.textTertiary),
           ],
         ),
       ),

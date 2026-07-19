@@ -99,6 +99,13 @@ abstract class AppStrings {
   String get progressOverview;
   String get filters;
 
+  // Today greeting header
+  String greetingMorning(String name);
+  String greetingAfternoon(String name);
+  String greetingEvening(String name);
+  String todayStatus(int total, int done);
+  String get allDoneToday;
+
   // Semester system settings
   String get semesterSettings;
   String get semesterCount;
