@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -34,7 +35,7 @@ List<_FutGroup> _buildFutGroups(
   ];
 }
 
-// Desktop content width cap shared by the layout and the drag feedback card
+// Width cap for the drag feedback card so it matches the list column
 const _contentMaxWidth = 600.0;
 
 class FutureScreen extends ConsumerStatefulWidget {
@@ -419,6 +420,93 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     );
   }
 
+  Widget _buildFilterSidebar() {
+    final s = ref.watch(stringsProvider);
+    final settings = ref.watch(semesterSettingsProvider);
+    final allGoals = ref.watch(futureGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
+    final semChips = _semesterChips(settings);
+
+    int countFor(String cat) => allGoals
+        .where((g) => g.parentId == null && g.categories.contains(cat))
+        .length;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.filters, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          Text(s.semester,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              )),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _FilterChip(
+                label: s.catAll,
+                selected: _semFilter == null,
+                onTap: () => setState(() => _semFilter = null),
+              ),
+              for (final sem in semChips)
+                _FilterChip(
+                  label: sem,
+                  selected: _semFilter == sem,
+                  onTap: () => setState(
+                      () => _semFilter = _semFilter == sem ? null : sem),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.expand_more, size: 16),
+                label: Text(s.more),
+                onPressed: () => _showMoreSemesters(context, settings),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(s.category,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              )),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _FilterChip(
+                label: s.catAll,
+                selected: _catFilter == null,
+                onTap: () => setState(() => _catFilter = null),
+              ),
+              for (final cat in cats)
+                _FilterChip(
+                  label: '${catLabel(cat, s)} (${countFor(cat)})',
+                  selected: _catFilter == cat,
+                  onTap: () => setState(
+                      () => _catFilter = _catFilter == cat ? null : cat),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.tune, size: 16),
+                label: Text(s.more),
+                onPressed: () => _showMoreCategories(context),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
@@ -436,7 +524,34 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildFutGroups(filtered, allGoals);
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
-    final isDesktop = MediaQuery.of(context).size.width >= 768;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+    final isWide = width >= AppBreakpoints.wide;
+
+    final goalsList = filtered.isEmpty
+        ? Center(
+            child: Text(s.noGoals,
+                style:
+                    Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textTertiary,
+                )),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageHorizontal,
+              0,
+              AppSpacing.pageHorizontal,
+              80,
+            ),
+            itemCount: groups.length + 1,
+            itemBuilder: (ctx, i) {
+              if (i == groups.length) return _endGapZone(groups);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildGroupCard(groups[i], allGoals, i, groups),
+              );
+            },
+          );
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,84 +581,81 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.pageHorizontal, vertical: 4),
-          child: _AdaptiveChipRow(
-            allChip: _FilterChip(
-              label: s.catAll,
-              selected: _semFilter == null,
-              onTap: () => setState(() => _semFilter = null),
-            ),
-            chips: [
-              for (final sem in semChips)
-                _FilterChip(
-                  label: sem,
-                  selected: _semFilter == sem,
-                  onTap: () => setState(
-                      () => _semFilter = _semFilter == sem ? null : sem),
-                ),
-            ],
-            trailing: ActionChip(
-              avatar: const Icon(Icons.expand_more, size: 16),
-              label: Text(s.more),
-              onPressed: () => _showMoreSemesters(context, settings),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.pageHorizontal, vertical: 4),
-          child: _AdaptiveChipRow(
-            allChip: _FilterChip(
-              label: s.catAll,
-              selected: _catFilter == null,
-              onTap: () => setState(() => _catFilter = null),
-            ),
-            chips: [
-              for (final cat in cats)
-                _FilterChip(
-                  label: catLabel(cat, s),
-                  selected: _catFilter == cat,
-                  onTap: () => setState(
-                      () => _catFilter = _catFilter == cat ? null : cat),
-                ),
-            ],
-            trailing: ActionChip(
-              avatar: const Icon(Icons.tune, size: 16),
-              label: Text(s.more),
-              onPressed: () => _showMoreCategories(context),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        // Mobile keeps the chip rows; desktop moves the filters into the sidebar
+        if (!isDesktop) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageHorizontal, vertical: 4),
+            child: _AdaptiveChipRow(
+              allChip: _FilterChip(
+                label: s.catAll,
+                selected: _semFilter == null,
+                onTap: () => setState(() => _semFilter = null),
+              ),
+              chips: [
+                for (final sem in semChips)
+                  _FilterChip(
+                    label: sem,
+                    selected: _semFilter == sem,
+                    onTap: () => setState(
+                        () => _semFilter = _semFilter == sem ? null : sem),
+                  ),
+              ],
+              trailing: ActionChip(
+                avatar: const Icon(Icons.expand_more, size: 16),
+                label: Text(s.more),
+                onPressed: () => _showMoreSemesters(context, settings),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageHorizontal, vertical: 4),
+            child: _AdaptiveChipRow(
+              allChip: _FilterChip(
+                label: s.catAll,
+                selected: _catFilter == null,
+                onTap: () => setState(() => _catFilter = null),
+              ),
+              chips: [
+                for (final cat in cats)
+                  _FilterChip(
+                    label: catLabel(cat, s),
+                    selected: _catFilter == cat,
+                    onTap: () => setState(
+                        () => _catFilter = _catFilter == cat ? null : cat),
+                  ),
+              ],
+              trailing: ActionChip(
+                avatar: const Icon(Icons.tune, size: 16),
+                label: Text(s.more),
+                onPressed: () => _showMoreCategories(context),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.sm),
         Expanded(
-          child: filtered.isEmpty
-              ? Center(
-                  child: Text(s.noGoals,
-                      style:
-                          Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textTertiary,
-                      )),
+          child: isDesktop
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Main block: goal group list
+                    Expanded(flex: 2, child: goalsList),
+                    // Secondary block: filters with per-category counts
+                    Expanded(
+                      flex: 1,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                            0, 0, AppSpacing.pageHorizontal, AppSpacing.xl),
+                        child: _buildFilterSidebar(),
+                      ),
+                    ),
+                  ],
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageHorizontal,
-                    0,
-                    AppSpacing.pageHorizontal,
-                    80,
-                  ),
-                  itemCount: groups.length + 1,
-                  itemBuilder: (ctx, i) {
-                    if (i == groups.length) return _endGapZone(groups);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildGroupCard(groups[i], allGoals, i, groups),
-                    );
-                  },
-                ),
+              : goalsList,
         ),
       ],
     );
@@ -552,8 +664,8 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       return SafeArea(
         child: Center(
           child: ConstrainedBox(
-            // Single-column page: cap content width so cards do not stretch on wide screens
-            constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+            // Two-column cap: roomier on wide screens so side gaps stay balanced
+            constraints: BoxConstraints(maxWidth: isWide ? 1100 : 900),
             child: content,
           ),
         ),

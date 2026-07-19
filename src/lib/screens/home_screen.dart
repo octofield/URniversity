@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/settings_provider.dart';
 import '../providers/date_provider.dart';
@@ -27,7 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final width = MediaQuery.sizeOf(context).width;
-    final isDesktop = width >= 768;
+    final isDesktop = width >= AppBreakpoints.desktop;
 
     // When dev mode changes the effective date, sync the task-date calendar
     ref.listen<DateTime>(effectiveNowProvider, (_, next) {
@@ -111,7 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             NavigationRail(
               selectedIndex: _index,
               onDestinationSelected: _onDestinationSelected,
-              extended: width >= 1200,
+              extended: width >= AppBreakpoints.wide,
               destinations: [
                 for (final d in destinations)
                   NavigationRailDestination(

@@ -56,5 +56,29 @@ final appTheme = ThemeData(
     backgroundColor: AppColors.surface,
     elevation: 0,
     indicatorColor: AppColors.primaryLight,
+    labelTextStyle: WidgetStateProperty.resolveWith(
+      (states) => GoogleFonts.nunito(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: states.contains(WidgetState.selected)
+            ? AppColors.textPrimary
+            : AppColors.textSecondary,
+      ),
+    ),
+  ),
+  navigationRailTheme: NavigationRailThemeData(
+    backgroundColor: AppColors.surface,
+    indicatorColor: AppColors.primaryLight,
+    selectedIconTheme: const IconThemeData(size: 28),
+    unselectedIconTheme: const IconThemeData(size: 28),
+    selectedLabelTextStyle: GoogleFonts.nunito(
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      color: AppColors.primary,
+    ),
+    unselectedLabelTextStyle: GoogleFonts.nunito(
+      fontSize: 16,
+      color: AppColors.textSecondary,
+    ),
   ),
 );

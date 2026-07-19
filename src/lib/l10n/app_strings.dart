@@ -95,6 +95,10 @@ abstract class AppStrings {
   String get noLink;
   String get more;
 
+  // Desktop sidebars
+  String get progressOverview;
+  String get filters;
+
   // Semester system settings
   String get semesterSettings;
   String get semesterCount;

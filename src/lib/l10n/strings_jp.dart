@@ -94,6 +94,8 @@ class StringsJp implements AppStrings {
   @override String get selectFutureGoal => 'ゴールを選択';
   @override String get noLink => 'リンクなし';
   @override String get more => 'もっと';
+  @override String get progressOverview => '進捗まとめ';
+  @override String get filters => '絞り込み';
 
   @override String get semesterSettings => '学期設定';
   @override String get semesterCount => '学期制';

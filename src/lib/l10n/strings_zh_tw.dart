@@ -94,6 +94,8 @@ class StringsZhTw implements AppStrings {
   @override String get selectFutureGoal => '選擇願景';
   @override String get noLink => '無連結';
   @override String get more => '更多';
+  @override String get progressOverview => '進度總覽';
+  @override String get filters => '篩選';
 
   @override String get semesterSettings => '學期設定';
   @override String get semesterCount => '學期制';
