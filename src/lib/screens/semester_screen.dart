@@ -11,6 +11,8 @@ import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../l10n/app_strings.dart';
 import '../utils/category_helpers.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/hover_lift.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
 
@@ -233,23 +235,25 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final parent = group.parent;
     final rootItems = groups.map((g) => g.parent).toList();
 
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildDraggableRow(parent,
-              depth: 0,
-              parentId: null,
-              siblings: rootItems,
-              siblingIndex: groupIdx),
-          ..._buildDescendantRows(parent.id, allGoals, 1),
-        ],
+    return HoverLift(
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildDraggableRow(parent,
+                depth: 0,
+                parentId: null,
+                siblings: rootItems,
+                siblingIndex: groupIdx),
+            ..._buildDescendantRows(parent.id, allGoals, 1),
+          ],
+        ),
       ),
     );
   }
@@ -270,12 +274,11 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final isWide = width >= AppBreakpoints.wide;
 
     final goalsList = groups.isEmpty
-        ? Center(
-            child: Text(s.noTargets,
-                style:
-                    Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textTertiary,
-                )),
+        ? EmptyState(
+            icon: Icons.school_outlined,
+            message: s.noTargets,
+            actionLabel: s.addTarget,
+            onAction: () => showAddSemesterGoalSheet(context, ref),
           )
         : ListView.builder(
             padding: const EdgeInsets.fromLTRB(
@@ -306,7 +309,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(s.appName,
+              Text(s.targets,
                   style:
                       Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -639,78 +642,103 @@ class _SemGoalCardTile extends ConsumerWidget {
           builder: (_) => SemesterGoalDetailScreen(goalId: goal.id),
         ),
       ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-            AppSpacing.md + depth * 16.0, 6, AppSpacing.md, 6),
+      child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Category color bar; softer on child rows
             Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: catC.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Icon(catIcon(primaryCat), color: catC, size: 20),
+              width: 4,
+              color: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
             ),
-            const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(goal.title,
-                      style: Theme.of(context).textTheme.titleMedium),
-                  if (goal.notes != null)
-                    Text(
-                      goal.notes!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    AppSpacing.md - 4 + depth * 16.0, 6, AppSpacing.md, 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: catC.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      child: Icon(catIcon(primaryCat), color: catC, size: 20),
                     ),
-                  if (total > 0) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(s.goalProgress(done, total),
-                        style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: AppSpacing.xs),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                      child: LinearProgressIndicator(
-                        value: done / total,
-                        minHeight: 4,
-                        color: catC,
-                        backgroundColor: AppColors.surfaceVariant,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(goal.title,
+                              style: Theme.of(context).textTheme.titleMedium),
+                          if (goal.notes != null)
+                            Text(
+                              goal.notes!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          if (total > 0) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(s.goalProgress(done, total),
+                                style: Theme.of(context).textTheme.bodySmall),
+                            const SizedBox(height: AppSpacing.xs),
+                            ClipRRect(
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.full),
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: done / total),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.easeOutCubic,
+                                builder: (_, v, _) => LinearProgressIndicator(
+                                  value: v,
+                                  minHeight: 4,
+                                  color: catC,
+                                  backgroundColor: AppColors.surfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          onPressed: () =>
+                              showEditSemesterGoalSheet(context, ref, goal),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          onPressed: () async {
+                            if (await _confirmDelete(context, s)) {
+                              ref
+                                  .read(trashProvider.notifier)
+                                  .addSemesterGoal(goal);
+                              notifier.remove(goal.id);
+                            }
+                          },
+                        ),
+                        const Icon(Icons.arrow_forward_ios,
+                            size: 14, color: AppColors.textTertiary),
+                      ],
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () =>
-                      showEditSemesterGoalSheet(context, ref, goal),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () async {
-                    if (await _confirmDelete(context, s)) {
-                      ref.read(trashProvider.notifier).addSemesterGoal(goal);
-                      notifier.remove(goal.id);
-                    }
-                  },
-                ),
-                const Icon(Icons.arrow_forward_ios,
-                    size: 14, color: AppColors.textTertiary),
-              ],
             ),
           ],
         ),

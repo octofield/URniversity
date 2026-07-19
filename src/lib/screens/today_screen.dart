@@ -14,6 +14,9 @@ import '../providers/date_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/future_goals_provider.dart';
+import '../providers/profile_provider.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/hover_lift.dart';
 import 'settings_screen.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
@@ -63,6 +66,19 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final isDesktop = width >= AppBreakpoints.desktop;
     final isWide = width >= AppBreakpoints.wide;
 
+    // Greeting header data
+    final profile = ref.watch(profileProvider);
+    final greetName = profile?.username ?? '';
+    final greeting = now.hour < 12
+        ? s.greetingMorning(greetName)
+        : now.hour < 18
+            ? s.greetingAfternoon(greetName)
+            : s.greetingEvening(greetName);
+    final todayDate = DateTime(now.year, now.month, now.day);
+    final todayTasks = ref.watch(tasksForDateProvider(todayDate));
+    final todayDone =
+        todayTasks.where((t) => t.isCompletedOn(todayDate)).length;
+
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,12 +88,28 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             AppSpacing.pageHorizontal, 0,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                s.appName,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greeting,
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${formatDate(todayDate, dateFormat)} · '
+                      '${s.todayStatus(todayTasks.length, todayDone)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -468,43 +500,94 @@ class _SummaryCard extends ConsumerWidget {
     final completed = tasks.where((t) => t.isCompletedOn(date)).length;
     final total = tasks.length;
     final allDone = total > 0 && completed == total;
+    final progress = total > 0 ? completed / total : 0.0;
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                allDone ? Icons.check_circle : Icons.check_circle_outline,
-                color: allDone ? AppColors.primary : null,
+    return HoverLift(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border, width: 1),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 72,
+              height: 72,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: value,
+                      strokeWidth: 7,
+                      strokeCap: StrokeCap.round,
+                      color: allDone ? AppColors.success : AppColors.primary,
+                      backgroundColor: AppColors.surfaceVariant,
+                    ),
+                    Center(
+                      child: Text(
+                        total == 0 ? '—' : '${(value * 100).round()}%',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                s.tasksCompleted(completed, total),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
-          ),
-          if (total > 0) ...[
-            const SizedBox(height: AppSpacing.sm),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.full),
-              child: LinearProgressIndicator(
-                value: completed / total,
-                minHeight: 6,
-                color: AppColors.primary,
-                backgroundColor: AppColors.surfaceVariant,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.tasksCompleted(completed, total),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (allDone) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.6, end: 1),
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.elasticOut,
+                      builder: (_, v, child) => Transform.scale(
+                        scale: v,
+                        alignment: Alignment.centerLeft,
+                        child: child,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.celebration,
+                              size: 16, color: AppColors.warning),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            s.allDoneToday,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -638,34 +721,38 @@ class _TasksSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border, width: 1),
-          ),
-          child: tasks.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: 20,
-                  ),
-                  child: Text(
-                    s.noTasks,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textTertiary,
+        HoverLift(
+          child: Container(
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border, width: 1),
+            ),
+            child: tasks.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.lg,
                     ),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (final task in tasks) ...[
-                      _TaskTile(task: task),
-                      const Divider(height: 1, indent: 56),
+                    child: EmptyState(
+                      icon: Icons.task_alt,
+                      message: s.noTasks,
+                      actionLabel: s.addTask,
+                      onAction: () => showAddTaskSheet(context, ref),
+                      compact: true,
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final task in tasks) ...[
+                        _TaskTile(task: task),
+                        const Divider(height: 1, indent: 56),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
+          ),
         ),
       ],
     );
@@ -905,20 +992,23 @@ class _CompletedTasksSection extends ConsumerWidget {
       children: [
         Text(s.completedTasks, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: AppSpacing.sm),
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border, width: 1),
-          ),
-          child: Column(
-            children: [
-              for (final task in completed) ...[
-                _TaskTile(task: task),
-                const Divider(height: 1, indent: 56),
+        HoverLift(
+          child: Container(
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border, width: 1),
+            ),
+            child: Column(
+              children: [
+                for (final task in completed) ...[
+                  _TaskTile(task: task),
+                  const Divider(height: 1, indent: 56),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],

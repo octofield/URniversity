@@ -96,6 +96,11 @@ class StringsZhTw implements AppStrings {
   @override String get more => '更多';
   @override String get progressOverview => '進度總覽';
   @override String get filters => '篩選';
+  @override String greetingMorning(String name) => name.isEmpty ? '早安 👋' : '早安，$name 👋';
+  @override String greetingAfternoon(String name) => name.isEmpty ? '午安 👋' : '午安，$name 👋';
+  @override String greetingEvening(String name) => name.isEmpty ? '晚安 👋' : '晚安，$name 👋';
+  @override String todayStatus(int total, int done) => total == 0 ? '今天還沒有安排任務' : '今天有 $total 件事，完成了 $done 件';
+  @override String get allDoneToday => '今天全部完成！';
 
   @override String get semesterSettings => '學期設定';
   @override String get semesterCount => '學期制';
