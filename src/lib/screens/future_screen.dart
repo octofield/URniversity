@@ -34,6 +34,9 @@ List<_FutGroup> _buildFutGroups(
   ];
 }
 
+// Desktop content width cap shared by the layout and the drag feedback card
+const _contentMaxWidth = 600.0;
+
 class FutureScreen extends ConsumerStatefulWidget {
   const FutureScreen({super.key});
 
@@ -77,12 +80,13 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
   }
 
   Widget _feedbackCard(FutureGoal goal) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Container(
-        width:
-            MediaQuery.of(context).size.width - AppSpacing.pageHorizontal * 2,
+        width: (screenWidth > _contentMaxWidth ? _contentMaxWidth : screenWidth) -
+            AppSpacing.pageHorizontal * 2,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -431,118 +435,132 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     }).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildFutGroups(filtered, allGoals);
+    // Layout follows screen width, not platform, so narrow web windows get the mobile UI
+    final isDesktop = MediaQuery.of(context).size.width >= 768;
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageHorizontal,
-              AppSpacing.pageTop,
-              AppSpacing.pageHorizontal,
-              AppSpacing.xs,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(s.appName,
-                    style:
-                        Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    )),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  ),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.pageTop,
+            AppSpacing.pageHorizontal,
+            AppSpacing.xs,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(s.appName,
+                  style:
+                      Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  )),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.pageHorizontal, vertical: 4),
+          child: _AdaptiveChipRow(
+            allChip: _FilterChip(
+              label: s.catAll,
+              selected: _semFilter == null,
+              onTap: () => setState(() => _semFilter = null),
+            ),
+            chips: [
+              for (final sem in semChips)
+                _FilterChip(
+                  label: sem,
+                  selected: _semFilter == sem,
+                  onTap: () => setState(
+                      () => _semFilter = _semFilter == sem ? null : sem),
+                ),
+            ],
+            trailing: ActionChip(
+              avatar: const Icon(Icons.expand_more, size: 16),
+              label: Text(s.more),
+              onPressed: () => _showMoreSemesters(context, settings),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pageHorizontal, vertical: 4),
-            child: _AdaptiveChipRow(
-              allChip: _FilterChip(
-                label: s.catAll,
-                selected: _semFilter == null,
-                onTap: () => setState(() => _semFilter = null),
-              ),
-              chips: [
-                for (final sem in semChips)
-                  _FilterChip(
-                    label: sem,
-                    selected: _semFilter == sem,
-                    onTap: () => setState(
-                        () => _semFilter = _semFilter == sem ? null : sem),
-                  ),
-              ],
-              trailing: ActionChip(
-                avatar: const Icon(Icons.expand_more, size: 16),
-                label: Text(s.more),
-                onPressed: () => _showMoreSemesters(context, settings),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.pageHorizontal, vertical: 4),
+          child: _AdaptiveChipRow(
+            allChip: _FilterChip(
+              label: s.catAll,
+              selected: _catFilter == null,
+              onTap: () => setState(() => _catFilter = null),
+            ),
+            chips: [
+              for (final cat in cats)
+                _FilterChip(
+                  label: catLabel(cat, s),
+                  selected: _catFilter == cat,
+                  onTap: () => setState(
+                      () => _catFilter = _catFilter == cat ? null : cat),
+                ),
+            ],
+            trailing: ActionChip(
+              avatar: const Icon(Icons.tune, size: 16),
+              label: Text(s.more),
+              onPressed: () => _showMoreCategories(context),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pageHorizontal, vertical: 4),
-            child: _AdaptiveChipRow(
-              allChip: _FilterChip(
-                label: s.catAll,
-                selected: _catFilter == null,
-                onTap: () => setState(() => _catFilter = null),
-              ),
-              chips: [
-                for (final cat in cats)
-                  _FilterChip(
-                    label: catLabel(cat, s),
-                    selected: _catFilter == cat,
-                    onTap: () => setState(
-                        () => _catFilter = _catFilter == cat ? null : cat),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Text(s.noGoals,
+                      style:
+                          Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.textTertiary,
+                      )),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageHorizontal,
+                    0,
+                    AppSpacing.pageHorizontal,
+                    80,
                   ),
-              ],
-              trailing: ActionChip(
-                avatar: const Icon(Icons.tune, size: 16),
-                label: Text(s.more),
-                onPressed: () => _showMoreCategories(context),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Text(s.noGoals,
-                        style:
-                            Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.textTertiary,
-                        )),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.pageHorizontal,
-                      0,
-                      AppSpacing.pageHorizontal,
-                      80,
-                    ),
-                    itemCount: groups.length + 1,
-                    itemBuilder: (ctx, i) {
-                      if (i == groups.length) return _endGapZone(groups);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _buildGroupCard(groups[i], allGoals, i, groups),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+                  itemCount: groups.length + 1,
+                  itemBuilder: (ctx, i) {
+                    if (i == groups.length) return _endGapZone(groups);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildGroupCard(groups[i], allGoals, i, groups),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
+
+    if (isDesktop) {
+      return SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            // Single-column page: cap content width so cards do not stretch on wide screens
+            constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(child: content);
   }
 }
 

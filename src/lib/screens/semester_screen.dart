@@ -33,6 +33,9 @@ List<_SemGroup> _buildSemGroups(
   ];
 }
 
+// Desktop content width cap shared by the layout and the drag feedback card
+const _contentMaxWidth = 600.0;
+
 class SemesterScreen extends ConsumerStatefulWidget {
   const SemesterScreen({super.key});
 
@@ -74,12 +77,13 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
   }
 
   Widget _feedbackCard(SemesterGoal goal) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Container(
-        width:
-            MediaQuery.of(context).size.width - AppSpacing.pageHorizontal * 2,
+        width: (screenWidth > _contentMaxWidth ? _contentMaxWidth : screenWidth) -
+            AppSpacing.pageHorizontal * 2,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -259,66 +263,80 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildSemGroups(topLevel, allGoals);
+    // Layout follows screen width, not platform, so narrow web windows get the mobile UI
+    final isDesktop = MediaQuery.of(context).size.width >= 768;
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageHorizontal,
-              AppSpacing.pageTop,
-              AppSpacing.pageHorizontal,
-              AppSpacing.xs,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(s.appName,
-                    style:
-                        Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    )),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  ),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.pageTop,
+            AppSpacing.pageHorizontal,
+            AppSpacing.xs,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(s.appName,
+                  style:
+                      Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  )),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const _SemesterPicker(),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: groups.isEmpty
-                ? Center(
-                    child: Text(s.noTargets,
-                        style:
-                            Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.textTertiary,
-                        )),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.pageHorizontal,
-                        0,
-                        AppSpacing.pageHorizontal,
-                        80),
-                    itemCount: groups.length + 1,
-                    itemBuilder: (ctx, i) {
-                      if (i == groups.length) return _endGapZone(groups);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _buildGroupCard(groups[i], allGoals, i, groups),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+        ),
+        const _SemesterPicker(),
+        const SizedBox(height: AppSpacing.sm),
+        Expanded(
+          child: groups.isEmpty
+              ? Center(
+                  child: Text(s.noTargets,
+                      style:
+                          Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.textTertiary,
+                      )),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageHorizontal,
+                      0,
+                      AppSpacing.pageHorizontal,
+                      80),
+                  itemCount: groups.length + 1,
+                  itemBuilder: (ctx, i) {
+                    if (i == groups.length) return _endGapZone(groups);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildGroupCard(groups[i], allGoals, i, groups),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
+
+    if (isDesktop) {
+      return SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            // Single-column page: cap content width so cards do not stretch on wide screens
+            constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(child: content);
   }
 }
 

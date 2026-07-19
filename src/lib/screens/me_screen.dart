@@ -25,56 +25,94 @@ class MeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
+    // Layout follows screen width, not platform, so narrow web windows get the mobile UI
+    final isDesktop = MediaQuery.of(context).size.width >= 768;
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal, AppSpacing.pageTop,
+            AppSpacing.pageHorizontal, 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                s.appName,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageHorizontal, AppSpacing.pageTop,
-              AppSpacing.pageHorizontal, 0,
+              AppSpacing.pageHorizontal, AppSpacing.md,
+              AppSpacing.pageHorizontal, AppSpacing.xl,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  s.appName,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+            child: isDesktop
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Main block: inspirations and journal
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _InspirationSection(),
+                            const SizedBox(height: AppSpacing.lg),
+                            _JournalSection(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.lg),
+                      // Secondary block: profile summary
+                      const Expanded(
+                        flex: 1,
+                        child: _ProfileCard(),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _ProfileCard(),
+                      const SizedBox(height: AppSpacing.lg),
+                      _InspirationSection(),
+                      const SizedBox(height: AppSpacing.lg),
+                      _JournalSection(),
+                    ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  ),
-                ),
-              ],
-            ),
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageHorizontal, AppSpacing.md,
-                AppSpacing.pageHorizontal, AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _ProfileCard(),
-                  const SizedBox(height: AppSpacing.lg),
-                  _InspirationSection(),
-                  const SizedBox(height: AppSpacing.lg),
-                  _JournalSection(),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
+
+    if (isDesktop) {
+      return SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            // Cap total width so the 2:1 columns top out around 600 / 300 on wide screens
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(child: content);
   }
 }
 

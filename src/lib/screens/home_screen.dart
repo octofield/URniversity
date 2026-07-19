@@ -21,100 +21,127 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _index = 0;
 
+  void _onDestinationSelected(int i) => setState(() => _index = i);
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 768;
 
     // When dev mode changes the effective date, sync the task-date calendar
     ref.listen<DateTime>(effectiveNowProvider, (_, next) {
       ref.read(dateProvider.notifier).goToToday(next);
     });
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: _index,
-            children: const [
-              TodayScreen(),
-              SemesterScreen(),
-              FutureScreen(),
-              MeScreen(),
-            ],
-          ),
-          if (_index < 3)
-            Positioned(
-              left: 16,
-              bottom: 16,
-              child: Material(
-                color: AppColors.primaryLight,
+    // Shared destination data for both NavigationBar and NavigationRail
+    final destinations = [
+      (icon: Icons.today_outlined, selectedIcon: Icons.today, label: s.tasks),
+      (icon: Icons.school_outlined, selectedIcon: Icons.school, label: s.targets),
+      (icon: Icons.flag_outlined, selectedIcon: Icons.flag, label: s.goals),
+      (icon: Icons.person_outlined, selectedIcon: Icons.person, label: s.me),
+    ];
+
+    final body = Stack(
+      children: [
+        IndexedStack(
+          index: _index,
+          children: const [
+            TodayScreen(),
+            SemesterScreen(),
+            FutureScreen(),
+            MeScreen(),
+          ],
+        ),
+        if (_index < 3)
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: Material(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(24),
+              elevation: 3,
+              child: InkWell(
                 borderRadius: BorderRadius.circular(24),
-                elevation: 3,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: () => showAddInspirationSheet(context, ref),
-                  child: const SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(Icons.cloud_outlined, size: 34, color: AppColors.primary),
-                        Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: Icon(Icons.lightbulb_outline, size: 17, color: AppColors.primary),
-                        ),
-                      ],
-                    ),
+                onTap: () => showAddInspirationSheet(context, ref),
+                child: const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(Icons.cloud_outlined, size: 34, color: AppColors.primary),
+                      Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(Icons.lightbulb_outline, size: 17, color: AppColors.primary),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-        ],
-      ),
-      floatingActionButton: switch (_index) {
-        0 => FloatingActionButton(
-            onPressed: () => showAddTaskSheet(context, ref),
-            tooltip: s.addTask,
-            child: const Icon(Icons.add)),
-        1 => FloatingActionButton(
-            onPressed: () => showAddSemesterGoalSheet(context, ref),
-            child: const Icon(Icons.add)),
-        2 => FloatingActionButton(
-            onPressed: () => showAddFutureGoalSheet(context, ref),
-            child: const Icon(Icons.add)),
-        3 => FloatingActionButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const JournalEditScreen()),
+          ),
+      ],
+    );
+
+    final floatingActionButton = switch (_index) {
+      0 => FloatingActionButton(
+          onPressed: () => showAddTaskSheet(context, ref),
+          tooltip: s.addTask,
+          child: const Icon(Icons.add)),
+      1 => FloatingActionButton(
+          onPressed: () => showAddSemesterGoalSheet(context, ref),
+          child: const Icon(Icons.add)),
+      2 => FloatingActionButton(
+          onPressed: () => showAddFutureGoalSheet(context, ref),
+          child: const Icon(Icons.add)),
+      3 => FloatingActionButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const JournalEditScreen()),
+          ),
+          child: const Icon(Icons.edit_note)),
+      _ => null,
+    };
+
+    if (isDesktop) {
+      return Scaffold(
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _index,
+              onDestinationSelected: _onDestinationSelected,
+              extended: width >= 1200,
+              destinations: [
+                for (final d in destinations)
+                  NavigationRailDestination(
+                    icon: Icon(d.icon),
+                    selectedIcon: Icon(d.selectedIcon, color: AppColors.primary),
+                    label: Text(d.label),
+                  ),
+              ],
             ),
-            child: const Icon(Icons.edit_note)),
-        _ => null,
-      },
+            const VerticalDivider(width: 1, color: AppColors.border),
+            Expanded(child: body),
+          ],
+        ),
+        floatingActionButton: floatingActionButton,
+      );
+    }
+
+    return Scaffold(
+      body: body,
+      floatingActionButton: floatingActionButton,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _onDestinationSelected,
         destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.today_outlined),
-            selectedIcon: const Icon(Icons.today, color: AppColors.primary),
-            label: s.tasks,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.school_outlined),
-            selectedIcon: const Icon(Icons.school, color: AppColors.primary),
-            label: s.targets,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.flag_outlined),
-            selectedIcon: const Icon(Icons.flag, color: AppColors.primary),
-            label: s.goals,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.person_outlined),
-            selectedIcon: const Icon(Icons.person, color: AppColors.primary),
-            label: s.me,
-          ),
+          for (final d in destinations)
+            NavigationDestination(
+              icon: Icon(d.icon),
+              selectedIcon: Icon(d.selectedIcon, color: AppColors.primary),
+              label: d.label,
+            ),
         ],
       ),
     );
