@@ -94,6 +94,8 @@ class StringsEn implements AppStrings {
   @override String get selectFutureGoal => 'Select Goal';
   @override String get noLink => 'No Link';
   @override String get more => 'More';
+  @override String get progressOverview => 'Progress overview';
+  @override String get filters => 'Filters';
 
   @override String get semesterSettings => 'Semester Settings';
   @override String get semesterCount => 'Semester System';

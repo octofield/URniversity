@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -33,7 +34,7 @@ List<_SemGroup> _buildSemGroups(
   ];
 }
 
-// Desktop content width cap shared by the layout and the drag feedback card
+// Width cap for the drag feedback card so it matches the list column
 const _contentMaxWidth = 600.0;
 
 class SemesterScreen extends ConsumerStatefulWidget {
@@ -264,7 +265,33 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildSemGroups(topLevel, allGoals);
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
-    final isDesktop = MediaQuery.of(context).size.width >= 768;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+    final isWide = width >= AppBreakpoints.wide;
+
+    final goalsList = groups.isEmpty
+        ? Center(
+            child: Text(s.noTargets,
+                style:
+                    Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textTertiary,
+                )),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageHorizontal,
+                0,
+                AppSpacing.pageHorizontal,
+                80),
+            itemCount: groups.length + 1,
+            itemBuilder: (ctx, i) {
+              if (i == groups.length) return _endGapZone(groups);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildGroupCard(groups[i], allGoals, i, groups),
+              );
+            },
+          );
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,29 +324,24 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         const _SemesterPicker(),
         const SizedBox(height: AppSpacing.sm),
         Expanded(
-          child: groups.isEmpty
-              ? Center(
-                  child: Text(s.noTargets,
-                      style:
-                          Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textTertiary,
-                      )),
+          child: isDesktop
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Main block: goal group list
+                    Expanded(flex: 2, child: goalsList),
+                    // Secondary block: semester progress overview
+                    Expanded(
+                      flex: 1,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                            0, 0, AppSpacing.pageHorizontal, AppSpacing.xl),
+                        child: const _SemesterOverviewCard(),
+                      ),
+                    ),
+                  ],
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.pageHorizontal,
-                      0,
-                      AppSpacing.pageHorizontal,
-                      80),
-                  itemCount: groups.length + 1,
-                  itemBuilder: (ctx, i) {
-                    if (i == groups.length) return _endGapZone(groups);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _buildGroupCard(groups[i], allGoals, i, groups),
-                    );
-                  },
-                ),
+              : goalsList,
         ),
       ],
     );
@@ -328,8 +350,8 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
       return SafeArea(
         child: Center(
           child: ConstrainedBox(
-            // Single-column page: cap content width so cards do not stretch on wide screens
-            constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+            // Two-column cap: roomier on wide screens so side gaps stay balanced
+            constraints: BoxConstraints(maxWidth: isWide ? 1100 : 900),
             child: content,
           ),
         ),
@@ -337,6 +359,112 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     }
 
     return SafeArea(child: content);
+  }
+}
+
+class _SemesterOverviewCard extends ConsumerWidget {
+  const _SemesterOverviewCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final selectedSem = ref.watch(selectedSemesterProvider);
+    final allGoals = ref.watch(semesterGoalsProvider);
+    final topLevel = allGoals
+        .where((g) => g.semester == selectedSem && g.parentId == null)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    var done = 0;
+    var total = 0;
+    final rows = <({SemesterGoal goal, int done, int total})>[];
+    for (final p in topLevel) {
+      final children = allGoals.where((g) => g.parentId == p.id).toList();
+      final d = children.where((c) => c.isDone).length;
+      rows.add((goal: p, done: d, total: children.length));
+      done += d;
+      total += children.length;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.progressOverview,
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          if (topLevel.isEmpty)
+            Text(s.noTargets,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textTertiary,
+                ))
+          else ...[
+            if (total > 0) ...[
+              Text(s.goalProgress(done, total),
+                  style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: AppSpacing.xs),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                child: LinearProgressIndicator(
+                  value: done / total,
+                  minHeight: 6,
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.surfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            for (final r in rows)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(r.goal.title,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        if (r.total > 0)
+                          Text(s.goalProgress(r.done, r.total),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                color: AppColors.textSecondary,
+                              )),
+                      ],
+                    ),
+                    if (r.total > 0) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        child: LinearProgressIndicator(
+                          value: r.done / r.total,
+                          minHeight: 4,
+                          color: catColor(r.goal.categories.isNotEmpty
+                              ? r.goal.categories.first
+                              : 'other'),
+                          backgroundColor: AppColors.surfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

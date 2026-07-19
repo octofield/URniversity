@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/avatars.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -26,7 +27,9 @@ class MeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
-    final isDesktop = MediaQuery.of(context).size.width >= 768;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+    final isWide = width >= AppBreakpoints.wide;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,7 +80,7 @@ class MeScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.lg),
+                      SizedBox(width: isWide ? AppSpacing.xl : AppSpacing.lg),
                       // Secondary block: profile summary
                       const Expanded(
                         flex: 1,
@@ -104,8 +107,8 @@ class MeScreen extends ConsumerWidget {
       return SafeArea(
         child: Center(
           child: ConstrainedBox(
-            // Cap total width so the 2:1 columns top out around 600 / 300 on wide screens
-            constraints: const BoxConstraints(maxWidth: 900),
+            // Two-column cap: roomier on wide screens so side gaps stay balanced
+            constraints: BoxConstraints(maxWidth: isWide ? 1100 : 900),
             child: content,
           ),
         ),

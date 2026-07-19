@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -58,7 +59,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         selectedDate.day == now.day;
     final weekEnd = _weekStart.add(const Duration(days: 6));
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
-    final isDesktop = MediaQuery.of(context).size.width >= 768;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= AppBreakpoints.desktop;
+    final isWide = width >= AppBreakpoints.wide;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,9 +206,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   child: isDesktop
                       ? Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             // Main block: task lists
-                            Expanded(
+                            const Expanded(
                               flex: 2,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,11 +219,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                 ],
                               ),
                             ),
-                            SizedBox(width: AppSpacing.lg),
-                            // Secondary block: completion summary
-                            Expanded(
+                            SizedBox(width: isWide ? AppSpacing.xl : AppSpacing.lg),
+                            // Secondary block: completion summary and inspirations
+                            const Expanded(
                               flex: 1,
-                              child: _SummaryCard(),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _SummaryCard(),
+                                  SizedBox(height: AppSpacing.lg),
+                                  _InspirationsQuickList(),
+                                ],
+                              ),
                             ),
                           ],
                         )
@@ -243,8 +253,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       return SafeArea(
         child: Center(
           child: ConstrainedBox(
-            // Cap total width so the 2:1 columns top out around 600 / 300 on wide screens
-            constraints: const BoxConstraints(maxWidth: 900),
+            // Two-column cap: roomier on wide screens so side gaps stay balanced
+            constraints: BoxConstraints(maxWidth: isWide ? 1100 : 900),
             child: content,
           ),
         ),
@@ -496,6 +506,96 @@ class _SummaryCard extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _InspirationsQuickList extends ConsumerWidget {
+  const _InspirationsQuickList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final active = ref.watch(inspirationsProvider)
+        .where((i) => !i.isCompleted)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(s.inspirations, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: AppSpacing.sm),
+        Container(
+          width: double.infinity,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border, width: 1),
+          ),
+          child: active.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: 20,
+                  ),
+                  child: Text(
+                    s.noInspirations,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (int i = 0; i < active.length; i++) ...[
+                      if (i > 0)
+                        const Divider(height: 1, indent: AppSpacing.md),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(Icons.lightbulb_outline,
+                                  size: 16, color: AppColors.primary),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(active[i].title,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium),
+                                  if (active[i].content != null)
+                                    Text(
+                                      active[i].content!,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                        color: AppColors.textTertiary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+      ],
     );
   }
 }
