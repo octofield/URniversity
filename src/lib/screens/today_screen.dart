@@ -57,163 +57,201 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         selectedDate.month == now.month &&
         selectedDate.day == now.day;
     final weekEnd = _weekStart.add(const Duration(days: 6));
+    // Layout follows screen width, not platform, so narrow web windows get the mobile UI
+    final isDesktop = MediaQuery.of(context).size.width >= 768;
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal, AppSpacing.pageTop,
+            AppSpacing.pageHorizontal, 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                s.appName,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _ViewToggleLabel(label: s.allTasks, active: taskView == 0,
+                  onTap: () => ref.read(taskViewProvider.notifier).state = 0),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+              ),
+              _ViewToggleLabel(label: s.dailyTasks, active: taskView == 1,
+                  onTap: () => ref.read(taskViewProvider.notifier).state = 1),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+              ),
+              _ViewToggleLabel(label: s.weeklyTasks, active: taskView == 2,
+                  onTap: () => ref.read(taskViewProvider.notifier).state = 2),
+            ],
+          ),
+        ),
+        if (taskView == 1)
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageHorizontal, AppSpacing.pageTop,
-              AppSpacing.pageHorizontal, 0,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => ref.read(dateProvider.notifier).prev(),
+                ),
                 Text(
-                  s.appName,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  formatDate(selectedDate, dateFormat),
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => ref.read(dateProvider.notifier).next(),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (picked != null) {
+                      ref.read(dateProvider.notifier).setDate(picked);
+                    }
+                  },
+                ),
+                if (!isToday)
+                  TextButton(
+                    onPressed: () => ref.read(dateProvider.notifier).goToToday(now),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    ),
+                    child: Text(s.backToToday),
+                  ),
+              ],
+            ),
+          ),
+        if (taskView == 2)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal - 8),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _prevWeek,
+                ),
+                Expanded(
+                  child: Text(
+                    '${_weekStart.month}/${_weekStart.day} – ${weekEnd.month}/${weekEnd.day}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  ),
+                  icon: const Icon(Icons.chevron_right),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _nextWeek,
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _ViewToggleLabel(label: s.allTasks, active: taskView == 0,
-                    onTap: () => ref.read(taskViewProvider.notifier).state = 0),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                ),
-                _ViewToggleLabel(label: s.dailyTasks, active: taskView == 1,
-                    onTap: () => ref.read(taskViewProvider.notifier).state = 1),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-                ),
-                _ViewToggleLabel(label: s.weeklyTasks, active: taskView == 2,
-                    onTap: () => ref.read(taskViewProvider.notifier).state = 2),
-              ],
-            ),
-          ),
-          if (taskView == 1)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => ref.read(dateProvider.notifier).prev(),
-                  ),
-                  Text(
-                    formatDate(selectedDate, dateFormat),
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => ref.read(dateProvider.notifier).next(),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (picked != null) {
-                        ref.read(dateProvider.notifier).setDate(picked);
-                      }
+                if (!_isCurrentWeek(now))
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _weekStart = _mondayOf(now));
+                      ref.read(dateProvider.notifier).goToToday(now);
                     },
-                  ),
-                  if (!isToday)
-                    TextButton(
-                      onPressed: () => ref.read(dateProvider.notifier).goToToday(now),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                      ),
-                      child: Text(s.backToToday),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                     ),
-                ],
-              ),
+                    child: Text(s.backToToday),
+                  ),
+              ],
             ),
-          if (taskView == 2)
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal - 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _prevWeek,
-                  ),
-                  Expanded(
-                    child: Text(
-                      '${_weekStart.month}/${_weekStart.day} – ${weekEnd.month}/${weekEnd.day}',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _nextWeek,
-                  ),
-                  if (!_isCurrentWeek(now))
-                    TextButton(
-                      onPressed: () {
-                        setState(() => _weekStart = _mondayOf(now));
-                        ref.read(dateProvider.notifier).goToToday(now);
-                      },
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                      ),
-                      child: Text(s.backToToday),
-                    ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: taskView == 2
-                ? _WeeklyGrid(weekStart: _weekStart)
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.pageHorizontal, 12,
-                      AppSpacing.pageHorizontal, AppSpacing.xl,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        _SummaryCard(),
-                        SizedBox(height: AppSpacing.lg),
-                        _TasksSection(),
-                        SizedBox(height: AppSpacing.lg),
-                        _CompletedTasksSection(),
-                      ],
-                    ),
-                  ),
           ),
-        ],
-      ),
+        Expanded(
+          child: taskView == 2
+              ? _WeeklyGrid(weekStart: _weekStart)
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageHorizontal, 12,
+                    AppSpacing.pageHorizontal, AppSpacing.xl,
+                  ),
+                  child: isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            // Main block: task lists
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _TasksSection(),
+                                  SizedBox(height: AppSpacing.lg),
+                                  _CompletedTasksSection(),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: AppSpacing.lg),
+                            // Secondary block: completion summary
+                            Expanded(
+                              flex: 1,
+                              child: _SummaryCard(),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            _SummaryCard(),
+                            SizedBox(height: AppSpacing.lg),
+                            _TasksSection(),
+                            SizedBox(height: AppSpacing.lg),
+                            _CompletedTasksSection(),
+                          ],
+                        ),
+                ),
+        ),
+      ],
     );
+
+    if (isDesktop) {
+      return SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            // Cap total width so the 2:1 columns top out around 600 / 300 on wide screens
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: content,
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(child: content);
   }
 }
 
