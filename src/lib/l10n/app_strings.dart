@@ -106,6 +106,11 @@ abstract class AppStrings {
   String todayStatus(int total, int done);
   String get allDoneToday;
 
+  // Overview graph
+  String get overview;
+  String get unlinked;
+  String get overviewEmpty;
+
   // Semester system settings
   String get semesterSettings;
   String get semesterCount;
