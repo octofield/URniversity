@@ -15,6 +15,7 @@ import '../utils/category_helpers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
+import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
 
 class _FutGroup {
@@ -568,13 +569,22 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             AppSpacing.xs,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(s.goals,
                   style:
                       Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   )),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.hub_outlined),
+                tooltip: s.overview,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const OverviewGraphScreen()),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.settings_outlined),
                 onPressed: () => Navigator.push(
