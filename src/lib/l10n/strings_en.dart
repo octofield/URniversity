@@ -101,9 +101,17 @@ class StringsEn implements AppStrings {
   @override String greetingEvening(String name) => name.isEmpty ? 'Good evening 👋' : 'Good evening, $name 👋';
   @override String todayStatus(int total, int done) => total == 0 ? 'Nothing planned for today yet' : '$done of $total tasks done today';
   @override String get allDoneToday => 'All done for today!';
-  @override String get overview => 'Overview';
+  @override String get overview => 'Relation map';
   @override String get unlinked => 'Not linked';
   @override String get overviewEmpty => 'No targets or goals yet';
+  @override String get profile => 'Profile';
+  @override String get taskHistory => 'Completion history';
+  @override String get historyDaily => 'Daily';
+  @override String get historyWeekly => 'Weekly';
+  @override String get historyMonthly => 'Monthly';
+  @override String historyAverage(int percent) => 'Average $percent%';
+  @override String get historyNoData => 'No data';
+  @override String get historyTapHint => 'Tap a bar for details';
 
   @override String get semesterSettings => 'Semester Settings';
   @override String get semesterCount => 'Semester System';

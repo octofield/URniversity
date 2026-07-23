@@ -14,6 +14,7 @@ import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/universities_provider.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'inspirations_screen.dart';
 import 'journal_edit_screen.dart';
@@ -82,10 +83,27 @@ class MeScreen extends ConsumerWidget {
                         ),
                       ),
                       SizedBox(width: isWide ? AppSpacing.xl : AppSpacing.lg),
-                      // Secondary block: profile summary
-                      const Expanded(
+                      // Secondary block: profile summary; header keeps card tops aligned
+                      Expanded(
                         flex: 1,
-                        child: _ProfileCard(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 40,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  s.profile,
+                                  style:
+                                      Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            const _ProfileCard(),
+                          ],
+                        ),
                       ),
                     ],
                   )
@@ -316,8 +334,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     final s = widget.s;
     return AlertDialog(
       title: Text(s.accountSettings),
-      content: SingleChildScrollView(
-        child: Column(
+      content: SizedBox(
+        width: 400,
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -377,6 +397,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               ],
             ),
           ],
+          ),
         ),
       ),
       actions: [
@@ -399,36 +420,46 @@ class _InspirationSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(s.inspirations, style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            // Navigate to full inspirations page
-            IconButton(
-              icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationsScreen())),
-            ),
-            IconButton(
-              icon: const Icon(Icons.add, color: AppColors.primary),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () => showAddInspirationSheet(context, ref),
-            ),
-          ],
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              Text(s.inspirations, style: Theme.of(context).textTheme.titleLarge),
+              const Spacer(),
+              // Navigate to full inspirations page
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationsScreen())),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, color: AppColors.primary),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: () => showAddInspirationSheet(context, ref),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         if (active.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 20),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.lg),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(color: AppColors.border),
             ),
-            child: Text(s.noInspirations, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+            child: EmptyState(
+              icon: Icons.lightbulb_outline,
+              message: s.noInspirations,
+              actionLabel: s.addInspiration,
+              onAction: () => showAddInspirationSheet(context, ref),
+              compact: true,
+            ),
           )
         else
           Container(
@@ -614,41 +645,46 @@ class _JournalSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(s.journal, style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            // Navigate to full journals page
-            IconButton(
-              icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalsScreen())),
-            ),
-            IconButton(
-              icon: const Icon(Icons.add, color: AppColors.primary),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
-            ),
-          ],
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              Text(s.journal, style: Theme.of(context).textTheme.titleLarge),
+              const Spacer(),
+              // Navigate to full journals page
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalsScreen())),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, color: AppColors.primary),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         if (journals.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: 20),
+                horizontal: AppSpacing.md, vertical: AppSpacing.lg),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(color: AppColors.border),
             ),
-            child: Text(
-              s.noJournal,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textTertiary,
-              ),
+            child: EmptyState(
+              icon: Icons.edit_note,
+              message: s.noJournal,
+              actionLabel: s.writeJournal,
+              onAction: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const JournalEditScreen())),
+              compact: true,
             ),
           )
         else

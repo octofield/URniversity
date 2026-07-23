@@ -24,14 +24,33 @@ const _semNodeW = 170.0;
 const _semNodeH = 52.0;
 const _hGap = 20.0;
 const _rowH = 104.0; // Max node height plus vertical gap between layers
+const _ringStep = 140.0; // Minimum radius increase between radial rings
 const _framePad = 16.0;
 const _compGap = 32.0;
 
-class OverviewGraphScreen extends ConsumerWidget {
+class OverviewGraphScreen extends ConsumerStatefulWidget {
   const OverviewGraphScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OverviewGraphScreen> createState() =>
+      _OverviewGraphScreenState();
+}
+
+class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
+    with SingleTickerProviderStateMixin {
+  bool _radial = false;
+  late final AnimationController _particleCtrl =
+      AnimationController(vsync: this, duration: const Duration(seconds: 3))
+        ..repeat();
+
+  @override
+  void dispose() {
+    _particleCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final futures = ref.watch(futureGoalsProvider);
     final semesters = ref.watch(semesterGoalsProvider);
@@ -78,6 +97,24 @@ class OverviewGraphScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.account_tree_outlined, size: 18)),
+                ButtonSegment(
+                    value: true, icon: Icon(Icons.hub_outlined, size: 18)),
+              ],
+              selected: {_radial},
+              onSelectionChanged: (v) => setState(() => _radial = v.first),
+              showSelectedIcon: false,
+              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+            ),
+          ),
+        ],
       ),
       body: nodes.isEmpty
           ? EmptyState(icon: Icons.hub_outlined, message: s.overviewEmpty)
@@ -88,6 +125,7 @@ class OverviewGraphScreen extends ConsumerWidget {
                   edges: edges,
                   targetWidth: max(
                       600.0, constraints.maxWidth - AppSpacing.pageHorizontal * 2),
+                  radial: _radial,
                 );
                 return InteractiveViewer(
                   constrained: false,
@@ -143,8 +181,12 @@ class OverviewGraphScreen extends ConsumerWidget {
                           ],
                           Positioned.fill(
                             child: CustomPaint(
-                              painter:
-                                  _EdgePainter(edges: edges, byId: layout.byId),
+                              painter: _EdgePainter(
+                                edges: edges,
+                                byId: layout.byId,
+                                radial: _radial,
+                                particles: _particleCtrl,
+                              ),
                             ),
                           ),
                           for (final node in layout.nodes)
@@ -189,6 +231,7 @@ class _GraphNode {
   bool get isFuture => future != null;
   double get width => isFuture ? _futureNodeW : _semNodeW;
   double get height => isFuture ? _futureNodeH : _semNodeH;
+  Offset get center => Offset(x + width / 2, y + height / 2);
   String get title => future?.title ?? semester!.title;
   bool get isDone => future?.isDone ?? semester!.isDone;
   String get category {
@@ -221,7 +264,7 @@ class _GraphLayout {
   });
 }
 
-// ─── Layout algorithm: components + layered placement ─────────────────────────
+// ─── Layout algorithms ────────────────────────────────────────────────────────
 
 class _UnionFind {
   final Map<String, String> _parent = {};
@@ -301,10 +344,121 @@ void _reduceCrossings(
   }
 }
 
+// Layered placement: goals on top, linked targets below, centered per layer
+Size _placeLayered(
+  List<_GraphNode> cluster,
+  Map<String, List<String>> incoming,
+  Map<String, List<String>> neighbors,
+) {
+  final layers = _assignLayers(cluster, incoming);
+  final maxLayer = layers.values.fold(0, max);
+  final byLayer = List.generate(maxLayer + 1, (_) => <_GraphNode>[]);
+  for (final n in cluster) {
+    n.layer = layers[n.id]!;
+    byLayer[n.layer].add(n);
+  }
+  _reduceCrossings(byLayer, neighbors);
+
+  double layerWidth(List<_GraphNode> layer) =>
+      layer.fold(0.0, (w, n) => w + n.width) + _hGap * (layer.length - 1);
+  final compW = byLayer.fold(0.0, (w, l) => max(w, layerWidth(l)));
+  for (var li = 0; li < byLayer.length; li++) {
+    var x = (compW - layerWidth(byLayer[li])) / 2;
+    for (final n in byLayer[li]) {
+      n.x = x;
+      n.y = li * _rowH;
+      x += n.width + _hGap;
+    }
+  }
+  return Size(compW, maxLayer * _rowH + _futureNodeH);
+}
+
+// Radial placement: the root future goal sits in the middle, everything
+// connected orbits it in BFS rings, branches kept angularly together
+Size _placeRadial(
+  List<_GraphNode> cluster,
+  Map<String, List<String>> incoming,
+  Map<String, List<String>> neighbors,
+) {
+  final byIdLocal = {for (final n in cluster) n.id: n};
+
+  // Center: prefer a future-goal root, break ties by connection count
+  var center = cluster.first;
+  var bestScore = -1;
+  for (final n in cluster) {
+    final isRoot = n.isFuture && (incoming[n.id]?.isEmpty ?? true);
+    final score = (isRoot ? 1000 : 0) + (neighbors[n.id]?.length ?? 0);
+    if (score > bestScore) {
+      bestScore = score;
+      center = n;
+    }
+  }
+
+  // BFS rings with parent tracking for angular grouping
+  final dist = <String, int>{center.id: 0};
+  final bfsParent = <String, String>{};
+  final queue = <String>[center.id];
+  var qi = 0;
+  while (qi < queue.length) {
+    final cur = queue[qi++];
+    for (final nb in neighbors[cur] ?? const <String>[]) {
+      if (!byIdLocal.containsKey(nb) || dist.containsKey(nb)) continue;
+      dist[nb] = dist[cur]! + 1;
+      bfsParent[nb] = cur;
+      queue.add(nb);
+    }
+  }
+  final maxD = dist.values.fold(0, max);
+  final rings = List.generate(maxD + 1, (_) => <_GraphNode>[]);
+  for (final n in cluster) {
+    rings[dist[n.id] ?? maxD].add(n);
+  }
+
+  // Assign angles ring by ring; children sorted by their parent's angle
+  final angle = <String, double>{center.id: 0};
+  final radius = <int, double>{0: 0};
+  for (var d = 1; d <= maxD; d++) {
+    final ring = rings[d];
+    final orderIdx = {for (var i = 0; i < ring.length; i++) ring[i].id: i};
+    ring.sort((a, b) {
+      final pa = angle[bfsParent[a.id]] ?? 0.0;
+      final pb = angle[bfsParent[b.id]] ?? 0.0;
+      final c = pa.compareTo(pb);
+      return c != 0 ? c : orderIdx[a.id]!.compareTo(orderIdx[b.id]!);
+    });
+    final maxW = ring.fold(0.0, (w, n) => max(w, n.width));
+    final need = ring.length * (maxW + _hGap) / (2 * pi);
+    radius[d] = max(radius[d - 1]! + _ringStep, need);
+    for (var i = 0; i < ring.length; i++) {
+      angle[ring[i].id] = 2 * pi * i / ring.length - pi / 2;
+    }
+  }
+
+  // Positions relative to the center, then shift into the positive quadrant
+  var minX = double.infinity, minY = double.infinity;
+  var maxX = -double.infinity, maxY = -double.infinity;
+  for (final n in cluster) {
+    final a = angle[n.id] ?? 0.0;
+    final r = radius[dist[n.id] ?? 0] ?? 0.0;
+    n.x = cos(a) * r - n.width / 2;
+    n.y = sin(a) * r - n.height / 2;
+    minX = min(minX, n.x);
+    minY = min(minY, n.y);
+    maxX = max(maxX, n.x + n.width);
+    maxY = max(maxY, n.y + n.height);
+  }
+  for (final n in cluster) {
+    n.x -= minX;
+    n.y -= minY;
+  }
+  return Size(maxX - minX, maxY - minY);
+}
+
 _GraphLayout _layoutGraph({
   required List<_GraphNode> nodes,
   required List<_GraphEdge> edges,
   required double targetWidth,
+  required bool radial,
 }) {
   final byId = {for (final n in nodes) n.id: n};
 
@@ -333,31 +487,13 @@ _GraphLayout _layoutGraph({
     neighbors.putIfAbsent(e.from, () => []).add(e.to);
   }
 
-  // 3. Layer, order and place each cluster in local coordinates
-  final compSizes = <Size>[];
-  for (final cluster in clusters) {
-    final layers = _assignLayers(cluster, incoming);
-    final maxLayer = layers.values.fold(0, max);
-    final byLayer = List.generate(maxLayer + 1, (_) => <_GraphNode>[]);
-    for (final n in cluster) {
-      n.layer = layers[n.id]!;
-      byLayer[n.layer].add(n);
-    }
-    _reduceCrossings(byLayer, neighbors);
-
-    double layerWidth(List<_GraphNode> layer) =>
-        layer.fold(0.0, (w, n) => w + n.width) + _hGap * (layer.length - 1);
-    final compW = byLayer.fold(0.0, (w, l) => max(w, layerWidth(l)));
-    for (var li = 0; li < byLayer.length; li++) {
-      var x = (compW - layerWidth(byLayer[li])) / 2;
-      for (final n in byLayer[li]) {
-        n.x = x;
-        n.y = li * _rowH;
-        x += n.width + _hGap;
-      }
-    }
-    compSizes.add(Size(compW, maxLayer * _rowH + _futureNodeH));
-  }
+  // 3. Place each cluster in local coordinates with the chosen algorithm
+  final compSizes = <Size>[
+    for (final cluster in clusters)
+      radial
+          ? _placeRadial(cluster, incoming, neighbors)
+          : _placeLayered(cluster, incoming, neighbors),
+  ];
 
   // 4. Shelf-pack cluster frames onto the canvas
   final componentRects = <Rect>[];
@@ -420,8 +556,15 @@ _GraphLayout _layoutGraph({
 class _EdgePainter extends CustomPainter {
   final List<_GraphEdge> edges;
   final Map<String, _GraphNode> byId;
+  final bool radial;
+  final Animation<double> particles;
 
-  const _EdgePainter({required this.edges, required this.byId});
+  _EdgePainter({
+    required this.edges,
+    required this.byId,
+    required this.radial,
+    required this.particles,
+  }) : super(repaint: particles);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -435,27 +578,52 @@ class _EdgePainter extends CustomPainter {
       ..strokeWidth = 1.4;
     final arrowPaint = Paint()
       ..color = AppColors.primary.withValues(alpha: 0.75);
+    final t = particles.value;
 
     for (final e in edges) {
       final from = byId[e.from];
       final to = byId[e.to];
       if (from == null || to == null) continue;
-      final p0 = Offset(from.x + from.width / 2, from.y + from.height);
-      final p1 = Offset(to.x + to.width / 2, to.y);
-      final bend = (p1.dy - p0.dy) / 2;
-      final path = Path()
-        ..moveTo(p0.dx, p0.dy)
-        ..cubicTo(p0.dx, p0.dy + bend, p1.dx, p1.dy - bend, p1.dx, p1.dy);
-      if (e.isLink) {
-        canvas.drawPath(_dashed(path), linkPaint);
-        final arrow = Path()
-          ..moveTo(p1.dx - 4, p1.dy - 7)
-          ..lineTo(p1.dx + 4, p1.dy - 7)
-          ..lineTo(p1.dx, p1.dy)
-          ..close();
-        canvas.drawPath(arrow, arrowPaint);
+
+      Path path;
+      if (radial) {
+        // Center-to-center straight edges; node cards cover the endpoints
+        final p0 = from.center;
+        final p1 = to.center;
+        path = Path()
+          ..moveTo(p0.dx, p0.dy)
+          ..lineTo(p1.dx, p1.dy);
       } else {
-        canvas.drawPath(path, treePaint);
+        final p0 = Offset(from.x + from.width / 2, from.y + from.height);
+        final p1 = Offset(to.x + to.width / 2, to.y);
+        final bend = (p1.dy - p0.dy) / 2;
+        path = Path()
+          ..moveTo(p0.dx, p0.dy)
+          ..cubicTo(p0.dx, p0.dy + bend, p1.dx, p1.dy - bend, p1.dx, p1.dy);
+        if (e.isLink) {
+          final arrow = Path()
+            ..moveTo(p1.dx - 4, p1.dy - 7)
+            ..lineTo(p1.dx + 4, p1.dy - 7)
+            ..lineTo(p1.dx, p1.dy)
+            ..close();
+          canvas.drawPath(arrow, arrowPaint);
+        }
+      }
+      canvas.drawPath(e.isLink ? _dashed(path) : path,
+          e.isLink ? linkPaint : treePaint);
+
+      // Flowing particles from source to target along the edge
+      final core = e.isLink ? AppColors.primary : AppColors.textSecondary;
+      final glowPaint = Paint()..color = core.withValues(alpha: 0.25);
+      final corePaint = Paint()..color = core.withValues(alpha: 0.9);
+      for (final metric in path.computeMetrics()) {
+        for (var i = 0; i < 2; i++) {
+          final f = (t + i / 2) % 1.0;
+          final pos = metric.getTangentForOffset(metric.length * f)?.position;
+          if (pos == null) continue;
+          canvas.drawCircle(pos, 3.2, glowPaint);
+          canvas.drawCircle(pos, 1.7, corePaint);
+        }
       }
     }
   }
@@ -475,7 +643,9 @@ class _EdgePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_EdgePainter oldDelegate) =>
-      oldDelegate.edges != edges || oldDelegate.byId != byId;
+      oldDelegate.edges != edges ||
+      oldDelegate.byId != byId ||
+      oldDelegate.radial != radial;
 }
 
 class _NodeCard extends StatelessWidget {

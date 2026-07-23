@@ -101,9 +101,17 @@ class StringsZhTw implements AppStrings {
   @override String greetingEvening(String name) => name.isEmpty ? '晚安 👋' : '晚安，$name 👋';
   @override String todayStatus(int total, int done) => total == 0 ? '今天還沒有安排任務' : '今天有 $total 件事，完成了 $done 件';
   @override String get allDoneToday => '今天全部完成！';
-  @override String get overview => '綜覽圖';
+  @override String get overview => '關聯圖';
   @override String get unlinked => '未連結';
   @override String get overviewEmpty => '還沒有任何目標或願景';
+  @override String get profile => '個人資料';
+  @override String get taskHistory => '完成度歷史';
+  @override String get historyDaily => '每日';
+  @override String get historyWeekly => '每週';
+  @override String get historyMonthly => '每月';
+  @override String historyAverage(int percent) => '平均完成率 $percent%';
+  @override String get historyNoData => '無資料';
+  @override String get historyTapHint => '點擊長條查看詳情';
 
   @override String get semesterSettings => '學期設定';
   @override String get semesterCount => '學期制';

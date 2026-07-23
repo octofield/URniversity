@@ -52,6 +52,10 @@ final appTheme = ThemeData(
       borderRadius: BorderRadius.circular(AppRadius.md),
     ),
   ),
+  // Modal bottom sheets stay centered with a width cap on wide screens
+  bottomSheetTheme: const BottomSheetThemeData(
+    constraints: BoxConstraints(maxWidth: 640),
+  ),
   navigationBarTheme: NavigationBarThemeData(
     backgroundColor: AppColors.surface,
     elevation: 0,

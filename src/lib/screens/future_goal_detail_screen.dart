@@ -492,7 +492,7 @@ void _showTaskSelectorForGoal(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectTask),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: Consumer(
           builder: (_, dlgRef, _) {
             final tasks = dlgRef.watch(tasksProvider);
@@ -554,7 +554,7 @@ void _showTargetSelectorForGoal(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectTarget),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: Consumer(
           builder: (_, dlgRef, _) {
             final targets = dlgRef
