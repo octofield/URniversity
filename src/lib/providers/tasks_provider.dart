@@ -202,6 +202,15 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
 final taskTargetFilterProvider = StateProvider<Set<String>>((ref) => const {});
 final taskGoalFilterProvider = StateProvider<Set<String>>((ref) => const {});
 
+// Completion stats for a single day; null when no task applies that day
+// (distinct from 0%, which means tasks existed but none were done)
+({int done, int total})? taskCompletionStatsOn(List<Task> all, DateTime date) {
+  final matching = all.where((t) => _taskAppliesTo(t, date)).toList();
+  if (matching.isEmpty) return null;
+  final done = matching.where((t) => t.isCompletedOn(date)).length;
+  return (done: done, total: matching.length);
+}
+
 final tasksForDateProvider = Provider.family<List<Task>, DateTime>((ref, date) {
   final all = ref.watch(tasksProvider);
   final matching = all.where((t) => _taskAppliesTo(t, date)).toList();

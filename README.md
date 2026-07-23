@@ -1,5 +1,24 @@
 # URniversity
 
+## 開發文件導覽（docs/）
+
+除了下方依課程進度撰寫的歷史報告（Proposal / Prototype / Final Report）之外，`docs/` 資料夾
+還維護一組**持續更新的技術文件**，供開發者（包含未來的你）在新增或修改功能前查閱。這組文件
+彼此有依賴關係，建議依序閱讀：
+
+| 文件 | 說明 | 什麼時候該看／該改 |
+|---|---|---|
+| [docs/DFD.md](docs/DFD.md) | 資料流程圖：畫面、Provider、Supabase 資料表／本機儲存之間的資料如何流動 | 想知道「這筆資料從哪裡來、寫到哪裡去」時查閱；新增/修改資料表欄位、Provider 讀寫邏輯、SharedPreferences key 時必須同步更新 |
+| [docs/DD.md](docs/DD.md) | 資料字典：每個 Supabase 資料表／本機儲存 key 的完整欄位定義、型別、必填、列舉值 | 想知道「這個欄位的格式與規則」時查閱；異動同上，需與 DFD.md 一起更新 |
+| [docs/system_design.md](docs/system_design.md) | 系統設計：畫面導覽架構、各功能輸入輸出格式、核心演算法處理過程、使用者操作步驟、程式流程圖 | 想知道「這個功能怎麼運作、使用者怎麼操作」時查閱；修改導覽流程、輸入輸出格式，或任何文件中列出的演算法邏輯時必須同步更新（含重畫流程圖） |
+| [docs/testing.md](docs/testing.md) | 測試方法：本專案採用的各類測試（平台、單元、系統、接受度、Alpha、Beta、黑箱、白箱、極限值、效能）定義與具體做法 | 執行任何測試前查閱，依此挑選適用的測試類型與案例依據 |
+| [docs/test-plans/](docs/test-plans/) | 測試計畫存放處，`TEMPLATE.md` 為範本 | **每次**執行測試（新功能或迴歸測試）前，複製範本填寫測試計畫，測試後補上實際結果，存成 `YYYY-MM-DD-主題.md` |
+
+這些文件的維護規則同時寫在專案根目錄的 `CLAUDE.md`，供 AI 協作工具（Claude Code）在讀寫程式
+碼時自動遵循，確保文件不會隨著程式碼演進而過時。
+
+---
+
 ## Proposal Report
 
 ### Motivation and Goals

@@ -419,17 +419,46 @@ class _SemesterOverviewCard extends ConsumerWidget {
                 ))
           else ...[
             if (total > 0) ...[
-              Text(s.goalProgress(done, total),
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: AppSpacing.xs),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.full),
-                child: LinearProgressIndicator(
-                  value: done / total,
-                  minHeight: 6,
-                  color: AppColors.primary,
-                  backgroundColor: AppColors.surfaceVariant,
-                ),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: done / total),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CircularProgressIndicator(
+                            value: value,
+                            strokeWidth: 6,
+                            strokeCap: StrokeCap.round,
+                            color: done == total
+                                ? AppColors.success
+                                : AppColors.primary,
+                            backgroundColor: AppColors.surfaceVariant,
+                          ),
+                          Center(
+                            child: Text(
+                              '${(value * 100).round()}%',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(s.goalProgress(done, total),
+                        style: Theme.of(context).textTheme.bodyMedium),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.md),
             ],
@@ -529,7 +558,7 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
       builder: (dlgCtx) => AlertDialog(
         title: Text(s.semester),
         content: SizedBox(
-          width: double.maxFinite,
+          width: 400,
           child: ListView.builder(
             shrinkWrap: true,
             itemCount: _semesters.length,

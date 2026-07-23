@@ -18,6 +18,7 @@ import '../providers/profile_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'settings_screen.dart';
+import 'task_history_screen.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
@@ -65,6 +66,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
     final isWide = width >= AppBreakpoints.wide;
+
+    // Active goal filters, shown as a banner chip across every view
+    final targetFilter = ref.watch(taskTargetFilterProvider);
+    final goalFilter = ref.watch(taskGoalFilterProvider);
+    final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
 
     // Greeting header data
     final profile = ref.watch(profileProvider);
@@ -144,6 +150,51 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ],
           ),
         ),
+        if (isFiltered)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageHorizontal, 4, AppSpacing.pageHorizontal, 0),
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    border: Border.all(color: AppColors.primary, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.filter_list,
+                          size: 14, color: AppColors.primary),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        '${s.filters} · ${targetFilter.length + goalFilter.length}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () {
+                          ref.read(taskTargetFilterProvider.notifier).state =
+                              const {};
+                          ref.read(taskGoalFilterProvider.notifier).state =
+                              const {};
+                        },
+                        child: const Icon(Icons.close,
+                            size: 14, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (taskView == 1)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
@@ -224,6 +275,19 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     ),
                     child: Text(s.backToToday),
                   ),
+                IconButton(
+                  icon: Icon(
+                    isFiltered
+                        ? Icons.filter_list
+                        : Icons.filter_list_outlined,
+                    color: isFiltered
+                        ? AppColors.primary
+                        : AppColors.textTertiary,
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _showTaskFilterDialog(context, ref, s),
+                ),
               ],
             ),
           ),
@@ -253,14 +317,27 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                             ),
                             SizedBox(width: isWide ? AppSpacing.xl : AppSpacing.lg),
                             // Secondary block: completion summary and inspirations
-                            const Expanded(
+                            Expanded(
                               flex: 1,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _SummaryCard(),
-                                  SizedBox(height: AppSpacing.lg),
-                                  _InspirationsQuickList(),
+                                  // Fixed-height header keeps this column's
+                                  // top edge aligned with the tasks column
+                                  SizedBox(
+                                    height: 40,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(s.progressOverview,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  const _SummaryCard(),
+                                  const SizedBox(height: AppSpacing.lg),
+                                  const _InspirationsQuickList(),
                                 ],
                               ),
                             ),
@@ -382,7 +459,15 @@ class _DayColumn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final normalDate = DateTime(date.year, date.month, date.day);
-    final tasks = ref.watch(tasksForDateProvider(normalDate));
+    // Weekly view honors the same goal filters as the other views
+    final expandedTargetFilter = _expandSemGoalIds(
+        ref.watch(taskTargetFilterProvider), ref.watch(semesterGoalsProvider));
+    final expandedGoalFilter = _expandFutureGoalIds(
+        ref.watch(taskGoalFilterProvider), ref.watch(futureGoalsProvider));
+    final tasks = ref.watch(tasksForDateProvider(normalDate))
+        .where((t) =>
+            _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+        .toList();
     final selectedDate = ref.watch(dateProvider);
     final now = DateTime.now();
     final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
@@ -516,30 +601,48 @@ class _SummaryCard extends ConsumerWidget {
             SizedBox(
               width: 72,
               height: 72,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: progress),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, _) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CircularProgressIndicator(
-                      value: value,
-                      strokeWidth: 7,
-                      strokeCap: StrokeCap.round,
-                      color: allDone ? AppColors.success : AppColors.primary,
-                      backgroundColor: AppColors.surfaceVariant,
-                    ),
-                    Center(
-                      child: Text(
-                        total == 0 ? '—' : '${(value * 100).round()}%',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+              child: Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const TaskHistoryScreen()),
+                  ),
+                  child: Tooltip(
+                    message: s.taskHistory,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: progress),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CircularProgressIndicator(
+                            value: value,
+                            strokeWidth: 7,
+                            strokeCap: StrokeCap.round,
+                            color: allDone
+                                ? AppColors.success
+                                : AppColors.primary,
+                            backgroundColor: AppColors.surfaceVariant,
+                          ),
+                          Center(
+                            child: Text(
+                              total == 0 ? '—' : '${(value * 100).round()}%',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -620,13 +723,14 @@ class _InspirationsQuickList extends ConsumerWidget {
               ? Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md,
-                    vertical: 20,
+                    vertical: AppSpacing.lg,
                   ),
-                  child: Text(
-                    s.noInspirations,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
+                  child: EmptyState(
+                    icon: Icons.lightbulb_outline,
+                    message: s.noInspirations,
+                    actionLabel: s.addInspiration,
+                    onAction: () => showAddInspirationSheet(context, ref),
+                    compact: true,
                   ),
                 )
               : Column(
@@ -690,7 +794,6 @@ class _TasksSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final date = ref.watch(dateProvider);
-    final taskView = ref.watch(taskViewProvider);
     final targetFilter = ref.watch(taskTargetFilterProvider);
     final goalFilter = ref.watch(taskGoalFilterProvider);
     final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
@@ -703,11 +806,12 @@ class _TasksSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(s.tasks, style: Theme.of(context).textTheme.titleLarge),
-            const Spacer(),
-            if (taskView == 0)
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              Text(s.tasks, style: Theme.of(context).textTheme.titleLarge),
+              const Spacer(),
               IconButton(
                 icon: Icon(
                   isFiltered ? Icons.filter_list : Icons.filter_list_outlined,
@@ -718,7 +822,8 @@ class _TasksSection extends ConsumerWidget {
                 padding: EdgeInsets.zero,
                 onPressed: () => _showTaskFilterDialog(context, ref, s),
               ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         HoverLift(
@@ -746,9 +851,9 @@ class _TasksSection extends ConsumerWidget {
                   )
                 : Column(
                     children: [
-                      for (final task in tasks) ...[
-                        _TaskTile(task: task),
-                        const Divider(height: 1, indent: 56),
+                      for (var i = 0; i < tasks.length; i++) ...[
+                        if (i > 0) const Divider(height: 1, indent: 56),
+                        _TaskTile(task: tasks[i]),
                       ],
                     ],
                   ),
@@ -838,7 +943,7 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
             ),
             content: SizedBox(
               height: 320,
-              width: double.maxFinite,
+              width: 400,
               child: TabBarView(
                 children: [
                   // Targets tab
@@ -1003,9 +1108,9 @@ class _CompletedTasksSection extends ConsumerWidget {
             ),
             child: Column(
               children: [
-                for (final task in completed) ...[
-                  _TaskTile(task: task),
-                  const Divider(height: 1, indent: 56),
+                for (var i = 0; i < completed.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, indent: 56),
+                  _TaskTile(task: completed[i]),
                 ],
               ],
             ),
@@ -1287,7 +1392,7 @@ void _showTargetSelector(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectTarget),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: ListView(
           shrinkWrap: true,
           children: [
@@ -1326,7 +1431,7 @@ void _showGoalSelectorForTask(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectFutureGoal),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: ListView(
           shrinkWrap: true,
           children: [

@@ -489,7 +489,7 @@ void _showTaskSelectorForTarget(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectTask),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: Consumer(
           builder: (_, dlgRef, _) {
             final tasks = dlgRef.watch(tasksProvider);
@@ -557,7 +557,7 @@ void _showGoalSelectorForTarget(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectFutureGoal),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: ListView(
           shrinkWrap: true,
           children: [
@@ -731,7 +731,7 @@ void _showFutureGoalSelectorForSheet(
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.selectFutureGoal),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 400,
         child: ListView(
           shrinkWrap: true,
           children: [

@@ -45,19 +45,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final body = Stack(
       children: [
-        // Soft top gradient so the page background is not one flat color
-        const Positioned(
+        // Top gradient so the page background is not one flat color
+        Positioned(
           top: 0,
           left: 0,
           right: 0,
-          height: 220,
+          height: 320,
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [AppColors.primaryLight, AppColors.background],
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.30),
+                    AppColors.primaryLight,
+                    AppColors.background,
+                  ],
+                  stops: const [0, 0.45, 1],
                 ),
               ),
             ),
@@ -104,22 +109,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
 
     final floatingActionButton = switch (_index) {
-      0 => FloatingActionButton(
-          onPressed: () => showAddTaskSheet(context, ref),
+      0 => _VividFab(
+          color: AppColors.categoryCompetition,
+          icon: Icons.add,
           tooltip: s.addTask,
-          child: const Icon(Icons.add)),
-      1 => FloatingActionButton(
-          onPressed: () => showAddSemesterGoalSheet(context, ref),
-          child: const Icon(Icons.add)),
-      2 => FloatingActionButton(
-          onPressed: () => showAddFutureGoalSheet(context, ref),
-          child: const Icon(Icons.add)),
-      3 => FloatingActionButton(
+          onPressed: () => showAddTaskSheet(context, ref)),
+      1 => _VividFab(
+          color: AppColors.categoryIntern,
+          icon: Icons.add,
+          tooltip: s.addTarget,
+          onPressed: () => showAddSemesterGoalSheet(context, ref)),
+      2 => _VividFab(
+          color: AppColors.categoryCert,
+          icon: Icons.add,
+          tooltip: s.addGoal,
+          onPressed: () => showAddFutureGoalSheet(context, ref)),
+      3 => _VividFab(
+          color: AppColors.categoryPerformance,
+          icon: Icons.edit_note,
+          tooltip: s.addJournal,
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const JournalEditScreen()),
-          ),
-          child: const Icon(Icons.edit_note)),
+          )),
       _ => null,
     };
 
@@ -162,6 +174,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               label: d.label,
             ),
         ],
+      ),
+    );
+  }
+}
+
+// Larger, colorful floating action button with a hover glow on desktop
+class _VividFab extends StatefulWidget {
+  final Color color;
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _VividFab({
+    required this.color,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  State<_VividFab> createState() => _VividFabState();
+}
+
+class _VividFabState extends State<_VividFab> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: AnimatedScale(
+            scale: _hovered ? 1.08 : 1.0,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.lerp(widget.color, Colors.white, 0.18)!,
+                    widget.color,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: _hovered ? 0.55 : 0.35),
+                    blurRadius: _hovered ? 26 : 14,
+                    offset: Offset(0, _hovered ? 10 : 6),
+                  ),
+                ],
+              ),
+              child: Icon(widget.icon, color: Colors.white, size: 30),
+            ),
+          ),
+        ),
       ),
     );
   }

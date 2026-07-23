@@ -111,6 +111,18 @@ abstract class AppStrings {
   String get unlinked;
   String get overviewEmpty;
 
+  // Me page desktop column header
+  String get profile;
+
+  // Task completion history
+  String get taskHistory;
+  String get historyDaily;
+  String get historyWeekly;
+  String get historyMonthly;
+  String historyAverage(int percent);
+  String get historyNoData;
+  String get historyTapHint;
+
   // Semester system settings
   String get semesterSettings;
   String get semesterCount;

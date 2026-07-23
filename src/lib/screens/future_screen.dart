@@ -279,7 +279,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       builder: (dlgCtx) => AlertDialog(
         title: Text(s.semester),
         content: SizedBox(
-          width: double.maxFinite,
+          width: 400,
           child: ListView(
             shrinkWrap: true,
             children: [
@@ -327,7 +327,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
           return AlertDialog(
             title: Text(s.category),
             content: SizedBox(
-              width: double.maxFinite,
+              width: 400,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
