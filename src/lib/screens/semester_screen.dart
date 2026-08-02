@@ -309,6 +309,15 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
           ),
           child: Row(
             children: [
+              if (!isDesktop) ...[
+                IconButton(
+                  icon: const Icon(Icons.menu),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Text(s.targets,
                   style:
                       Theme.of(context).textTheme.headlineSmall?.copyWith(

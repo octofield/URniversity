@@ -19,14 +19,14 @@ final appTheme = ThemeData(
   ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
-    fillColor: AppColors.surfaceVariant,
+    fillColor: AppColors.surface,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(AppRadius.sm),
-      borderSide: BorderSide.none,
+      borderSide: const BorderSide(color: AppColors.border),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(AppRadius.sm),
-      borderSide: BorderSide.none,
+      borderSide: const BorderSide(color: AppColors.border),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(AppRadius.sm),

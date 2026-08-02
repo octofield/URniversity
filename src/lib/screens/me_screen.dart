@@ -42,14 +42,23 @@ class MeScreen extends ConsumerWidget {
             AppSpacing.pageHorizontal, 0,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              if (!isDesktop) ...[
+                IconButton(
+                  icon: const Icon(Icons.menu),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Text(
                 s.me,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const Spacer(),
               IconButton(
                 icon: const Icon(Icons.settings_outlined),
                 onPressed: () => Navigator.push(

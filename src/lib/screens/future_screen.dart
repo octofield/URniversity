@@ -570,6 +570,15 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
           ),
           child: Row(
             children: [
+              if (!isDesktop) ...[
+                IconButton(
+                  icon: const Icon(Icons.menu),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Text(s.goals,
                   style:
                       Theme.of(context).textTheme.headlineSmall?.copyWith(

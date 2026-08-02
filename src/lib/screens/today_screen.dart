@@ -96,6 +96,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!isDesktop) ...[
+                IconButton(
+                  icon: const Icon(Icons.menu),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,24 +138,34 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 2),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, AppSpacing.sm, AppSpacing.pageHorizontal, AppSpacing.xs),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              _ViewToggleLabel(label: s.allTasks, active: taskView == 0,
-                  onTap: () => ref.read(taskViewProvider.notifier).state = 0),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+              SegmentedButton<int>(
+                segments: [
+                  ButtonSegment(
+                      value: 0,
+                      label: FittedBox(
+                          fit: BoxFit.scaleDown, child: Text(s.allTasks))),
+                  ButtonSegment(
+                      value: 1,
+                      label: FittedBox(
+                          fit: BoxFit.scaleDown, child: Text(s.dailyTasks))),
+                  ButtonSegment(
+                      value: 2,
+                      label: FittedBox(
+                          fit: BoxFit.scaleDown, child: Text(s.weeklyTasks))),
+                ],
+                selected: {taskView},
+                onSelectionChanged: (v) =>
+                    ref.read(taskViewProvider.notifier).state = v.first,
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
               ),
-              _ViewToggleLabel(label: s.dailyTasks, active: taskView == 1,
-                  onTap: () => ref.read(taskViewProvider.notifier).state = 1),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Text('/', style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
-              ),
-              _ViewToggleLabel(label: s.weeklyTasks, active: taskView == 2,
-                  onTap: () => ref.read(taskViewProvider.notifier).state = 2),
             ],
           ),
         ),
@@ -371,28 +390,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     }
 
     return SafeArea(child: content);
-  }
-}
-
-class _ViewToggleLabel extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _ViewToggleLabel({required this.label, required this.active, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-          color: active ? AppColors.primary : AppColors.textTertiary,
-        ),
-      ),
-    );
   }
 }
 
