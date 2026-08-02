@@ -5,12 +5,14 @@ import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/future_goal.dart';
 import '../l10n/app_strings.dart';
+import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
+import '../utils/semester_helpers.dart';
 import 'future_screen.dart';
 import 'semester_goal_detail_screen.dart';
 
@@ -39,10 +41,12 @@ class FutureGoalDetailScreen extends ConsumerWidget {
         .where((g) => g.futureGoalId == goalId && g.parentId == null)
         .toList();
 
+    final cats = ref.watch(categoriesProvider);
+    final semSettings = ref.watch(semesterSettingsProvider);
     final primaryCat = goal.categories.isNotEmpty
         ? goal.categories.first
         : FutureCategories.other;
-    final catC = catColor(primaryCat);
+    final catC = resolveCatColor(cats, primaryCat);
 
     return Scaffold(
       appBar: AppBar(
@@ -71,7 +75,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                   color: catC.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Icon(catIcon(primaryCat), color: catC, size: 26),
+                child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 26),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -96,11 +100,12 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                         child: Text(
                           [
                             if (goal.startSemester != null)
-                              goal.startSemester!,
+                              formatSemester(goal.startSemester!, semSettings, s),
                             if (goal.startSemester != null &&
                                 goal.endSemester != null)
                               '→',
-                            if (goal.endSemester != null) goal.endSemester!,
+                            if (goal.endSemester != null)
+                              formatSemester(goal.endSemester!, semSettings, s),
                           ].join(' '),
                           style: Theme.of(context)
                               .textTheme
@@ -227,7 +232,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                   color: target.isDone ? AppColors.textTertiary : null,
                 ),
               ),
-              subtitle: Text(target.semester,
+              subtitle: Text(formatSemester(target.semester, semSettings, s),
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -437,14 +442,15 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _CategoryBadge extends StatelessWidget {
+class _CategoryBadge extends ConsumerWidget {
   final String cat;
   final dynamic s;
   const _CategoryBadge({required this.cat, required this.s});
 
   @override
-  Widget build(BuildContext context) {
-    final color = catColor(cat);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cats = ref.watch(categoriesProvider);
+    final color = resolveCatColor(cats, cat);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -454,7 +460,7 @@ class _CategoryBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(catIcon(cat), size: 12, color: color),
+          Icon(resolveCatIcon(cats, cat), size: 12, color: color),
           const SizedBox(width: 4),
           Text(catLabel(cat, s),
               style: TextStyle(fontSize: 12, color: color)),
@@ -549,6 +555,7 @@ void _showTaskSelectorForGoal(
 void _showTargetSelectorForGoal(
     BuildContext context, WidgetRef ref, String goalId) {
   final s = ref.read(stringsProvider);
+  final semSettings = ref.read(semesterSettingsProvider);
   showDialog(
     context: context,
     builder: (dlgCtx) => AlertDialog(
@@ -586,7 +593,7 @@ void _showTargetSelectorForGoal(
                               ? AppColors.textTertiary
                               : null,
                         )),
-                    subtitle: Text(target.semester,
+                    subtitle: Text(formatSemester(target.semester, semSettings, s),
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.textSecondary)),
                     enabled: target.futureGoalId != goalId,

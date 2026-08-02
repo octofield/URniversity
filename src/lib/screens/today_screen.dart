@@ -14,7 +14,10 @@ import '../providers/date_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/future_goals_provider.dart';
+import '../providers/categories_provider.dart';
 import '../providers/profile_provider.dart';
+import '../utils/category_helpers.dart';
+import '../utils/semester_helpers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'settings_screen.dart';
@@ -925,6 +928,7 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
         builder: (_, dlgRef, _) {
           final allTargets = dlgRef.watch(semesterGoalsProvider);
           final allGoals = dlgRef.watch(futureGoalsProvider);
+          final semSettings = dlgRef.watch(semesterSettingsProvider);
           final targetTree = _buildTargetTree(allTargets);
           final goalTree = _buildGoalTree(allGoals);
           final targetFilter = dlgRef.watch(taskTargetFilterProvider);
@@ -959,7 +963,8 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                                 ),
                                 value: targetFilter.contains(item.goal.id),
                                 title: Text(item.goal.title),
-                                subtitle: Text(item.goal.semester,
+                                subtitle: Text(
+                                    formatSemester(item.goal.semester, semSettings, s),
                                     style: const TextStyle(fontSize: 12)),
                                 onChanged: (v) {
                                   final next = Set<String>.from(
@@ -1012,7 +1017,9 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                                 value: goalFilter.contains(item.goal.id),
                                 title: Text(item.goal.title),
                                 subtitle: item.goal.startSemester != null
-                                    ? Text(item.goal.startSemester!,
+                                    ? Text(
+                                        formatSemester(item.goal.startSemester!,
+                                            semSettings, s),
                                         style: const TextStyle(fontSize: 12))
                                     : null,
                                 onChanged: (v) {
@@ -1130,6 +1137,7 @@ class _TaskTile extends ConsumerWidget {
     final isCompleted = task.isCompletedOn(effectiveDate);
     final targets = ref.watch(semesterGoalsProvider);
     final goals = ref.watch(futureGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
 
     final linkedTarget = task.linkedTargetId != null
         ? targets.where((g) => g.id == task.linkedTargetId).firstOrNull
@@ -1138,13 +1146,22 @@ class _TaskTile extends ConsumerWidget {
         ? goals.where((g) => g.id == task.linkedGoalId).firstOrNull
         : null;
 
+    final targetColor = linkedTarget != null
+        ? resolveCatColor(cats,
+            linkedTarget.categories.isNotEmpty ? linkedTarget.categories.first : 'other')
+        : null;
+    final goalColor = linkedGoal != null
+        ? resolveCatColor(cats,
+            linkedGoal.categories.isNotEmpty ? linkedGoal.categories.first : 'other')
+        : null;
+
     final hasSubtitle = task.content != null ||
         task.dueTime != null ||
         (task.recurrence != null && !task.recurrence!.isNone) ||
         linkedTarget != null ||
         linkedGoal != null;
 
-    return ListTile(
+    final tile = ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       leading: Checkbox(
         value: isCompleted,
@@ -1251,7 +1268,38 @@ class _TaskTile extends ConsumerWidget {
       ),
       onTap: () => _showEditTaskSheet(context, ref, task),
     );
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _linkColorBar(targetColor, goalColor),
+          Expanded(child: tile),
+        ],
+      ),
+    );
   }
+}
+
+// Left edge color bar showing the category color of the task's linked
+// target/goal; split top/bottom when both are linked with different colors.
+Widget _linkColorBar(Color? top, Color? bottom) {
+  const width = 6.0;
+  if (top == null && bottom == null) return const SizedBox(width: 0);
+  if (bottom == null) return Container(width: width, color: top);
+  if (top == null) return Container(width: width, color: bottom);
+  if (top.toARGB32() == bottom.toARGB32()) {
+    return Container(width: width, color: top);
+  }
+  return SizedBox(
+    width: width,
+    child: Column(
+      children: [
+        Expanded(child: Container(color: top)),
+        Expanded(child: Container(color: bottom)),
+      ],
+    ),
+  );
 }
 
 Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
@@ -1384,6 +1432,7 @@ void _showTargetSelector(
   String? currentId, ValueChanged<String?> onSelect,
 ) {
   final targets = ref.read(semesterGoalsProvider);
+  final semSettings = ref.read(semesterSettingsProvider);
   showDialog(
     context: context,
     builder: (dlgCtx) => AlertDialog(
@@ -1402,7 +1451,7 @@ void _showTargetSelector(
             for (final g in targets)
               ListTile(
                 title: Text(g.title),
-                subtitle: Text(g.semester),
+                subtitle: Text(formatSemester(g.semester, semSettings, s)),
                 selected: g.id == currentId,
                 selectedColor: AppColors.primary,
                 onTap: () { onSelect(g.id); Navigator.pop(dlgCtx); },
@@ -1509,6 +1558,7 @@ void showAddTaskSheet(BuildContext context, WidgetRef ref) {
   final titleController = TextEditingController();
   final contentController = TextEditingController();
   final s = ref.read(stringsProvider);
+  final semSettings = ref.read(semesterSettingsProvider);
 
   showModalBottomSheet(
     context: context,
@@ -1616,7 +1666,7 @@ void showAddTaskSheet(BuildContext context, WidgetRef ref) {
                   _linkRow(
                     icon: Icons.flag_outlined,
                     label: linkedTarget != null
-                        ? '${linkedTarget.title} · ${linkedTarget.semester}'
+                        ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
                         : s.linkedTarget,
                     active: linkedTarget != null,
                     onTap: () => _showTargetSelector(
@@ -1678,6 +1728,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
   final titleController = TextEditingController(text: task.title);
   final contentController = TextEditingController(text: task.content ?? '');
   final s = ref.read(stringsProvider);
+  final semSettings = ref.read(semesterSettingsProvider);
 
   showModalBottomSheet(
     context: context,
@@ -1789,7 +1840,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                   _linkRow(
                     icon: Icons.flag_outlined,
                     label: linkedTarget != null
-                        ? '${linkedTarget.title} · ${linkedTarget.semester}'
+                        ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
                         : s.linkedTarget,
                     active: linkedTarget != null,
                     onTap: () => _showTargetSelector(

@@ -75,6 +75,8 @@ flowchart TD
     Me -.-> Inspirations["InspirationsScreen"]
     Today/Semester/Future/Me -.->|頁首齒輪| Settings["SettingsScreen"]
     Settings -.-> Trash["TrashScreen"]
+    Settings -.-> CatSettings["CategorySettingsScreen\n分類設定"]
+    Future -.->|「更多分類」對話框| CatSettings
 ```
 
 - `Home` 為單一 `Scaffold`，用 `IndexedStack` 切換四個分頁，切換分頁不重建畫面（狀態保留）。
@@ -115,15 +117,17 @@ flowchart TD
 | 欄位 | 輸入元件 | 格式 | 必填 |
 |---|---|---|---|
 | 標題 | 文字輸入框 | 任意字串 | ✓ |
-| 分類 | 多選 `FilterChip` | 見 DD.md `FutureCategories` 列舉 + 使用者自訂分類 | ✗（預設 `other`） |
+| 分類 | 多選 `FilterChip` | 見 DD.md `FutureCategories` 列舉 + 使用者自訂分類（顏色/圖示可自訂，見 §2-I） | ✗（預設 `other`） |
 | 備註 | 文字輸入框（多行） | 任意字串 | ✗ |
-| 學期目標專屬：所屬學期 | 由目前檢視的學期分頁決定 | `"YYY-N"` | ✓ |
+| 學期目標專屬：所屬學期 | 由目前檢視的學期分頁決定 | `"YYY-N"` 或假期 `"YYY-Bk"`（見 §3-D） | ✓ |
 | 學期目標專屬：連結未來願景 | 清單選擇對話框 | 未來願景 id | ✗ |
-| 未來願景專屬：起訖學期 | 兩個下拉選單 | `"YYY-N"`，結束學期不可早於起始學期 | ✗ |
+| 未來願景專屬：起訖學期 | 兩個下拉選單 | `"YYY-N"` 或假期 `"YYY-Bk"`，結束學期不可早於起始學期 | ✗ |
 | 父節點（子目標/子願景） | 由「新增子目標」入口決定，非表單欄位 | 目標/願景 id | ✗ |
 
-輸出：樹狀縮排卡片列表（可拖曳排序／換父節點），完成度以子節點完成比例呈現進度條；桌面版
-側欄另有「進度總覽」環形圖（學期目標頁）與「篩選」面板（未來願景頁）。
+輸出：樹狀縮排卡片列表（可拖曳排序／換父節點），左側有分類色條（寬度 7px），完成度以子節點
+完成比例呈現進度條；桌面版側欄另有「進度總覽」環形圖（學期目標頁）與「篩選」面板（未來願景
+頁）。學期/起訖學期的下拉選單與挑選對話框都會把假期 token 顯示成本地化名稱（例如「114 暑假」），
+不會顯示原始 `"114-B3"` 字串。
 
 ### 2-D 篩選（Today 頁）
 
@@ -162,6 +166,23 @@ flowchart TD
 輸出：長條圖（0–100% 完成率）+ 期間平均完成率文字 + 選取期間的「N / M 完成（P%）」明細，
 沒有任務的日期以底線刻度呈現而非 0% 長條（區分「沒事做」與「有事沒做」）。
 
+### 2-I 分類設定（CategorySettingsScreen／「更多分類」對話框）
+
+兩個入口（設定頁「分類設定」全螢幕頁、未來願景頁「更多分類」對話框）共用同一份列表元件
+（`src/lib/widgets/category_manager.dart`）。
+
+| 欄位 | 輸入元件 | 格式 |
+|---|---|---|
+| 新增分類 | 文字輸入框 + 送出鈕 | 任意字串，成為該分類的 id 與顯示名稱 |
+| 排序 | 拖曳單線把手（`Icons.horizontal_rule`，圖一改版前是雙線 `Icons.drag_handle`） | 拖放調整順序 |
+| 顏色 | 圓形色塊按鈕 → 彈出色票網格 | `categoryColorPresets`（12 色固定清單） |
+| 圖示 | 圖示按鈕 → 彈出圖示網格 | `categoryIconPresets`（20 個固定圖示，見 §3 備註） |
+| 刪除 | 垃圾桶 icon（僅自訂分類） | 內建 6 分類無法刪除 |
+
+輸出：即時套用到所有顯示該分類的畫面（目標/願景卡片色條、關聯圖節點、任務左側連結色條等），
+非訪客模式非同步寫回 `user_categories.styles`（見 DD.md D7；需要先手動執行一次資料庫 migration
+才會生效）。
+
 ---
 
 ## 3. 處理過程（核心演算法）
@@ -197,15 +218,24 @@ flowchart TD
 - **還原**：若原本的 `parentId` 已不存在，還原時自動改掛在頂層（`parentId = null`），避免
   出現斷鏈孤兒。
 
-### 3-D 學期字串生成與比較（`semester_goals_provider.dart` / `future_goal.dart`）
+### 3-D 學期字串生成、比較與假期（`semester_goals_provider.dart` / `future_goal.dart` / `semester_helpers.dart`）
 
 - `currentSemester(settings)`：以民國年為基礎，依 `SemesterSettings.startMonths`（各學期起始
   月份）找出「不晚於今天、且最接近今天」的學期起始點，組成 `"{民國年}-{學期序}"`。
-  跨年度學期（例如第 2 學期在隔年開始）用 `yearOffset` 校正。
-- `generateSemesters(settings)`：以目前學期為中心，往前 4 年、往後 3 年展開所有學期字串，
-  供選單使用。
-- `compareSemesters(a, b)`：拆解 `"YYY-N"` 字串分別比較年、學期序，**禁止**直接用字串或轉數字
-  比較（`"114-10"` 這種學期序不存在，但字串比較仍可能有陷阱，一律呼叫此函式）。
+  跨年度學期（例如第 2 學期在隔年開始）用 `yearOffset` 校正。只回傳一般學期，不會回傳假期
+  （若「現在」落在假期期間，回傳的是最近一個已開始的學期，作為選單的合理預設起點）。
+- `generateSemesters(settings)`：以目前學期為中心，往前 4 年、往後 3 年展開，**每個學期後面
+  緊接著插入該學期的假期**（`"Y-1"`, `"Y-B1"`, `"Y-2"`, `"Y-B2"`, ...），供選單使用。
+- **假期 token 格式**：`"{民國年}-B{k}"`，k = 1..該年學期數，代表「緊接在第 k 個學期後面的假期」；
+  `k = 學期數`（最後一個）固定是暑假（下學年第 1 學期開學前的長假）。
+- `compareSemesters(a, b)`：把 `"YYY-N"` 或 `"YYY-Bk"` 換算成同一套權重（一般學期 k → `2k-1`，
+  假期 k → `2k`）後比較 `(年, 權重)`，讓假期正確排在對應學期之後、下一個學期之前。**禁止**直接
+  用字串或轉數字比較。
+- `breakName(k, count, s)` / `formatSemester(token, settings, s)`（`semester_helpers.dart`）：
+  假期名稱依「目前配置的學期數 `count`」查表決定（例如 3 學期制的假期依序是寒假／春假／暑假，
+  4 學期制是秋假／寒假／春假／暑假），**不是**存在 token 裡固定不變的——所有顯示學期字串的地方
+  一律呼叫 `formatSemester()`，不要直接顯示原始 token（一般學期會原樣顯示 `"114-1"`，只有假期
+  token 會被轉成「114 暑假」這種可讀名稱）。
 
 ### 3-E 年級自動推進（`settings_provider.dart`）
 
@@ -244,6 +274,20 @@ flowchart TD
 ### 3-I 身分驗證與資料同步協調
 
 由 `sync_provider.dart` 統籌，完整流程與時序見 [DFD.md](./DFD.md) Diagram 1-A，本文件不重複。
+
+### 3-J 分類顏色／圖示解析與任務連結色條
+
+- `resolveCatColor(cats, id)` / `resolveCatIcon(cats, id)`（`category_helpers.dart`）：在使用者
+  目前的分類清單（`categoriesProvider` 狀態，`List<CategoryEntry>`）中找出對應 id 的顏色／圖示；
+  找不到（分類被刪除、或訪客模式尚未載入）時退回 `defaultCatColor()`/`defaultCatIcon()` 的
+  內建預設值。所有畫面一律透過這兩個函式取色/取圖示，不再各自寫死 switch。
+- 圖示只能是 `categoryIconPresets`（固定 const 清單）裡的其中一個：因為 Flutter 的圖示
+  tree-shaking 只認得「原始碼裡出現過的字面 `Icons.xxx`」，這份清單本身就會被圖示選擇器的
+  網格 UI 字面引用，才能保證使用者選到的任何圖示都不會在正式建置時被砍掉。
+- 任務左側連結色條（`_linkColorBar()`，`today_screen.dart`）：依任務是否連結學期目標／未來願景
+  決定顯示內容——只連結一邊就顯示該分類的實心色條；兩邊都連結且分類顏色相同也顯示單一實心色；
+  兩邊都連結但分類顏色不同，色條上半用目標顏色、下半用願景顏色（`Column` + 兩個 `Expanded`）；
+  都沒連結則不顯示色條（寬度 0）。
 
 ---
 
@@ -307,6 +351,13 @@ flowchart TD
 3. `sync_provider._handleGuestLogin()`：若選擇整合，依序把六種本機資料 `mergeToUser()` 寫入
    雲端（**不含**回收桶與自訂分類，訪客模式本來就沒有這兩者）。
 4. 清除本機 `guest_*` key 並關閉訪客模式，重新以登入身分載入全部資料。
+
+### UC11　自訂分類的顏色與圖示
+1. 設定頁點「分類設定」（或願景頁點「更多分類」）→ 開啟分類管理列表。
+2. 點任一分類列的色塊 → 跳出色票網格（`categoryColorPresets`）→ 選一色 → 立即套用並關閉。
+3. 點圖示按鈕 → 跳出圖示網格（`categoryIconPresets`）→ 選一個 → 立即套用並關閉。
+4. 變更會立刻反映在所有顯示該分類的地方（目標/願景卡片色條、任務連結色條、關聯圖節點等），
+   並非同步寫回 `user_categories.styles`（訪客模式僅存於記憶體）。
 
 ---
 
@@ -437,7 +488,7 @@ flowchart TD
 | `InspirationsScreen` / Today 靈感區塊 | `inspirationsProvider` | D4 `inspirations` |
 | `JournalsScreen` / `JournalEditScreen` | `journalProvider` | D5 `journals` |
 | `TrashScreen` | `trashProvider` | D6 `trash_items` |
-| Future 頁「更多分類」 | `categoriesProvider` | D7 `user_categories` |
+| Future 頁「更多分類」 / `CategorySettingsScreen` | `categoriesProvider` | D7 `user_categories` |
 | `MeScreen`（個人資料卡） | `profileProvider` | D8-A `user_settings` |
 | `SettingsScreen` | `settingsProvider` 家族 | D8-B `user_settings` |
 | `SettingsScreen` 意見回饋對話框 | 無獨立 Provider，直接呼叫 Supabase | D9 `feedbacks` |

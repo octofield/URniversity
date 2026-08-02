@@ -94,6 +94,13 @@ class StringsEn implements AppStrings {
   @override String get selectFutureGoal => 'Select Goal';
   @override String get noLink => 'No Link';
   @override String get more => 'More';
+  @override String get pickColor => 'Pick a color';
+  @override String get pickIcon => 'Pick an icon';
+  @override String get categorySettings => 'Category settings';
+  @override String get winterBreak => 'Winter break';
+  @override String get summerBreak => 'Summer break';
+  @override String get springBreak => 'Spring break';
+  @override String get autumnBreak => 'Autumn break';
   @override String get progressOverview => 'Progress overview';
   @override String get filters => 'Filters';
   @override String greetingMorning(String name) => name.isEmpty ? 'Good morning 👋' : 'Good morning, $name 👋';

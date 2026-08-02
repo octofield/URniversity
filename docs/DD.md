@@ -163,16 +163,29 @@
 
 讀寫處理程序：`CategoriesNotifier`（`src/lib/providers/categories_provider.dart`）
 
+對應 Dart 型別：`CategoryEntry`（`src/lib/models/category.dart`）
+
 | 欄位 | 型別 | 必填 | 預設值 | 說明 |
 |---|---|---|---|---|
 | `user_id` | text (PK, FK → auth.users.id) | ✓ | — | 一個使用者一列（`onConflict: 'user_id'`） |
 | `ordered_list` | text[] | ✓ | 內建分類清單 `FutureCategories.builtIns` | 使用者可見的分類 id 陣列，含內建與自訂分類，陣列順序即畫面顯示順序 |
+| `styles` | jsonb | ✗ | `null` | `{ id: { color: int(ARGB), icon: int(codePoint) } }`，每個分類（含內建）目前自訂的顯示顏色與圖示；沒有出現在這個 map 裡的 id 使用 `defaultCatColor()`/`defaultCatIcon()` 的內建預設值 |
 
 **特別說明：**
+- ⚠️ **`styles` 欄位需要手動在 Supabase 執行一次性 migration 才會存在**（本機開發環境無法從這裡
+  直接改動雲端資料庫 schema）：
+  ```sql
+  ALTER TABLE user_categories ADD COLUMN styles jsonb;
+  ```
+  在執行這個 migration 之前，顏色/圖示自訂功能寫入會靜默失敗（`_persist()` 內的
+  `.catchError((_) {})`），畫面上的變更只存在當次 session 記憶體中，重新整理就會消失。
+- 圖示只會是 `src/lib/utils/category_helpers.dart` 裡 `categoryIconPresets`（固定常數清單）中的
+  其中一個，而不是任意 `IconData`——因為這些 codepoint 也會被寫在挑選圖示的網格 UI 裡當成
+  literal `Icons.xxx`，Flutter 的圖示 tree-shaking 才不會把使用者選到的字型砍掉。
 - 內建分類（`exchange` / `intern` / `competition` / `certification` / `performance` / `other`）
-  無法被使用者刪除（`isBuiltIn()` 擋掉），但可以被拖曳排序。
-- **訪客模式沒有本機持久化**：`reset()` 會讓分類清單還原成僅剩內建分類，訪客新增的自訂分類
-  只存在記憶體中。
+  無法被使用者刪除（`isBuiltIn()` 擋掉），但可以被拖曳排序、改色、改圖示。
+- **訪客模式沒有本機持久化**：`reset()` 會讓分類清單還原成僅剩內建分類（含其預設顏色/圖示），
+  訪客新增或自訂的內容只存在記憶體中。
 
 ---
 
@@ -277,7 +290,8 @@
 | `FutureCategories`（內建分類） | `src/lib/models/future_goal.dart` | `exchange` / `intern` / `competition` / `certification` / `performance` / `other` |
 | `DateDisplayFormat`（儲存為字串） | `src/lib/providers/settings_provider.dart` | `mmddWeekday` / `mmdd` / `yyyymmdd` / `longDate` |
 | `AppLanguage`（儲存為字串） | `src/lib/providers/settings_provider.dart` | `zh_tw` / `en` / `jp` |
-| 學期字串格式 | `semester_goals_provider.dart` / `future_goal.dart` | `"{民國年}-{學期序}"`，例如 `"114-1"`；比較大小請用 `compareSemesters()`，不要用字串或數字直接比較 |
+| 學期字串格式 | `semester_goals_provider.dart` / `future_goal.dart` | 一般學期：`"{民國年}-{學期序}"`，例如 `"114-1"`；假期：`"{民國年}-B{學期序}"`，例如 `"114-B1"` 代表「第 1 學期後面那個假期」（見下方假期字串格式）。比較大小一律用 `compareSemesters()`，不要用字串或數字直接比較 |
+| 假期字串格式 | `future_goal.dart` (`compareSemesters`/`isBreakToken`) / `semester_helpers.dart` (`breakName`/`formatSemester`) | `"{民國年}-B{k}"`，k = 1..該年學期數，第 k 個假期緊接在第 k 個學期之後，`k = 學期數` 永遠是「暑假」（下學年第 1 學期開學前的長假）。⚠️ 假期名稱是依「目前的學期制度（`SemesterSettings.count`）」動態算出來的位置對應名稱，不是存在 token 裡——如果使用者事後把兩/三/四學期制切換掉，舊資料裡已選的假期字串顯示名稱可能會跟著改變（例如 `"114-B1"` 在二學期制是寒假、在四學期制變成秋假）。這是已知、刻意接受的簡化，非 bug。 |
 | 日期字串格式（`Task.completedDates` / `Journal.date`） | 各自 Model | `"yyyy-MM-dd"`（月、日補零至 2 位） |
 
 ---

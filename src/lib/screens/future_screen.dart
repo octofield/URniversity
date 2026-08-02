@@ -5,6 +5,7 @@ import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../l10n/app_strings.dart';
 import '../models/future_goal.dart';
 import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
@@ -12,6 +13,8 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
+import '../utils/semester_helpers.dart';
+import '../widgets/category_manager.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
@@ -294,7 +297,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ),
               for (final sem in all)
                 ListTile(
-                  title: Text(sem),
+                  title: Text(formatSemester(sem, settings, s)),
                   selected: sem == _semFilter,
                   selectedColor: AppColors.primary,
                   onTap: () {
@@ -317,7 +320,6 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
 
   void _showMoreCategories(BuildContext context) {
     final s = ref.read(stringsProvider);
-    final addCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -337,78 +339,22 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                       itemCount: cats.length,
                       onReorder: (o, n) =>
                           cRef.read(categoriesProvider.notifier).reorder(o, n),
-                      itemBuilder: (_, i) {
-                        final cat = cats[i];
-                        final isBuiltIn = cRef
-                            .read(categoriesProvider.notifier)
-                            .isBuiltIn(cat);
-                        return ListTile(
-                          key: ValueKey(cat),
-                          leading: Icon(catIcon(cat), color: catColor(cat)),
-                          title: Text(catLabel(cat, s)),
-                          selected: _catFilter == cat,
-                          selectedColor: AppColors.primary,
-                          trailing: isBuiltIn
-                              ? const Icon(Icons.drag_handle,
-                                  color: AppColors.textTertiary)
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline,
-                                          size: 18),
-                                      onPressed: () {
-                                        cRef
-                                            .read(categoriesProvider.notifier)
-                                            .remove(cat);
-                                        if (_catFilter == cat) {
-                                          setState(() => _catFilter = null);
-                                        }
-                                      },
-                                    ),
-                                    const Icon(Icons.drag_handle,
-                                        color: AppColors.textTertiary),
-                                  ],
-                                ),
-                          onTap: () {
-                            setState(() =>
-                                _catFilter = _catFilter == cat ? null : cat);
-                            Navigator.pop(dlgCtx);
-                          },
-                        );
-                      },
+                      itemBuilder: (tileCtx, i) => categoryManageTile(
+                        context: tileCtx,
+                        ref: cRef,
+                        entry: cats[i],
+                        s: s,
+                        selected: _catFilter == cats[i].id,
+                        onTap: () {
+                          setState(() => _catFilter =
+                              _catFilter == cats[i].id ? null : cats[i].id);
+                          Navigator.pop(dlgCtx);
+                        },
+                      ),
                     ),
                   ),
                   const Divider(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: addCtrl,
-                          decoration:
-                              InputDecoration(hintText: s.categoryName),
-                          textCapitalization: TextCapitalization.sentences,
-                          onSubmitted: (name) {
-                            final trimmed = name.trim();
-                            if (trimmed.isEmpty) return;
-                            cRef
-                                .read(categoriesProvider.notifier)
-                                .add(trimmed);
-                            addCtrl.clear();
-                          },
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add, color: AppColors.primary),
-                        onPressed: () {
-                          final name = addCtrl.text.trim();
-                          if (name.isEmpty) return;
-                          cRef.read(categoriesProvider.notifier).add(name);
-                          addCtrl.clear();
-                        },
-                      ),
-                    ],
-                  ),
+                  const CategoryAddRow(),
                 ],
               ),
             ),
@@ -464,14 +410,14 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ),
               for (final sem in semChips)
                 _FilterChip(
-                  label: sem,
+                  label: formatSemester(sem, settings, s),
                   selected: _semFilter == sem,
                   onTap: () => setState(
                       () => _semFilter = _semFilter == sem ? null : sem),
                 ),
               ActionChip(
                 avatar: const Icon(Icons.expand_more, size: 16),
-                label: Text(s.more),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
                 onPressed: () => _showMoreSemesters(context, settings),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -494,15 +440,15 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ),
               for (final cat in cats)
                 _FilterChip(
-                  label: '${catLabel(cat, s)} (${countFor(cat)})',
-                  selected: _catFilter == cat,
-                  color: catColor(cat),
+                  label: '${catLabel(cat.id, s)} (${countFor(cat.id)})',
+                  selected: _catFilter == cat.id,
+                  color: cat.color,
                   onTap: () => setState(
-                      () => _catFilter = _catFilter == cat ? null : cat),
+                      () => _catFilter = _catFilter == cat.id ? null : cat.id),
                 ),
               ActionChip(
                 avatar: const Icon(Icons.tune, size: 16),
-                label: Text(s.more),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
                 onPressed: () => _showMoreCategories(context),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -618,7 +564,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               chips: [
                 for (final sem in semChips)
                   _FilterChip(
-                    label: sem,
+                    label: formatSemester(sem, settings, s),
                     selected: _semFilter == sem,
                     onTap: () => setState(
                         () => _semFilter = _semFilter == sem ? null : sem),
@@ -626,7 +572,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ],
               trailing: ActionChip(
                 avatar: const Icon(Icons.expand_more, size: 16),
-                label: Text(s.more),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
                 onPressed: () => _showMoreSemesters(context, settings),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -644,16 +590,16 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               chips: [
                 for (final cat in cats)
                   _FilterChip(
-                    label: catLabel(cat, s),
-                    selected: _catFilter == cat,
-                    color: catColor(cat),
+                    label: catLabel(cat.id, s),
+                    selected: _catFilter == cat.id,
+                    color: cat.color,
                     onTap: () => setState(
-                        () => _catFilter = _catFilter == cat ? null : cat),
+                        () => _catFilter = _catFilter == cat.id ? null : cat.id),
                   ),
               ],
               trailing: ActionChip(
                 avatar: const Icon(Icons.tune, size: 16),
-                label: Text(s.more),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
                 onPressed: () => _showMoreCategories(context),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -719,17 +665,28 @@ class _AdaptiveChipRow extends StatelessWidget {
         allChip,
         const SizedBox(width: AppSpacing.xs),
         Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                for (final chip in chips) ...[
-                  chip,
-                  const SizedBox(width: AppSpacing.xs),
+          child: ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Colors.white, Colors.white, Colors.transparent],
+              stops: [0.0, 0.9, 1.0],
+            ).createShader(bounds),
+            blendMode: BlendMode.dstIn,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  for (final chip in chips) ...[
+                    chip,
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                  // Trailing spacer so the last chip can fully scroll clear of the fade
+                  const SizedBox(width: AppSpacing.md),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -755,7 +712,7 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilterChip(
-      label: Text(label),
+      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
       selected: selected,
       onSelected: (_) => onTap(),
       backgroundColor: color?.withValues(alpha: 0.08),
@@ -775,6 +732,8 @@ class _FutureGoalCardRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final allGoals = ref.watch(futureGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
+    final semSettings = ref.watch(semesterSettingsProvider);
     final children = allGoals.where((g) => g.parentId == goal.id).toList();
     final notifier = ref.read(futureGoalsProvider.notifier);
     final done = children.where((c) => c.isDone).length;
@@ -783,7 +742,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
     final primaryCat = goal.categories.isNotEmpty
         ? goal.categories.first
         : FutureCategories.other;
-    final catC = catColor(primaryCat);
+    final catC = resolveCatColor(cats, primaryCat);
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -798,13 +757,13 @@ class _FutureGoalCardRow extends ConsumerWidget {
           children: [
             // Category color bar; softer on child rows
             Container(
-              width: 4,
+              width: goalCatBarWidth,
               color: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
             ),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md - 4 + depth * 16.0,
+                  AppSpacing.md - goalCatBarWidth + depth * 16.0,
                   AppSpacing.sm, AppSpacing.md, AppSpacing.sm,
                 ),
                 child: Row(
@@ -816,7 +775,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
                         color: catC.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      child: Icon(catIcon(primaryCat), color: catC, size: 20),
+                      child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 20),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
@@ -832,12 +791,12 @@ class _FutureGoalCardRow extends ConsumerWidget {
                             Text(
                               [
                                 if (goal.startSemester != null)
-                                  goal.startSemester!,
+                                  formatSemester(goal.startSemester!, semSettings, s),
                                 if (goal.startSemester != null &&
                                     goal.endSemester != null)
                                   '→',
                                 if (goal.endSemester != null)
-                                  goal.endSemester!,
+                                  formatSemester(goal.endSemester!, semSettings, s),
                               ].join(' '),
                               style: Theme.of(context)
                                   .textTheme
@@ -924,10 +883,12 @@ Widget _semesterDropdown({
   required String label,
   required String? minSemester,
   required void Function(String?) onChanged,
+  required SemesterSettings settings,
+  required AppStrings s,
 }) {
   final valid = minSemester == null
       ? semesters
-      : semesters.where((s) => compareSemesters(s, minSemester) >= 0).toList();
+      : semesters.where((sem) => compareSemesters(sem, minSemester) >= 0).toList();
 
   return DropdownButtonFormField<String?>(
     initialValue: value,
@@ -935,7 +896,7 @@ Widget _semesterDropdown({
     items: [
       const DropdownMenuItem(value: null, child: Text('—')),
       for (final sem in valid)
-        DropdownMenuItem(value: sem, child: Text(sem)),
+        DropdownMenuItem(value: sem, child: Text(formatSemester(sem, settings, s))),
     ],
     onChanged: onChanged,
   );
@@ -1030,7 +991,7 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                     color: AppColors.textSecondary,
                   )),
               const SizedBox(height: AppSpacing.xs),
-              _categoryChipsMulti(sheetCtx, s, cats, selectedCategories,
+              _categoryChipsMulti(sheetCtx, s, [for (final c in cats) c.id], selectedCategories,
                   (cat) => setState(() {
                     if (selectedCategories.contains(cat)) {
                       selectedCategories.remove(cat);
@@ -1047,6 +1008,8 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                       semesters: semesters,
                       label: s.startSemester,
                       minSemester: null,
+                      settings: settings,
+                      s: s,
                       onChanged: (v) => setState(() {
                         startSemester = v;
                         if (endSemester != null &&
@@ -1065,6 +1028,8 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
                       semesters: semesters,
                       label: s.endSemester,
                       minSemester: startSemester,
+                      settings: settings,
+                      s: s,
                       onChanged: (v) => setState(() => endSemester = v),
                     ),
                   ),
@@ -1164,7 +1129,7 @@ void showEditFutureGoalSheet(
                     color: AppColors.textSecondary,
                   )),
               const SizedBox(height: AppSpacing.xs),
-              _categoryChipsMulti(sheetCtx, s, cats, selectedCategories,
+              _categoryChipsMulti(sheetCtx, s, [for (final c in cats) c.id], selectedCategories,
                   (cat) => setState(() {
                     if (selectedCategories.contains(cat)) {
                       selectedCategories.remove(cat);
@@ -1181,6 +1146,8 @@ void showEditFutureGoalSheet(
                       semesters: semesters,
                       label: s.startSemester,
                       minSemester: null,
+                      settings: settings,
+                      s: s,
                       onChanged: (v) => setState(() {
                         startSemester = v;
                         if (endSemester != null &&
@@ -1199,6 +1166,8 @@ void showEditFutureGoalSheet(
                       semesters: semesters,
                       label: s.endSemester,
                       minSemester: startSemester,
+                      settings: settings,
+                      s: s,
                       onChanged: (v) => setState(() => endSemester = v),
                     ),
                   ),

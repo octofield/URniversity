@@ -6,11 +6,13 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/semester_goal.dart';
+import '../providers/categories_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../l10n/app_strings.dart';
 import '../utils/category_helpers.dart';
+import '../utils/semester_helpers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'overview_graph_screen.dart';
@@ -392,6 +394,7 @@ class _SemesterOverviewCard extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final selectedSem = ref.watch(selectedSemesterProvider);
     final allGoals = ref.watch(semesterGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
     final topLevel = allGoals
         .where((g) => g.semester == selectedSem && g.parentId == null)
         .toList()
@@ -502,7 +505,7 @@ class _SemesterOverviewCard extends ConsumerWidget {
                         child: LinearProgressIndicator(
                           value: r.done / r.total,
                           minHeight: 4,
-                          color: catColor(r.goal.categories.isNotEmpty
+                          color: resolveCatColor(cats, r.goal.categories.isNotEmpty
                               ? r.goal.categories.first
                               : 'other'),
                           backgroundColor: AppColors.surfaceVariant,
@@ -561,6 +564,7 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
 
   void _pickSemester(BuildContext ctx) {
     final s = ref.read(stringsProvider);
+    final settings = ref.read(semesterSettingsProvider);
     final currentSem = ref.read(selectedSemesterProvider);
     showDialog(
       context: ctx,
@@ -574,7 +578,7 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
             itemBuilder: (_, i) {
               final sem = _semesters[i];
               return ListTile(
-                title: Text(sem),
+                title: Text(formatSemester(sem, settings, s)),
                 selected: sem == currentSem,
                 selectedColor: AppColors.primary,
                 onTap: () {
@@ -638,7 +642,7 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
                               ? AppColors.primary
                               : AppColors.textTertiary,
                         ),
-                        child: Text(sem),
+                        child: Text(formatSemester(sem, settings, s)),
                       ),
                       if (isSelected)
                         const Icon(Icons.arrow_drop_down,
@@ -675,13 +679,14 @@ class _SemGoalCardTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final allGoals = ref.watch(semesterGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
     final children = allGoals.where((g) => g.parentId == goal.id).toList();
     final notifier = ref.read(semesterGoalsProvider.notifier);
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
     final primaryCat =
         goal.categories.isNotEmpty ? goal.categories.first : 'other';
-    final catC = catColor(primaryCat);
+    final catC = resolveCatColor(cats, primaryCat);
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -696,13 +701,13 @@ class _SemGoalCardTile extends ConsumerWidget {
           children: [
             // Category color bar; softer on child rows
             Container(
-              width: 4,
+              width: goalCatBarWidth,
               color: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
             ),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                    AppSpacing.md - 4 + depth * 16.0, 6, AppSpacing.md, 6),
+                    AppSpacing.md - goalCatBarWidth + depth * 16.0, 6, AppSpacing.md, 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -712,7 +717,7 @@ class _SemGoalCardTile extends ConsumerWidget {
                         color: catC.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      child: Icon(catIcon(primaryCat), color: catC, size: 20),
+                      child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 20),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(

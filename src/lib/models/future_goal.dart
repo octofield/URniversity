@@ -11,13 +11,27 @@ class FutureCategories {
   ];
 }
 
-// Compare semester strings like "114-1" < "114-2" < "115-1"
+// Compare semester strings like "114-1" < "114-B1" < "114-2" < ... < "115-1".
+// Regular semesters use a plain numeric index ("114-1"); breaks use "B" plus
+// the index of the semester they directly follow ("114-B1" = the break right
+// after semester 1). The break following the last semester ("B{count}") is
+// always the long break before next year's semester 1 restarts.
 int compareSemesters(String a, String b) {
   final pa = a.split('-');
   final pb = b.split('-');
   final yearDiff = int.parse(pa[0]) - int.parse(pb[0]);
   if (yearDiff != 0) return yearDiff;
-  return int.parse(pa[1]) - int.parse(pb[1]);
+  return _semesterWeight(pa[1]) - _semesterWeight(pb[1]);
+}
+
+int _semesterWeight(String token) {
+  if (token.startsWith('B')) return int.parse(token.substring(1)) * 2;
+  return int.parse(token) * 2 - 1;
+}
+
+bool isBreakToken(String semester) {
+  final parts = semester.split('-');
+  return parts.length == 2 && parts[1].startsWith('B');
 }
 
 class FutureGoal {
