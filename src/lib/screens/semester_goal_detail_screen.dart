@@ -6,12 +6,14 @@ import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
 import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
+import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
+import '../utils/semester_helpers.dart';
 import 'future_goal_detail_screen.dart';
 
 class SemesterGoalDetailScreen extends ConsumerWidget {
@@ -44,8 +46,10 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
             .firstOrNull
         : null;
 
+    final cats = ref.watch(categoriesProvider);
+    final semSettings = ref.watch(semesterSettingsProvider);
     final primaryCat = goal.categories.isNotEmpty ? goal.categories.first : 'other';
-    final catC = catColor(primaryCat);
+    final catC = resolveCatColor(cats, primaryCat);
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
 
@@ -76,7 +80,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                   color: catC.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Icon(catIcon(primaryCat), color: catC, size: 26),
+                child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 26),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -95,13 +99,13 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                         ],
                       )
                     else
-                      Text(goal.semester,
+                      Text(formatSemester(goal.semester, semSettings, s),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: AppColors.primary)),
                     if (goal.categories.length <= 1)
                       const SizedBox.shrink()
                     else
-                      Text(goal.semester,
+                      Text(formatSemester(goal.semester, semSettings, s),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: AppColors.primary)),
                     if (goal.notes != null) ...[
@@ -226,7 +230,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.stars,
-                  color: catColor(linkedGoal.categories.isNotEmpty
+                  color: resolveCatColor(cats, linkedGoal.categories.isNotEmpty
                       ? linkedGoal.categories.first
                       : FutureCategories.other)),
               title: Text(linkedGoal.title),
@@ -295,12 +299,13 @@ class _SemMilestoneTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final allGoals = ref.watch(semesterGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
     final children = allGoals.where((g) => g.parentId == milestone.id).toList();
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
     final primaryCat =
         milestone.categories.isNotEmpty ? milestone.categories.first : 'other';
-    final catC = catColor(primaryCat);
+    final catC = resolveCatColor(cats, primaryCat);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,7 +348,7 @@ class _SemMilestoneTile extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                       child: Icon(
-                        milestone.isDone ? Icons.check : catIcon(primaryCat),
+                        milestone.isDone ? Icons.check : resolveCatIcon(cats, primaryCat),
                         color: catC,
                         size: 16,
                       ),
@@ -436,14 +441,15 @@ class _SemMilestoneTile extends ConsumerWidget {
   }
 }
 
-class _CategoryBadge extends StatelessWidget {
+class _CategoryBadge extends ConsumerWidget {
   final String cat;
   final dynamic s;
   const _CategoryBadge({required this.cat, required this.s});
 
   @override
-  Widget build(BuildContext context) {
-    final color = catColor(cat);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cats = ref.watch(categoriesProvider);
+    final color = resolveCatColor(cats, cat);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -453,7 +459,7 @@ class _CategoryBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(catIcon(cat), size: 11, color: color),
+          Icon(resolveCatIcon(cats, cat), size: 11, color: color),
           const SizedBox(width: 3),
           Text(catLabel(cat, s), style: TextStyle(fontSize: 11, color: color)),
         ],
@@ -723,6 +729,7 @@ void _showFutureGoalSelectorForSheet(
   BuildContext context,
   List<FutureGoal> goals,
   AppStrings s,
+  SemesterSettings settings,
   String? currentId,
   ValueChanged<String?> onSelect,
 ) {
@@ -747,8 +754,9 @@ void _showFutureGoalSelectorForSheet(
             for (final g in goals)
               ListTile(
                 title: Text(g.title),
-                subtitle:
-                    g.startSemester != null ? Text(g.startSemester!) : null,
+                subtitle: g.startSemester != null
+                    ? Text(formatSemester(g.startSemester!, settings, s))
+                    : null,
                 selected: g.id == currentId,
                 selectedColor: AppColors.primary,
                 onTap: () {
@@ -872,7 +880,8 @@ void showAddSemesterGoalSheet(BuildContext context, WidgetRef ref,
                   _goalLinkTile(
                     sheetCtx, s, linked,
                     () => _showFutureGoalSelectorForSheet(
-                        context, futureGoals, s, selectedFutureGoalId,
+                        context, futureGoals, s, ref.read(semesterSettingsProvider),
+                        selectedFutureGoalId,
                         (id) => setState(() => selectedFutureGoalId = id)),
                     () => setState(() => selectedFutureGoalId = null),
                   ),
@@ -990,7 +999,8 @@ void showEditSemesterGoalSheet(
                 _goalLinkTile(
                   sheetCtx, s, linked,
                   () => _showFutureGoalSelectorForSheet(
-                      context, futureGoals, s, selectedFutureGoalId,
+                      context, futureGoals, s, ref.read(semesterSettingsProvider),
+                      selectedFutureGoalId,
                       (id) => setState(() => selectedFutureGoalId = id)),
                   () => setState(() => selectedFutureGoalId = null),
                 ),

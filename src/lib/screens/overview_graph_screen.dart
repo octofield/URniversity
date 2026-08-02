@@ -7,11 +7,13 @@ import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
+import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../utils/category_helpers.dart';
+import '../utils/semester_helpers.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
@@ -659,24 +661,29 @@ class _EdgePainter extends CustomPainter {
       oldDelegate.radial != radial;
 }
 
-class _NodeCard extends StatelessWidget {
+class _NodeCard extends ConsumerWidget {
   final _GraphNode node;
   final int taskCount;
 
   const _NodeCard({required this.node, required this.taskCount});
 
   @override
-  Widget build(BuildContext context) {
-    final catC = catColor(node.category);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cats = ref.watch(categoriesProvider);
+    final semSettings = ref.watch(semesterSettingsProvider);
+    final s = ref.watch(stringsProvider);
+    final catC = resolveCatColor(cats, node.category);
     final subtitle = node.isFuture
         ? [
-            if (node.future!.startSemester != null) node.future!.startSemester!,
+            if (node.future!.startSemester != null)
+              formatSemester(node.future!.startSemester!, semSettings, s),
             if (node.future!.startSemester != null &&
                 node.future!.endSemester != null)
               '→',
-            if (node.future!.endSemester != null) node.future!.endSemester!,
+            if (node.future!.endSemester != null)
+              formatSemester(node.future!.endSemester!, semSettings, s),
           ].join(' ')
-        : node.semester!.semester;
+        : formatSemester(node.semester!.semester, semSettings, s);
 
     return SizedBox(
       width: node.width,
@@ -713,7 +720,7 @@ class _NodeCard extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    catIcon(node.category),
+                    resolveCatIcon(cats, node.category),
                     size: node.isFuture ? 18 : 15,
                     color: node.isDone ? AppColors.textTertiary : catC,
                   ),

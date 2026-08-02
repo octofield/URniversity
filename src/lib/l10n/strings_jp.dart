@@ -94,6 +94,13 @@ class StringsJp implements AppStrings {
   @override String get selectFutureGoal => 'ゴールを選択';
   @override String get noLink => 'リンクなし';
   @override String get more => 'もっと';
+  @override String get pickColor => '色を選ぶ';
+  @override String get pickIcon => 'アイコンを選ぶ';
+  @override String get categorySettings => 'カテゴリ設定';
+  @override String get winterBreak => '冬休み';
+  @override String get summerBreak => '夏休み';
+  @override String get springBreak => '春休み';
+  @override String get autumnBreak => '秋休み';
   @override String get progressOverview => '進捗まとめ';
   @override String get filters => '絞り込み';
   @override String greetingMorning(String name) => name.isEmpty ? 'おはよう 👋' : 'おはよう、$name 👋';

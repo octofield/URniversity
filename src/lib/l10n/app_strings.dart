@@ -94,6 +94,13 @@ abstract class AppStrings {
   String get selectFutureGoal;
   String get noLink;
   String get more;
+  String get pickColor;
+  String get pickIcon;
+  String get categorySettings;
+  String get winterBreak;
+  String get summerBreak;
+  String get springBreak;
+  String get autumnBreak;
 
   // Desktop sidebars
   String get progressOverview;

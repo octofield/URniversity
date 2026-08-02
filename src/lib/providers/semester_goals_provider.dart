@@ -27,6 +27,9 @@ String currentSemester(SemesterSettings settings) {
   return result;
 }
 
+// Interleaves each semester with the break immediately following it
+// ("Y-1", "Y-B1", "Y-2", "Y-B2", ...); the break after the last semester
+// ("Y-B{n}") is always the long break before next year's semester 1 restarts.
 List<String> generateSemesters(SemesterSettings settings) {
   final curSem = currentSemester(settings);
   final curYear = int.parse(curSem.split('-')[0]);
@@ -35,6 +38,7 @@ List<String> generateSemesters(SemesterSettings settings) {
   for (var ay = curYear - 4; ay <= curYear + 3; ay++) {
     for (var t = 1; t <= n; t++) {
       sems.add('$ay-$t');
+      sems.add('$ay-B$t');
     }
   }
   return sems;

@@ -94,6 +94,13 @@ class StringsZhTw implements AppStrings {
   @override String get selectFutureGoal => '選擇願景';
   @override String get noLink => '無連結';
   @override String get more => '更多';
+  @override String get pickColor => '選擇顏色';
+  @override String get pickIcon => '選擇圖示';
+  @override String get categorySettings => '分類設定';
+  @override String get winterBreak => '寒假';
+  @override String get summerBreak => '暑假';
+  @override String get springBreak => '春假';
+  @override String get autumnBreak => '秋假';
   @override String get progressOverview => '進度總覽';
   @override String get filters => '篩選';
   @override String greetingMorning(String name) => name.isEmpty ? '早安 👋' : '早安，$name 👋';

@@ -172,7 +172,7 @@ flowchart TD
     PTr -. " " .-> PS2
     PTr -. " " .-> PF2
 
-    User -- "新增/刪除/排序分類" --> PC <--> DC
+    User -- "新增/刪除/排序/改色/改圖示分類" --> PC <--> DC
 ```
 
 - `journal_provider` 的 `_fillMissingDays()` 是唯一會「自動產生資料」的處理程序：每次載入日記後，
@@ -180,6 +180,9 @@ flowchart TD
   的日記（`id` 以 `auto_` 開頭），並寫回資料儲存。
 - 回收桶（`trash_items`）與自訂分類（`user_categories`）**只在登入模式下持久化**；訪客模式下這兩者
   仍可在畫面上操作，但只存在記憶體中，重新整理或結束訪客模式後即消失。
+- 分類管理有兩個入口都會操作同一個 `categories_provider`：願景頁「更多分類」對話框，以及
+  設定頁「分類設定」（`CategorySettingsScreen`）。兩者共用 `src/lib/widgets/category_manager.dart`
+  裡的同一份列表項目／顏色選擇器／圖示選擇器邏輯，避免分類管理規則寫兩份。
 
 ---
 
