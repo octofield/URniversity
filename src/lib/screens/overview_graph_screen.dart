@@ -93,7 +93,18 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(s.overview),
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context),
+            ),
+            Text(s.overview),
+          ],
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
