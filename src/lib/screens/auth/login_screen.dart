@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         OAuthProvider.google,
         redirectTo: kIsWeb
             ? Uri.base.origin
-            : 'com.example.urniversity://login-callback',
+            : 'com.octofield.urniversity://login-callback',
       );
     } on AuthException catch (e) {
       if (mounted) {

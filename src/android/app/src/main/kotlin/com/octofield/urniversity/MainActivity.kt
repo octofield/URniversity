@@ -1,4 +1,4 @@
-package com.example.urniversity
+package com.octofield.urniversity
 
 import io.flutter.embedding.android.FlutterActivity
 
