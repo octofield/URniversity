@@ -1,7 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Webhook } from 'npm:standardwebhooks@1.0.0'
 
-const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET') ?? ''
+// The Dashboard shows the secret as "v1,whsec_...": the "v1," is Supabase's own
+// outer wrapper, not part of the whsec_<base64> format standardwebhooks expects.
+const RAW_HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET') ?? ''
+const HOOK_SECRET = RAW_HOOK_SECRET.startsWith('v1,')
+  ? RAW_HOOK_SECRET.slice(3)
+  : RAW_HOOK_SECRET
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 

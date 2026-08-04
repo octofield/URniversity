@@ -251,6 +251,11 @@ flowchart TD
 邏輯，不另開 Widget class）。彈出視窗（bottom sheet／dialog）另外在 `app_theme.dart` 統一
 限制最大寬度，避免超寬螢幕被拉伸。詳細流程圖見 §5-E。
 
+單欄表單／列表類畫面（`LoginScreen`、`SettingsScreen`）不套用 §5-E 的雙欄＋NavigationRail
+模式（這兩個畫面沒有底部導覽／側邊欄），改用較簡單的版本：寬度 < 768 維持原本鋪滿寬度的單欄
+版面；≥ 768 時用 `Center` + `ConstrainedBox` 把同一份內容限制在固定最大寬度並置中（`LoginScreen`
+420、`SettingsScreen` 640），避免欄位／清單在超寬螢幕被拉伸到不合理的寬度。
+
 ### 3-G 關聯圖佈局演算法（`overview_graph_screen.dart`）
 
 節點＝全部學期目標＋未來願景；邊＝三種關聯（目標樹／願景樹／目標→願景跨層連結）。共用前處理
@@ -306,6 +311,29 @@ flowchart TD
    序載入 8 種資料（見 DFD.md Diagram 1-A）。
 5. 若為 Email 帳號且尚未設定暱稱 → 導向 `SetupProfileScreen`，輸入暱稱與頭像後才進首頁。
 
+**驗證信的寄送機制（不走 Supabase 內建寄信）：**
+專案在 Supabase Dashboard 啟用了 Auth「Send Email」Hook，指向自建的 Edge Function
+`supabase/functions/send-auth-email/index.ts`。每當 Auth 需要寄信（`signup` 驗證、`recovery`
+密碼重設、`email_change`、`invite`、`magiclink`），Supabase 不自己寄，而是把
+`{ user, email_data }` 以 Standard Webhooks 簽章 POST 給這支 function，由它組出
+`{SUPABASE_URL}/auth/v1/verify?token=...&type=...&redirect_to=...` 連結後呼叫 Resend API 寄出。
+
+維護時的已知陷阱（都實際踩過）：
+- 部署務必帶 `--no-verify-jwt`：Auth Hook 呼叫不帶使用者 JWT，靠簽章驗證身分，預設的 JWT 閘道
+  會把請求擋在 function 之外。
+- Dashboard 顯示的 Hook secret 格式是 `v1,whsec_<base64>`，`standardwebhooks` 只接受
+  `whsec_<base64>`，前面的 `v1,` 必須自行去掉，否則會噴 `Base64Coder: incorrect characters`。
+- Hook 內部任何失敗，GoTrue 對外一律回報成 `Hook requires authorization token`，這個訊息會誤導
+  排查方向，實際原因要看 Edge Function 的 Invocations／Logs。
+- Authentication → Rate Limits 的「Rate limit for sending emails」預設極低（2 封/小時，整個專案
+  共用）。超過額度時 Supabase 直接跳過呼叫 Hook，API 仍回 200，但 Invocations 不會有任何紀錄。
+- 對「已存在且已驗證」的信箱呼叫 `signUp()`，Supabase 為防帳號探測會回一個 `identities: []`
+  且每次 user id 都不同的假成功回應，同樣不寄信、不呼叫 Hook。以 Google 登入建立的帳號天生就是
+  已驗證狀態，用同一個信箱測試註冊信會永遠收不到——這不是 bug。
+- ⚠️ 寄件人目前仍是 Resend 沙盒位址 `onboarding@resend.dev`，**只能寄達 Resend 帳號本人的信箱**，
+  寄給其他任何收件者一律 403。正式對外使用前必須在 resend.com/domains 驗證自有網域，並把
+  function 裡的 `from` 改成該網域下的地址。
+
 ### UC3　新增一筆每週循環任務並完成當週那次
 1. 今日頁按浮動新增鈕（amber 色）→ 開啟新增任務表單。
 2. 輸入標題，選擇循環規則「每週」，可選擇連結學期目標／未來願景 → 送出。
@@ -358,6 +386,15 @@ flowchart TD
 3. 點圖示按鈕 → 跳出圖示網格（`categoryIconPresets`）→ 選一個 → 立即套用並關閉。
 4. 變更會立刻反映在所有顯示該分類的地方（目標/願景卡片色條、任務連結色條、關聯圖節點等），
    並非同步寫回 `user_categories.styles`（訪客模式僅存於記憶體）。
+
+### UC12　刪除帳號
+1. 設定頁點「刪除帳號」→ 彈出 `_DeleteAccountDialog`。
+2. 身分確認方式依登入方式而定：Email／密碼帳號需重新輸入密碼（`signInWithPassword` 驗證通過
+   才繼續）；Google 帳號沒有密碼可驗證，改為要求輸入完整信箱地址並與帳號信箱字串比對相符。
+3. 確認通過 → `profileProvider.deleteAllData(uid)` 清除該使用者全部資料 → `auth.signOut()`。
+4. 關閉對話框後呼叫 `Navigator.popUntil((route) => route.isFirst)`（沿用 UC 登出的既有作法）
+   跳回堆疊最底層，讓 `_AuthGate` 依新的 session 狀態顯示 `LoginScreen`；若不做這一步，畫面會
+   卡在已經失去 session 的設定頁而非自動導回登入頁。
 
 ---
 
