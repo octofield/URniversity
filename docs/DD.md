@@ -172,13 +172,16 @@
 | `styles` | jsonb | ✗ | `null` | `{ id: { color: int(ARGB), icon: int(codePoint) } }`，每個分類（含內建）目前自訂的顯示顏色與圖示；沒有出現在這個 map 裡的 id 使用 `defaultCatColor()`/`defaultCatIcon()` 的內建預設值 |
 
 **特別說明：**
-- ⚠️ **`styles` 欄位需要手動在 Supabase 執行一次性 migration 才會存在**（本機開發環境無法從這裡
-  直接改動雲端資料庫 schema）：
+- `ordered_list`／`styles` 兩欄位已於雲端 Supabase 執行過一次性 migration 補齊：
   ```sql
-  ALTER TABLE user_categories ADD COLUMN styles jsonb;
+  ALTER TABLE user_categories ADD COLUMN IF NOT EXISTS ordered_list text[] NOT NULL DEFAULT '{}';
+  ALTER TABLE user_categories ADD COLUMN IF NOT EXISTS styles jsonb;
   ```
-  在執行這個 migration 之前，顏色/圖示自訂功能寫入會靜默失敗（`_persist()` 內的
-  `.catchError((_) {})`），畫面上的變更只存在當次 session 記憶體中，重新整理就會消失。
+  在這之前，顏色/圖示自訂功能寫入會靜默失敗（`_persist()` 內的 `.catchError((_) {})`），畫面上的
+  變更只存在當次 session 記憶體中，重新整理就會消失——這個狀況已排除。
+- ⚠️ 這張表目前還留有 `name`（text）、`order_index`（integer）兩個欄位，是比較舊、「一個分類一列」
+  設計遺留下來的，現行程式碼（`CategoriesNotifier`）完全不讀寫這兩欄，屬於未清理的死欄位，維護時
+  請勿誤以為它們是目前分類系統的一部分。
 - 圖示只會是 `src/lib/utils/category_helpers.dart` 裡 `categoryIconPresets`（固定常數清單）中的
   其中一個，而不是任意 `IconData`——因為這些 codepoint 也會被寫在挑選圖示的網格 UI 裡當成
   literal `Icons.xxx`，Flutter 的圖示 tree-shaking 才不會把使用者選到的字型砍掉。

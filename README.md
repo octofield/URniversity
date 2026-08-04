@@ -143,12 +143,10 @@ Users can login as a guest, with email, or using Google account.
 Currently no Android / iOS version, only web version available.
 
 ### Next
-- Android / iOS / Windows version support
-- Different designs among different screen widths
-- Widgets on distinct devices
-- Better UI experience (More smooth interactions, generalized button positions)
-- Visualization of a future goal
 - Retro system
 - Notification system
 - GPA tracking
 - Inspiration archive
+- Custom classifications sync between goals and targets
+- Thinner margins of tasks
+- Fix for regular tasks
