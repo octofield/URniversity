@@ -71,28 +71,39 @@ Future<void> _pickColor(BuildContext context, WidgetRef ref, CategoryEntry entry
       title: Text(s.pickColor),
       content: SizedBox(
         width: 280,
-        child: Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final c in categoryColorPresets)
-              GestureDetector(
-                onTap: () => Navigator.pop(dlgCtx, c),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: c,
-                    border: Border.all(
-                      color: c.toARGB32() == entry.color.toARGB32()
-                          ? AppColors.textPrimary
-                          : Colors.transparent,
-                      width: 3,
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                for (final c in categoryColorPresets)
+                  GestureDetector(
+                    onTap: () => Navigator.pop(dlgCtx, c),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: c,
+                        border: Border.all(
+                          color: c.toARGB32() == entry.color.toARGB32()
+                              ? AppColors.textPrimary
+                              : Colors.transparent,
+                          width: 3,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _HexColorField(
+              initial: entry.color,
+              onSubmit: (c) => Navigator.pop(dlgCtx, c),
+            ),
           ],
         ),
       ),
@@ -115,9 +126,13 @@ Future<void> _pickIcon(BuildContext context, WidgetRef ref, CategoryEntry entry)
     context: context,
     builder: (dlgCtx) => AlertDialog(
       title: Text(s.pickIcon),
+      // Height-capped and scrollable: the preset list is long enough to
+      // overflow a plain Wrap
       content: SizedBox(
         width: 280,
-        child: Wrap(
+        height: 320,
+        child: SingleChildScrollView(
+          child: Wrap(
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: [
@@ -143,6 +158,7 @@ Future<void> _pickIcon(BuildContext context, WidgetRef ref, CategoryEntry entry)
                 ),
               ),
           ],
+          ),
         ),
       ),
       actions: [
@@ -155,6 +171,75 @@ Future<void> _pickIcon(BuildContext context, WidgetRef ref, CategoryEntry entry)
   );
   if (picked != null) {
     ref.read(categoriesProvider.notifier).updateStyle(entry.id, icon: picked);
+  }
+}
+
+// Hex entry for colors outside the preset swatches. Storage already accepts any
+// 32-bit color (CategoryEntry stores color.toARGB32()), so this is UI-only
+class _HexColorField extends StatefulWidget {
+  final Color initial;
+  final ValueChanged<Color> onSubmit;
+  const _HexColorField({required this.initial, required this.onSubmit});
+
+  @override
+  State<_HexColorField> createState() => _HexColorFieldState();
+}
+
+class _HexColorFieldState extends State<_HexColorField> {
+  late final TextEditingController _ctrl = TextEditingController(
+    text: '#${(widget.initial.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}',
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  // Accepts "#RRGGBB" or "RRGGBB"; alpha is always forced opaque
+  Color? _parse(String raw) {
+    final hex = raw.trim().replaceFirst('#', '');
+    if (hex.length != 6) return null;
+    final value = int.tryParse(hex, radix: 16);
+    return value == null ? null : Color(0xFF000000 | value);
+  }
+
+  void _submit() {
+    final parsed = _parse(_ctrl.text);
+    if (parsed == null) {
+      setState(() => _error = 'RRGGBB');
+      return;
+    }
+    widget.onSubmit(parsed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _ctrl,
+            decoration: InputDecoration(
+              labelText: 'Hex',
+              hintText: '#RRGGBB',
+              isDense: true,
+              errorText: _error,
+            ),
+            autocorrect: false,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) => _submit(),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.check, color: AppColors.primary),
+          onPressed: _submit,
+        ),
+      ],
+    );
   }
 }
 
@@ -187,24 +272,29 @@ class _CategoryAddRowState extends State<CategoryAddRow> {
           _ctrl.clear();
         }
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.pageHorizontal, vertical: AppSpacing.sm),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _ctrl,
-                  decoration: InputDecoration(hintText: s.categoryName),
-                  textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => submit(),
+        // Pinned to the bottom of the screen, so it needs the system nav bar
+        // inset or the add button sits under it
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageHorizontal, vertical: AppSpacing.sm),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _ctrl,
+                    decoration: InputDecoration(hintText: s.categoryName),
+                    textCapitalization: TextCapitalization.sentences,
+                    onSubmitted: (_) => submit(),
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add, color: AppColors.primary),
-                onPressed: submit,
-              ),
-            ],
+                IconButton(
+                  icon: const Icon(Icons.add, color: AppColors.primary),
+                  onPressed: submit,
+                ),
+              ],
+            ),
           ),
         );
       },

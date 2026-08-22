@@ -13,6 +13,7 @@ abstract class AppStrings {
   String get tasks;
   String get noTasks;
   String get addTask;
+  String get addSubtask;
   String get taskNotes;
   String get priority;
   String get priorityLow;
@@ -32,6 +33,14 @@ abstract class AppStrings {
   String get repeatMonthly;
   String get repeatEveryNDays;
   String get repeatInterval;
+  // Weekly/monthly summaries. When no day is chosen the rule falls back to the
+  // task's creation date, and these render that fallback identically to an
+  // explicit choice so the two read the same
+  String repeatWeeklyOn(String days);
+  String repeatMonthlyOn(String days);
+  String monthDayShort(int day);
+  String repeatEveryNDaysShort(int n);
+  String get repeatMonthLastDay;
 
   String get inspirations;
   String get noInspirations;

@@ -17,6 +17,7 @@ class StringsJp implements AppStrings {
   @override String get tasks => 'タスク';
   @override String get noTasks => 'タスクがありません。＋ をタップして追加';
   @override String get addTask => 'タスクを追加';
+  @override String get addSubtask => 'サブタスクを追加';
   @override String get taskNotes => 'メモ（任意）';
   @override String get priority => '優先度：';
   @override String get priorityLow => '低';
@@ -35,6 +36,11 @@ class StringsJp implements AppStrings {
   @override String get repeatMonthly => '毎月';
   @override String get repeatEveryNDays => 'N日ごと';
   @override String get repeatInterval => '間隔（日）';
+  @override String repeatWeeklyOn(String days) => '毎週$days';
+  @override String repeatMonthlyOn(String days) => '毎月$days';
+  @override String monthDayShort(int day) => '$day日';
+  @override String repeatEveryNDaysShort(int n) => '$n日ごと';
+  @override String get repeatMonthLastDay => '月末';
 
   @override String get inspirations => 'インスピレーション';
   @override String get noInspirations => 'インスピレーションがありません。＋ をタップして記録';

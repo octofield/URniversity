@@ -1,105 +1,149 @@
-Table users {
-  id uuid [primary key]
-  email varchar(255) [unique]
-  username varchar(20) [not null]
-  grade integer
+// URniversity — Supabase schema
+//
+// Source of truth: docs/DD.md. Regenerate this file from DD.md whenever a
+// persisted field changes; the two must not drift apart again.
+//
+// Conventions that differ from a typical Postgres design:
+//  - Every id is TEXT generated on the client
+//    (DateTime.now().millisecondsSinceEpoch.toString()), not a uuid/serial.
+//  - user_id is TEXT referencing auth.users.id, attached by the Provider on
+//    write rather than being part of the Dart model.
+//  - Parent/child links are logical FKs only; there are no DB-level
+//    constraints, and cascades are implemented in the Providers.
 
-  created_at timestamp
+Table tasks {
+  id text [primary key, note: "Client-generated millisecond timestamp"]
+  user_id text [not null]
+
+  title text [not null]
+  content text
+
+  due_time timestamptz [note: "Non-recurring tasks use this to decide which day they belong to"]
+  priority int [not null, default: 1, note: "1=low, 2=medium, 3=high"]
+
+  is_completed bool [not null, default: false, note: "Non-recurring tasks ONLY; recurring tasks use completed_dates"]
+  created_at timestamptz [not null, note: "Also the anchor for every recurrence rule"]
+
+  recurrence_type text [note: "daily / weekly / monthly / everyNDays; null = not recurring"]
+  recurrence_interval int [note: "everyNDays only; clamped to >= 1 on read"]
+  recurrence_weekdays "int[]" [note: "weekly only; ISO weekdays 1=Mon..7=Sun. Empty = same weekday as created_at"]
+  recurrence_month_days "int[]" [note: "monthly only; 1-31 plus 32 = last day of month. Empty = same day-of-month as created_at"]
+
+  linked_target_id text [note: "Logical FK -> semester_goals.id"]
+  linked_goal_id text [note: "Logical FK -> future_goals.id"]
+
+  parent_task_id text [note: "Logical self-FK; subtasks are capped at ONE level"]
+  sort_order int [not null, default: 0, note: "Manual drag order within one parent_task_id group; new items get max + 1000"]
+
+  completed_dates text [note: "Recurring tasks only; JSON string of List<String> in yyyy-MM-dd"]
+}
+
+Table semester_goals {
+  id text [primary key]
+  user_id text [not null]
+
+  parent_id text [note: "Logical self-FK; null = top-level goal"]
+  title text [not null]
+  semester text [not null, note: "YYY-N (ROC year + semester index) or YYY-Bk for a break"]
+
+  category text [not null, default: '["other"]', note: "WARNING: singular name, but stores a jsonEncode'd List<String>. future_goals.categories is a native array instead"]
+
+  future_goal_id text [note: "Logical FK -> future_goals.id; also drives the overview graph edges"]
+  notes text
+  is_done bool [not null, default: false]
+  sort_order int [not null, default: 0, note: "Scoped to (parent_id, semester)"]
 }
 
 Table future_goals {
-  id uuid [primary key]
-  user_id uuid
+  id text [primary key]
+  user_id text [not null]
 
-  title varchar(255) [not null]
-  content text
+  parent_id text [note: "Logical self-FK; null = top-level vision"]
+  title text [not null]
 
-  category varchar(255) [not null]
-  parent_goal_id uuid
+  categories "text[]" [not null, default: `ARRAY['other']`, note: "Native Postgres array, unlike semester_goals.category"]
 
-  start_semester varchar(10)
-  end_semester varchar(10)
-
-  is_completed bool [not null, default: false]
-  created_at timestamp
-}
-
-Table semester_objectives {
-  id uuid [primary key]
-  user_id uuid
-  
-  title varchar(255) [not null]
-  content text
-
-  category varchar(255) [not null]
-  semester varchar(10)
-  future_goals_id uuid [note: "Optional, can be related to some future goals"]
-  
-  is_completed bool [not null, default: false]
-  created_at timestamp
-}
-
-Table tasks {
-  id uuid [primary key]
-  user_id uuid
-
-  title varchar(255) [not null]
-  content text
-
-  due_time timestamp
-  priority integer
-
-  future_goals_id uuid [note: "Optional, can be related to some future goals"]
-  semester_objectives_id uuid [note: "Optional, can be related to some semester objectives"]
-  
-  is_recurring bool [default: false]
-  recurrence_rule varchar(10) [note: "daily / weekly / monthly / null"]
-
-  is_completed bool [not null, default: false]
-  created_at timestamp
+  start_semester text [note: "YYY-N or YYY-Bk"]
+  end_semester text [note: "YYY-N or YYY-Bk"]
+  notes text
+  is_done bool [not null, default: false]
+  sort_order int [not null, default: 0, note: "Scoped to parent_id"]
 }
 
 Table inspirations {
-  id uuid [primary key]
-  user_id uuid
+  id text [primary key]
+  user_id text [not null]
 
-  title varchar(255) [not null]
+  title text [not null]
   content text
-  
-  archived bool [default: false]
-  future_goals_id uuid [note: "Optional, can be related to some future goals"]
-  
-  created_at timestamp
+  is_completed bool [not null, default: false]
+  created_at timestamptz [not null, note: "Read newest-first by this column"]
 }
 
 Table journals {
-  id uuid [primary key]
-  user_id uuid
+  id text [primary key, note: "Auto-filled entries use an 'auto_' prefix"]
+  user_id text [not null]
 
-  date date [not null]
+  date text [not null, note: "yyyy-MM-dd string, not a date type"]
   content text
-  retro_type varchar(10) [note: "daily / weekly / monthly / null"]
-
-  created_at timestamp
 }
 
+Table trash_items {
+  id text [primary key, note: "trash_{originalId}_{deletedAtMillis}"]
+  user_id text [not null]
 
-Ref: "users"."id" < "future_goals"."user_id"
+  deleted_at timestamptz [not null]
+  item_type text [not null, note: "task / semester_goal / future_goal"]
+  item_data jsonb [not null, note: "Full toJson() snapshot of the deleted item"]
+}
 
-Ref: "users"."id" < "tasks"."user_id"
+Table user_categories {
+  user_id text [primary key, note: "One row per user"]
 
-Ref: "future_goals"."id" < "tasks"."future_goals_id"
+  ordered_list "text[]" [not null, note: "Category ids in display order, built-ins included"]
+  styles jsonb [note: "{ id: { color: int(ARGB), icon: int(codePoint) } }; missing ids fall back to built-in defaults"]
 
-Ref: "users"."id" < "semester_objectives"."user_id"
+  name text [note: "DEAD COLUMN - leftover from a one-row-per-category design, never read"]
+  order_index int [note: "DEAD COLUMN - same"]
+}
 
-Ref: "semester_objectives"."id" < "tasks"."semester_objectives_id"
+// Profile fields and app settings share one table; two Providers each upsert
+// only the columns they own, so neither overwrites the other.
+Table user_settings {
+  user_id text [primary key]
 
-Ref: "users"."id" < "journals"."user_id"
+  username text
+  school text
+  department text
+  grade int [note: "1-7"]
+  grade_set_year int [note: "ROC year the grade was set, so it can auto-advance"]
+  avatar_index int [note: "Index into AppAvatars.presets; null = Google photo or initials"]
 
-Ref: "users"."id" < "inspirations"."user_id"
+  language text [default: 'zh_tw', note: "zh_tw / en / jp"]
+  date_format text [default: 'mmddWeekday', note: "mmddWeekday / mmdd / yyyymmdd / longDate"]
+  semester_count int [default: 2, note: "2, 3 or 4"]
+  semester_start_months "int[]" [default: `ARRAY[8, 2]`, note: "Length must equal semester_count"]
+  default_task_view int [default: 0, note: "0=all, 1=daily, 2=weekly"]
+  show_day_counter bool [default: true]
+}
 
-Ref: "future_goals"."id" < "future_goals"."parent_goal_id"
+// Fully anonymous: no user_id is attached, and nothing ever reads it back.
+Table feedbacks {
+  type text [not null, note: "bug / suggestion"]
+  message text [not null, note: "10-1000 chars, enforced client-side"]
+}
 
-Ref: "future_goals"."id" < "semester_objectives"."future_goals_id"
+Ref: tasks.user_id > user_settings.user_id
+Ref: semester_goals.user_id > user_settings.user_id
+Ref: future_goals.user_id > user_settings.user_id
+Ref: inspirations.user_id > user_settings.user_id
+Ref: journals.user_id > user_settings.user_id
+Ref: trash_items.user_id > user_settings.user_id
+Ref: user_categories.user_id > user_settings.user_id
 
-Ref: "future_goals"."id" < "inspirations"."future_goals_id"
+Ref: tasks.linked_target_id > semester_goals.id
+Ref: tasks.linked_goal_id > future_goals.id
+Ref: tasks.parent_task_id > tasks.id
+Ref: semester_goals.parent_id > semester_goals.id
+Ref: semester_goals.future_goal_id > future_goals.id
+Ref: future_goals.parent_id > future_goals.id

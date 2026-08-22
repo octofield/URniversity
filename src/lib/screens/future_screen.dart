@@ -15,11 +15,34 @@ import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/category_manager.dart';
+import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
+
+Future<bool> _confirmDeleteGoal(BuildContext context, AppStrings s) async {
+  return await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          content: Text('${s.delete}？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: Text(s.delete),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
 
 class _FutGroup {
   final FutureGoal parent;
@@ -27,15 +50,12 @@ class _FutGroup {
   const _FutGroup({required this.parent, required this.children});
 }
 
-List<_FutGroup> _buildFutGroups(
-    List<FutureGoal> topLevel, List<FutureGoal> all) {
+List<_FutGroup> _buildFutGroups(List<FutureGoal> topLevel, List<FutureGoal> all) {
   return [
     for (final p in topLevel)
       _FutGroup(
         parent: p,
-        children: all
-            .where((g) => g.parentId == p.id)
-            .toList()
+        children: all.where((g) => g.parentId == p.id).toList()
           ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
       ),
   ];
@@ -56,18 +76,15 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
   String? _semFilter;
   String? _draggingId;
   String? _hoveredId;
-  bool _hoverAbove = false;
+  DropZone _hoverZone = DropZone.before;
   final _rowCtxs = <String, BuildContext>{};
 
   Widget _endGapZone(List<_FutGroup> groups) {
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => _draggingId != null,
       onAcceptWithDetails: (details) {
-        final lastOrder =
-            groups.isNotEmpty ? groups.last.parent.sortOrder : 0;
-        ref
-            .read(futureGoalsProvider.notifier)
-            .reparent(details.data, null, lastOrder + 1000);
+        final lastOrder = groups.isNotEmpty ? groups.last.parent.sortOrder : 0;
+        ref.read(futureGoalsProvider.notifier).reparent(details.data, null, lastOrder + 1000);
       },
       builder: (ctx, candidates, _) {
         final hovered = candidates.isNotEmpty;
@@ -92,7 +109,8 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       elevation: 4,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Container(
-        width: (screenWidth > _contentMaxWidth ? _contentMaxWidth : screenWidth) -
+        width:
+            (screenWidth > _contentMaxWidth ? _contentMaxWidth : screenWidth) -
             AppSpacing.pageHorizontal * 2,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -126,12 +144,12 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         final storedCtx = _rowCtxs[goalId];
         if (storedCtx == null) return;
         final box = storedCtx.findRenderObject() as RenderBox;
-        final localY = box.globalToLocal(details.offset).dy;
-        final above = localY < box.size.height * 0.2;
-        if (_hoveredId != goalId || _hoverAbove != above) {
+        // details.offset is the pointer thanks to pointerDragAnchorStrategy
+        final zone = dropZoneFor(box, details.offset, canNest: true);
+        if (_hoveredId != goalId || _hoverZone != zone) {
           setState(() {
             _hoveredId = goalId;
-            _hoverAbove = above;
+            _hoverZone = zone;
           });
         }
       },
@@ -139,39 +157,46 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         if (_hoveredId == goalId) setState(() => _hoveredId = null);
       },
       onAcceptWithDetails: (details) {
-        if (_hoverAbove) {
-          final prevOrder =
-              siblingIndex > 0 ? siblings[siblingIndex - 1].sortOrder : null;
-          final nextOrder = goal.sortOrder;
-          final newSortOrder = prevOrder == null
-              ? nextOrder - 1000
-              : ((prevOrder + nextOrder) / 2).round();
-          notifier.reparent(details.data, parentId, newSortOrder);
-        } else {
-          final allGoals = ref.read(futureGoalsProvider);
-          final children =
-              allGoals.where((g) => g.parentId == goalId).toList();
-          final maxOrder = children.fold(
-              0, (prev, c) => c.sortOrder > prev ? c.sortOrder : prev);
-          notifier.reparent(details.data, goalId, maxOrder + 1000);
+        switch (_hoverZone) {
+          case DropZone.before:
+            final prev =
+                siblingIndex > 0 ? siblings[siblingIndex - 1].sortOrder : null;
+            notifier.reparent(
+                details.data, parentId, orderBetween(prev, goal.sortOrder));
+          case DropZone.after:
+            final next = siblingIndex < siblings.length - 1
+                ? siblings[siblingIndex + 1].sortOrder
+                : null;
+            notifier.reparent(
+                details.data, parentId, orderBetween(goal.sortOrder, next));
+          case DropZone.into:
+            final childOrders = ref
+                .read(futureGoalsProvider)
+                .where((g) => g.parentId == goalId)
+                .map((g) => g.sortOrder);
+            notifier.reparent(
+                details.data, goalId, orderAfterLast(childOrders));
         }
         setState(() => _hoveredId = null);
       },
       builder: (ctx, candidates, _) {
         _rowCtxs[goalId] = ctx;
         final isHovered = _hoveredId == goalId && candidates.isNotEmpty;
-        final showAboveLine = isHovered && _hoverAbove;
-        final showChildBg = isHovered && !_hoverAbove;
+        final showBeforeLine = isHovered && _hoverZone == DropZone.before;
+        final showAfterLine = isHovered && _hoverZone == DropZone.after;
+        final showChildBg = isHovered && _hoverZone == DropZone.into;
         final tile = _FutureGoalCardRow(goal: goal, depth: depth);
         final fading = Opacity(
-            opacity: 0.3,
-            child: _FutureGoalCardRow(goal: goal, depth: depth));
+          opacity: 0.3,
+          child: _FutureGoalCardRow(goal: goal, depth: depth),
+        );
         final feedback = _feedbackCard(goal);
 
         Widget draggable;
         if (kIsWeb) {
           draggable = Draggable<String>(
             data: goalId,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
             onDragStarted: () => setState(() => _draggingId = goalId),
             onDragEnd: (_) => setState(() {
               _draggingId = null;
@@ -184,6 +209,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         } else {
           draggable = LongPressDraggable<String>(
             data: goalId,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
             onDragStarted: () => setState(() => _draggingId = goalId),
             onDragEnd: (_) => setState(() {
               _draggingId = null;
@@ -200,9 +226,16 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
           child: Stack(
             children: [
               draggable,
-              if (showAboveLine)
+              if (showBeforeLine)
                 Positioned(
                   top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(height: 2, color: AppColors.primary),
+                ),
+              if (showAfterLine)
+                Positioned(
+                  bottom: 0,
                   left: 0,
                   right: 0,
                   child: Container(height: 2, color: AppColors.primary),
@@ -214,32 +247,33 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     );
   }
 
-  List<Widget> _buildDescendantRows(
-      String parentId, List<FutureGoal> all, int depth) {
-    final children = all
-        .where((g) => g.parentId == parentId)
-        .toList()
+  List<Widget> _buildDescendantRows(String parentId, List<FutureGoal> all, int depth) {
+    final children = all.where((g) => g.parentId == parentId).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     if (children.isEmpty) return [];
     final result = <Widget>[];
     for (int i = 0; i < children.length; i++) {
+      result.add(const Divider(height: 1, thickness: 1, color: AppColors.border));
       result.add(
-          const Divider(height: 1, thickness: 1, color: AppColors.border));
-      result.add(_buildDraggableRow(children[i],
+        _buildDraggableRow(
+          children[i],
           depth: depth,
           parentId: parentId,
           siblings: children,
-          siblingIndex: i));
+          siblingIndex: i,
+        ),
+      );
       result.addAll(_buildDescendantRows(children[i].id, all, depth + 1));
     }
     return result;
   }
 
   Widget _buildGroupCard(
-      _FutGroup group,
-      List<FutureGoal> allGoals,
-      int groupIdx,
-      List<_FutGroup> groups) {
+    _FutGroup group,
+    List<FutureGoal> allGoals,
+    int groupIdx,
+    List<_FutGroup> groups,
+  ) {
     final parent = group.parent;
     final rootItems = groups.map((g) => g.parent).toList();
 
@@ -254,11 +288,13 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDraggableRow(parent,
-                depth: 0,
-                parentId: null,
-                siblings: rootItems,
-                siblingIndex: groupIdx),
+            _buildDraggableRow(
+              parent,
+              depth: 0,
+              parentId: null,
+              siblings: rootItems,
+              siblingIndex: groupIdx,
+            ),
             ..._buildDescendantRows(parent.id, allGoals, 1),
           ],
         ),
@@ -337,8 +373,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                     height: 300,
                     child: ReorderableListView.builder(
                       itemCount: cats.length,
-                      onReorder: (o, n) =>
-                          cRef.read(categoriesProvider.notifier).reorder(o, n),
+                      onReorder: (o, n) => cRef.read(categoriesProvider.notifier).reorder(o, n),
                       itemBuilder: (tileCtx, i) => categoryManageTile(
                         context: tileCtx,
                         ref: cRef,
@@ -346,8 +381,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                         s: s,
                         selected: _catFilter == cats[i].id,
                         onTap: () {
-                          setState(() => _catFilter =
-                              _catFilter == cats[i].id ? null : cats[i].id);
+                          setState(() => _catFilter = _catFilter == cats[i].id ? null : cats[i].id);
                           Navigator.pop(dlgCtx);
                         },
                       ),
@@ -361,8 +395,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dlgCtx),
-                child: Text(
-                    MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+                child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
               ),
             ],
           );
@@ -378,9 +411,8 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     final cats = ref.watch(categoriesProvider);
     final semChips = _semesterChips(settings);
 
-    int countFor(String cat) => allGoals
-        .where((g) => g.parentId == null && g.categories.contains(cat))
-        .length;
+    int countFor(String cat) =>
+        allGoals.where((g) => g.parentId == null && g.categories.contains(cat)).length;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -394,10 +426,10 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         children: [
           Text(s.filters, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
-          Text(s.semester,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              )),
+          Text(
+            s.semester,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: AppSpacing.xs),
           Wrap(
             spacing: AppSpacing.xs,
@@ -412,8 +444,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 _FilterChip(
                   label: formatSemester(sem, settings, s),
                   selected: _semFilter == sem,
-                  onTap: () => setState(
-                      () => _semFilter = _semFilter == sem ? null : sem),
+                  onTap: () => setState(() => _semFilter = _semFilter == sem ? null : sem),
                 ),
               ActionChip(
                 avatar: const Icon(Icons.expand_more, size: 16),
@@ -424,10 +455,10 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(s.category,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              )),
+          Text(
+            s.category,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: AppSpacing.xs),
           Wrap(
             spacing: AppSpacing.xs,
@@ -443,8 +474,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                   label: '${catLabel(cat.id, s)} (${countFor(cat.id)})',
                   selected: _catFilter == cat.id,
                   color: cat.color,
-                  onTap: () => setState(
-                      () => _catFilter = _catFilter == cat.id ? null : cat.id),
+                  onTap: () => setState(() => _catFilter = _catFilter == cat.id ? null : cat.id),
                 ),
               ActionChip(
                 avatar: const Icon(Icons.tune, size: 16),
@@ -472,8 +502,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       final semOk = _semFilter == null || g.startSemester == _semFilter;
       final catOk = _catFilter == null || g.categories.contains(_catFilter);
       return semOk && catOk;
-    }).toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    }).toList()..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildFutGroups(filtered, allGoals);
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
     final width = MediaQuery.of(context).size.width;
@@ -525,19 +554,19 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 ),
                 const SizedBox(width: AppSpacing.sm),
               ],
-              Text(s.goals,
-                  style:
-                      Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  )),
+              Text(
+                s.goals,
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.hub_outlined),
                 tooltip: s.overview,
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) => const OverviewGraphScreen()),
+                  MaterialPageRoute(builder: (_) => const OverviewGraphScreen()),
                 ),
               ),
               IconButton(
@@ -553,8 +582,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         // Mobile keeps the chip rows; desktop moves the filters into the sidebar
         if (!isDesktop) ...[
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pageHorizontal, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: 4),
             child: _AdaptiveChipRow(
               allChip: _FilterChip(
                 label: s.catAll,
@@ -566,8 +594,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                   _FilterChip(
                     label: formatSemester(sem, settings, s),
                     selected: _semFilter == sem,
-                    onTap: () => setState(
-                        () => _semFilter = _semFilter == sem ? null : sem),
+                    onTap: () => setState(() => _semFilter = _semFilter == sem ? null : sem),
                   ),
               ],
               trailing: ActionChip(
@@ -579,8 +606,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pageHorizontal, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: 4),
             child: _AdaptiveChipRow(
               allChip: _FilterChip(
                 label: s.catAll,
@@ -593,8 +619,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                     label: catLabel(cat.id, s),
                     selected: _catFilter == cat.id,
                     color: cat.color,
-                    onTap: () => setState(
-                        () => _catFilter = _catFilter == cat.id ? null : cat.id),
+                    onTap: () => setState(() => _catFilter = _catFilter == cat.id ? null : cat.id),
                   ),
               ],
               trailing: ActionChip(
@@ -619,7 +644,11 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                       flex: 1,
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(
-                            0, 0, AppSpacing.pageHorizontal, AppSpacing.xl),
+                          0,
+                          0,
+                          AppSpacing.pageHorizontal,
+                          AppSpacing.xl,
+                        ),
                         child: _buildFilterSidebar(),
                       ),
                     ),
@@ -651,11 +680,7 @@ class _AdaptiveChipRow extends StatelessWidget {
   final List<Widget> chips;
   final Widget trailing;
 
-  const _AdaptiveChipRow({
-    required this.allChip,
-    required this.chips,
-    required this.trailing,
-  });
+  const _AdaptiveChipRow({required this.allChip, required this.chips, required this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -679,10 +704,7 @@ class _AdaptiveChipRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  for (final chip in chips) ...[
-                    chip,
-                    const SizedBox(width: AppSpacing.xs),
-                  ],
+                  for (final chip in chips) ...[chip, const SizedBox(width: AppSpacing.xs)],
                   // Trailing spacer so the last chip can fully scroll clear of the fade
                   const SizedBox(width: AppSpacing.md),
                 ],
@@ -703,11 +725,7 @@ class _FilterChip extends StatelessWidget {
   final VoidCallback onTap;
   final Color? color;
 
-  const _FilterChip(
-      {required this.label,
-      required this.selected,
-      required this.onTap,
-      this.color});
+  const _FilterChip({required this.label, required this.selected, required this.onTap, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -739,17 +757,13 @@ class _FutureGoalCardRow extends ConsumerWidget {
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
     final progress = total > 0 ? done / total : 0.0;
-    final primaryCat = goal.categories.isNotEmpty
-        ? goal.categories.first
-        : FutureCategories.other;
+    final primaryCat = goal.categories.isNotEmpty ? goal.categories.first : FutureCategories.other;
     final catC = resolveCatColor(cats, primaryCat);
 
     return InkWell(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => FutureGoalDetailScreen(goalId: goal.id),
-        ),
+        MaterialPageRoute(builder: (_) => FutureGoalDetailScreen(goalId: goal.id)),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -764,62 +778,78 @@ class _FutureGoalCardRow extends ConsumerWidget {
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   AppSpacing.md - goalCatBarWidth + depth * 16.0,
-                  AppSpacing.sm, AppSpacing.md, AppSpacing.sm,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: catC.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                    GestureDetector(
+                      onTap: () => notifier.toggleDone(goal.id),
+                      behavior: HitTestBehavior.opaque,
+                      child: Tooltip(
+                        message: goal.isDone ? s.markUndone : s.markDone,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: catC.withValues(alpha: goal.isDone ? 0.25 : 0.15),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: Icon(
+                            goal.isDone ? Icons.check : resolveCatIcon(cats, primaryCat),
+                            color: catC,
+                            size: 20,
+                          ),
+                        ),
                       ),
-                      child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 20),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(goal.title,
-                              style: Theme.of(context).textTheme.titleMedium,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          if (goal.startSemester != null ||
-                              goal.endSemester != null)
+                          Text(
+                            goal.title,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              decoration: goal.isDone ? TextDecoration.lineThrough : null,
+                              color: goal.isDone ? AppColors.textTertiary : null,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (goal.startSemester != null || goal.endSemester != null)
                             Text(
                               [
                                 if (goal.startSemester != null)
                                   formatSemester(goal.startSemester!, semSettings, s),
-                                if (goal.startSemester != null &&
-                                    goal.endSemester != null)
-                                  '→',
+                                if (goal.startSemester != null && goal.endSemester != null) '→',
                                 if (goal.endSemester != null)
                                   formatSemester(goal.endSemester!, semSettings, s),
                               ].join(' '),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: AppColors.primary),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
                             ),
                           if (goal.notes != null)
-                            Text(goal.notes!,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                        color: AppColors.textSecondary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
+                            Text(
+                              goal.notes!,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           if (total > 0) ...[
                             const SizedBox(height: 4),
-                            Text(s.goalProgress(done, total),
-                                style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                              s.goalProgress(done, total),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
                             const SizedBox(height: 4),
                             ClipRRect(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
+                              borderRadius: BorderRadius.circular(AppRadius.full),
                               child: TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0, end: progress),
                                 duration: const Duration(milliseconds: 600),
@@ -841,20 +871,22 @@ class _FutureGoalCardRow extends ConsumerWidget {
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      onPressed: () =>
-                          showEditFutureGoalSheet(context, ref, goal),
+                      onPressed: () => showEditFutureGoalSheet(context, ref, goal),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 18),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      onPressed: () {
-                        ref.read(trashProvider.notifier).addFutureGoal(goal);
-                        notifier.remove(goal.id);
+                      onPressed: () async {
+                        // Confirm before deleting, matching the goal cards —
+                        // this was deleting immediately with no prompt
+                        if (await _confirmDeleteGoal(context, s)) {
+                          ref.read(trashProvider.notifier).addFutureGoal(goal);
+                          notifier.remove(goal.id);
+                        }
                       },
                     ),
-                    const Icon(Icons.arrow_forward_ios,
-                        size: 13, color: AppColors.textTertiary),
+                    const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textTertiary),
                   ],
                 ),
               ),
@@ -865,17 +897,6 @@ class _FutureGoalCardRow extends ConsumerWidget {
     );
   }
 }
-
-Widget _sheetDragHandle() => Center(
-      child: Container(
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: AppColors.border,
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-      ),
-    );
 
 Widget _semesterDropdown({
   required String? value,
@@ -926,8 +947,12 @@ Widget _categoryChipsMulti(
   );
 }
 
-void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
-    {String? defaultSemester, String? parentId}) {
+void showAddFutureGoalSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  String? defaultSemester,
+  String? parentId,
+}) {
   final titleCtrl = TextEditingController();
   final notesCtrl = TextEditingController();
   final s = ref.read(stringsProvider);
@@ -944,130 +969,116 @@ void showAddFutureGoalSheet(BuildContext context, WidgetRef ref,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetCtx) => StatefulBuilder(
-      builder: (sheetCtx, setState) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            left: AppSpacing.pageHorizontal,
-            right: AppSpacing.pageHorizontal,
-            top: AppSpacing.lg,
-            bottom:
-                MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sheetDragHandle(),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                parentId != null ? s.addSubgoal : s.addGoal,
-                style: Theme.of(sheetCtx).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: s.titleField),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: notesCtrl,
-                maxLines: 2,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: s.goalNotes,
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(s.category,
-                  style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  )),
-              const SizedBox(height: AppSpacing.xs),
-              _categoryChipsMulti(sheetCtx, s, [for (final c in cats) c.id], selectedCategories,
-                  (cat) => setState(() {
-                    if (selectedCategories.contains(cat)) {
-                      selectedCategories.remove(cat);
-                    } else {
-                      selectedCategories.add(cat);
-                    }
-                  })),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: _semesterDropdown(
-                      value: startSemester,
-                      semesters: semesters,
-                      label: s.startSemester,
-                      minSemester: null,
-                      settings: settings,
-                      s: s,
-                      onChanged: (v) => setState(() {
-                        startSemester = v;
-                        if (endSemester != null &&
-                            startSemester != null &&
-                            compareSemesters(endSemester!, startSemester!) <
-                                0) {
-                          endSemester = null;
-                        }
-                      }),
-                    ),
+      builder: (sheetCtx, setState) => SheetBody(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              parentId != null ? s.addSubgoal : s.addGoal,
+              style: Theme.of(sheetCtx).textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: titleCtrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: s.titleField),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: notesCtrl,
+              maxLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: s.goalNotes, isDense: true),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              s.category,
+              style: Theme.of(
+                sheetCtx,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _categoryChipsMulti(
+              sheetCtx,
+              s,
+              [for (final c in cats) c.id],
+              selectedCategories,
+              (cat) => setState(() {
+                if (selectedCategories.contains(cat)) {
+                  selectedCategories.remove(cat);
+                } else {
+                  selectedCategories.add(cat);
+                }
+              }),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _semesterDropdown(
+                    value: startSemester,
+                    semesters: semesters,
+                    label: s.startSemester,
+                    minSemester: null,
+                    settings: settings,
+                    s: s,
+                    onChanged: (v) => setState(() {
+                      startSemester = v;
+                      if (endSemester != null &&
+                          startSemester != null &&
+                          compareSemesters(endSemester!, startSemester!) < 0) {
+                        endSemester = null;
+                      }
+                    }),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _semesterDropdown(
-                      value: endSemester,
-                      semesters: semesters,
-                      label: s.endSemester,
-                      minSemester: startSemester,
-                      settings: settings,
-                      s: s,
-                      onChanged: (v) => setState(() => endSemester = v),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    if (titleCtrl.text.trim().isEmpty) return;
-                    ref.read(futureGoalsProvider.notifier).addGoal(
-                      parentId: parentId,
-                      title: titleCtrl.text.trim(),
-                      categories: selectedCategories.isEmpty
-                          ? [FutureCategories.other]
-                          : selectedCategories,
-                      startSemester: startSemester,
-                      endSemester: endSemester,
-                      notes: notesCtrl.text.trim().isEmpty
-                          ? null
-                          : notesCtrl.text.trim(),
-                    );
-                    Navigator.pop(sheetCtx);
-                  },
-                  child: Text(s.add),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _semesterDropdown(
+                    value: endSemester,
+                    semesters: semesters,
+                    label: s.endSemester,
+                    minSemester: startSemester,
+                    settings: settings,
+                    s: s,
+                    onChanged: (v) => setState(() => endSemester = v),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  if (titleCtrl.text.trim().isEmpty) return;
+                  ref
+                      .read(futureGoalsProvider.notifier)
+                      .addGoal(
+                        parentId: parentId,
+                        title: titleCtrl.text.trim(),
+                        categories: selectedCategories.isEmpty
+                            ? [FutureCategories.other]
+                            : selectedCategories,
+                        startSemester: startSemester,
+                        endSemester: endSemester,
+                        notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                      );
+                  Navigator.pop(sheetCtx);
+                },
+                child: Text(s.add),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     ),
   );
 }
 
-void showEditFutureGoalSheet(
-    BuildContext context, WidgetRef ref, FutureGoal goal) {
+void showEditFutureGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
   final titleCtrl = TextEditingController(text: goal.title);
   final notesCtrl = TextEditingController(text: goal.notes ?? '');
   final s = ref.read(stringsProvider);
@@ -1084,120 +1095,106 @@ void showEditFutureGoalSheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetCtx) => StatefulBuilder(
-      builder: (sheetCtx, setState) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            left: AppSpacing.pageHorizontal,
-            right: AppSpacing.pageHorizontal,
-            top: AppSpacing.lg,
-            bottom:
-                MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sheetDragHandle(),
-              const SizedBox(height: AppSpacing.lg),
-              Text(s.editGoal,
-                  style: Theme.of(sheetCtx).textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: s.titleField),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: notesCtrl,
-                maxLines: 2,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: s.goalNotes,
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(s.category,
-                  style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  )),
-              const SizedBox(height: AppSpacing.xs),
-              _categoryChipsMulti(sheetCtx, s, [for (final c in cats) c.id], selectedCategories,
-                  (cat) => setState(() {
-                    if (selectedCategories.contains(cat)) {
-                      selectedCategories.remove(cat);
-                    } else {
-                      selectedCategories.add(cat);
-                    }
-                  })),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: _semesterDropdown(
-                      value: startSemester,
-                      semesters: semesters,
-                      label: s.startSemester,
-                      minSemester: null,
-                      settings: settings,
-                      s: s,
-                      onChanged: (v) => setState(() {
-                        startSemester = v;
-                        if (endSemester != null &&
-                            startSemester != null &&
-                            compareSemesters(endSemester!, startSemester!) <
-                                0) {
-                          endSemester = null;
-                        }
-                      }),
-                    ),
+      builder: (sheetCtx, setState) => SheetBody(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.editGoal, style: Theme.of(sheetCtx).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: titleCtrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: s.titleField),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: notesCtrl,
+              maxLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: s.goalNotes, isDense: true),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              s.category,
+              style: Theme.of(
+                sheetCtx,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _categoryChipsMulti(
+              sheetCtx,
+              s,
+              [for (final c in cats) c.id],
+              selectedCategories,
+              (cat) => setState(() {
+                if (selectedCategories.contains(cat)) {
+                  selectedCategories.remove(cat);
+                } else {
+                  selectedCategories.add(cat);
+                }
+              }),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _semesterDropdown(
+                    value: startSemester,
+                    semesters: semesters,
+                    label: s.startSemester,
+                    minSemester: null,
+                    settings: settings,
+                    s: s,
+                    onChanged: (v) => setState(() {
+                      startSemester = v;
+                      if (endSemester != null &&
+                          startSemester != null &&
+                          compareSemesters(endSemester!, startSemester!) < 0) {
+                        endSemester = null;
+                      }
+                    }),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _semesterDropdown(
-                      value: endSemester,
-                      semesters: semesters,
-                      label: s.endSemester,
-                      minSemester: startSemester,
-                      settings: settings,
-                      s: s,
-                      onChanged: (v) => setState(() => endSemester = v),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    if (titleCtrl.text.trim().isEmpty) return;
-                    ref.read(futureGoalsProvider.notifier).updateGoal(
-                      goal.id,
-                      title: titleCtrl.text.trim(),
-                      categories: selectedCategories.isEmpty
-                          ? [FutureCategories.other]
-                          : selectedCategories,
-                      startSemester: startSemester,
-                      endSemester: endSemester,
-                      notes: notesCtrl.text.trim().isEmpty
-                          ? null
-                          : notesCtrl.text.trim(),
-                    );
-                    Navigator.pop(sheetCtx);
-                  },
-                  child: Text(s.save),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _semesterDropdown(
+                    value: endSemester,
+                    semesters: semesters,
+                    label: s.endSemester,
+                    minSemester: startSemester,
+                    settings: settings,
+                    s: s,
+                    onChanged: (v) => setState(() => endSemester = v),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  if (titleCtrl.text.trim().isEmpty) return;
+                  ref
+                      .read(futureGoalsProvider.notifier)
+                      .updateGoal(
+                        goal.id,
+                        title: titleCtrl.text.trim(),
+                        categories: selectedCategories.isEmpty
+                            ? [FutureCategories.other]
+                            : selectedCategories,
+                        startSemester: startSemester,
+                        endSemester: endSemester,
+                        notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                      );
+                  Navigator.pop(sheetCtx);
+                },
+                child: Text(s.save),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     ),

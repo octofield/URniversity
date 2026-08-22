@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -48,18 +49,11 @@ class FutureGoalDetailScreen extends ConsumerWidget {
         : FutureCategories.other;
     final catC = resolveCatColor(cats, primaryCat);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(goal.title, overflow: TextOverflow.ellipsis),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: s.editGoal,
-            onPressed: () => showEditFutureGoalSheet(context, ref, goal),
-          ),
-        ],
-      ),
-      body: ListView(
+    // Layout follows screen width, not platform, so narrow web windows get the mobile UI
+    final isDesktop =
+        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+
+    final content = ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pageHorizontal, AppSpacing.md,
           AppSpacing.pageHorizontal, 80,
@@ -69,13 +63,26 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: catC.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+              GestureDetector(
+                onTap: () =>
+                    ref.read(futureGoalsProvider.notifier).toggleDone(goalId),
+                behavior: HitTestBehavior.opaque,
+                child: Tooltip(
+                  message: goal.isDone ? s.markUndone : s.markDone,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: catC.withValues(alpha: goal.isDone ? 0.25 : 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Icon(
+                        goal.isDone
+                            ? Icons.check
+                            : resolveCatIcon(cats, primaryCat),
+                        color: catC,
+                        size: 26),
+                  ),
                 ),
-                child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 26),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -83,7 +90,14 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(goal.title,
-                        style: Theme.of(context).textTheme.headlineSmall),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(
+                          decoration:
+                              goal.isDone ? TextDecoration.lineThrough : null,
+                          color: goal.isDone ? AppColors.textTertiary : null,
+                        )),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -267,7 +281,27 @@ class FutureGoalDetailScreen extends ConsumerWidget {
             onTap: () => _showTargetSelectorForGoal(context, ref, goalId),
           ),
         ],
+      );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(goal.title, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: s.editGoal,
+            onPressed: () => showEditFutureGoalSheet(context, ref, goal),
+          ),
+        ],
       ),
+      body: isDesktop
+          ? Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: content,
+              ),
+            )
+          : content,
     );
   }
 }

@@ -17,6 +17,7 @@ class StringsZhTw implements AppStrings {
   @override String get tasks => '任務';
   @override String get noTasks => '尚無任務';
   @override String get addTask => '新增任務';
+  @override String get addSubtask => '新增子任務';
   @override String get taskNotes => '備註（選填）';
   @override String get priority => '優先度：';
   @override String get priorityLow => '低';
@@ -35,6 +36,11 @@ class StringsZhTw implements AppStrings {
   @override String get repeatMonthly => '每月';
   @override String get repeatEveryNDays => '每隔幾天';
   @override String get repeatInterval => '間隔（天）';
+  @override String repeatWeeklyOn(String days) => '每週$days';
+  @override String repeatMonthlyOn(String days) => '每月$days';
+  @override String monthDayShort(int day) => '$day號';
+  @override String repeatEveryNDaysShort(int n) => '每 $n 天';
+  @override String get repeatMonthLastDay => '最後一天';
 
   @override String get inspirations => '靈感';
   @override String get noInspirations => '尚無靈感，點 + 記錄';
