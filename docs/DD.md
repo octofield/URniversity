@@ -36,11 +36,34 @@
 | `created_at` | timestamptz | ✓ | — | 建立時間；循環任務用來計算「哪些日期符合循環規則」的起算點 |
 | `recurrence_type` | text | ✗ | `null` | 列舉：`daily` / `weekly` / `monthly` / `everyNDays`；`null` 代表不循環 |
 | `recurrence_interval` | int | ✗ | `null` | 僅 `recurrence_type = everyNDays` 時有意義，代表間隔天數 |
+| `recurrence_weekdays` | int[] | ✗ | `null` | 僅 `recurrence_type = weekly` 時有意義；ISO 星期（週一=1 … 週日=7），可複選。`null`／空陣列代表沿用舊行為「與建立日同一個星期幾」 |
+| `recurrence_month_days` | int[] | ✗ | `null` | 僅 `recurrence_type = monthly` 時有意義；日期 1–31，外加 **`32` 代表「該月最後一天」**（超出合法日數範圍的哨兵值，排序時自然落在最後）。`null`／空陣列代表沿用舊行為「與建立日同一個號數」 |
 | `linked_target_id` | text（邏輯 FK → `semester_goals.id`） | ✗ | `null` | 連結的學期目標 |
 | `linked_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景 |
+| `parent_task_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 父任務；`null` 代表頂層任務。**限制一層**：有 `parent_task_id` 的任務不能再有自己的子任務 |
+| `sort_order` | int | ✓ | `0` | 同一層（同 `parent_task_id`）手動拖曳排序用；新增時取同層最大值 `+1000` |
 | `completed_dates` | text（JSON 字串，`List<String>`） | ✗ | `null` | 僅循環任務使用；陣列內為 `"yyyy-MM-dd"` 字串，記錄哪些日期已完成 |
 
 **特別說明：**
+- 這些欄位需在 Supabase 執行過一次性 migration：
+  ```sql
+  ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order int NOT NULL DEFAULT 0;
+  ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id text;
+  ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_weekdays int[];
+  ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_month_days int[];
+  ```
+  ⚠️ `Task.toJson()` **只在 `monthDays` 非空時才輸出 `recurrence_month_days` 這個 key**。
+  原因是 PostgREST 只要看到不存在的欄位就會拒絕整筆寫入——若無條件輸出，在 migration 執行前
+  連「所有其他任務的儲存」都會一起失敗。這個條件輸出讓未使用該功能時完全不受影響。
+- `recurrence_interval` 讀取時會被夾在 `>= 1`（`Task.fromJson`）：舊資料若存了 `0`，
+  `_recurringAppliesTo()` 的 `%` 運算在手機上會拋 `IntegerDivisionByZeroException`，
+  在 web（dart2js）上則得到 `NaN` 而靜默算錯。`RecurrenceRule.safeInterval` 是第二道防線。
+- ⚠️ **既有資料的 `sort_order` 全部是 `0`**。排序邏輯（`filteredTasksProvider`）刻意設計成
+  「`sort_order` 優先，相同時退回原本的自動分組排序」，所以在使用者第一次拖曳之前，畫面順序
+  與改版前完全一致，不會因為 migration 而重排。
+- ⚠️ 任務刪除**沒有回收桶快照**：`TasksNotifier.remove()` 直接硬刪（並連帶刪除子任務）。
+  `trash_provider.dart` 雖有 `addTask()`，但**全專案沒有任何地方呼叫它**，是未接線的死碼。
+  這與 system_design.md UC6 的描述不符，屬既有落差，尚未處理。
 - 「一個任務屬於哪一天」的判斷邏輯集中在 `src/lib/providers/tasks_provider.dart` 的
   `_taskAppliesTo()`（私有函式）。若需要新的「依日期查詢任務完成狀況」的功能，請優先呼叫
   同檔案中已公開的 `taskCompletionStatsOn()`，不要重新複寫一份判斷邏輯。

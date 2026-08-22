@@ -7,12 +7,14 @@ import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/semester_goal.dart';
 import '../providers/categories_provider.dart';
+import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../l10n/app_strings.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'overview_graph_screen.dart';
@@ -52,7 +54,7 @@ class SemesterScreen extends ConsumerStatefulWidget {
 class _SemesterScreenState extends ConsumerState<SemesterScreen> {
   String? _draggingId;
   String? _hoveredId;
-  bool _hoverAbove = false;
+  DropZone _hoverZone = DropZone.before;
   final _rowCtxs = <String, BuildContext>{};
 
   Widget _endGapZone(List<_SemGroup> groups) {
@@ -122,12 +124,12 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         final storedCtx = _rowCtxs[goalId];
         if (storedCtx == null) return;
         final box = storedCtx.findRenderObject() as RenderBox;
-        final localY = box.globalToLocal(details.offset).dy;
-        final above = localY < box.size.height * 0.2;
-        if (_hoveredId != goalId || _hoverAbove != above) {
+        // details.offset is the pointer thanks to pointerDragAnchorStrategy
+        final zone = dropZoneFor(box, details.offset, canNest: true);
+        if (_hoveredId != goalId || _hoverZone != zone) {
           setState(() {
             _hoveredId = goalId;
-            _hoverAbove = above;
+            _hoverZone = zone;
           });
         }
       },
@@ -135,29 +137,34 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         if (_hoveredId == goalId) setState(() => _hoveredId = null);
       },
       onAcceptWithDetails: (details) {
-        if (_hoverAbove) {
-          final prevOrder =
-              siblingIndex > 0 ? siblings[siblingIndex - 1].sortOrder : null;
-          final nextOrder = goal.sortOrder;
-          final newSortOrder = prevOrder == null
-              ? nextOrder - 1000
-              : ((prevOrder + nextOrder) / 2).round();
-          notifier.reparent(details.data, parentId, newSortOrder);
-        } else {
-          final allGoals = ref.read(semesterGoalsProvider);
-          final children =
-              allGoals.where((g) => g.parentId == goalId).toList();
-          final maxOrder = children.fold(
-              0, (prev, c) => c.sortOrder > prev ? c.sortOrder : prev);
-          notifier.reparent(details.data, goalId, maxOrder + 1000);
+        switch (_hoverZone) {
+          case DropZone.before:
+            final prev =
+                siblingIndex > 0 ? siblings[siblingIndex - 1].sortOrder : null;
+            notifier.reparent(
+                details.data, parentId, orderBetween(prev, goal.sortOrder));
+          case DropZone.after:
+            final next = siblingIndex < siblings.length - 1
+                ? siblings[siblingIndex + 1].sortOrder
+                : null;
+            notifier.reparent(
+                details.data, parentId, orderBetween(goal.sortOrder, next));
+          case DropZone.into:
+            final childOrders = ref
+                .read(semesterGoalsProvider)
+                .where((g) => g.parentId == goalId)
+                .map((g) => g.sortOrder);
+            notifier.reparent(
+                details.data, goalId, orderAfterLast(childOrders));
         }
         setState(() => _hoveredId = null);
       },
       builder: (ctx, candidates, _) {
         _rowCtxs[goalId] = ctx;
         final isHovered = _hoveredId == goalId && candidates.isNotEmpty;
-        final showAboveLine = isHovered && _hoverAbove;
-        final showChildBg = isHovered && !_hoverAbove;
+        final showBeforeLine = isHovered && _hoverZone == DropZone.before;
+        final showAfterLine = isHovered && _hoverZone == DropZone.after;
+        final showChildBg = isHovered && _hoverZone == DropZone.into;
         final tile = _SemGoalCardTile(goal: goal, depth: depth);
         final fading = Opacity(
             opacity: 0.3, child: _SemGoalCardTile(goal: goal, depth: depth));
@@ -167,6 +174,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         if (kIsWeb) {
           draggable = Draggable<String>(
             data: goalId,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
             onDragStarted: () => setState(() => _draggingId = goalId),
             onDragEnd: (_) => setState(() {
               _draggingId = null;
@@ -179,6 +187,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         } else {
           draggable = LongPressDraggable<String>(
             data: goalId,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
             onDragStarted: () => setState(() => _draggingId = goalId),
             onDragEnd: (_) => setState(() {
               _draggingId = null;
@@ -195,9 +204,16 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
           child: Stack(
             children: [
               draggable,
-              if (showAboveLine)
+              if (showBeforeLine)
                 Positioned(
                   top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(height: 2, color: AppColors.primary),
+                ),
+              if (showAfterLine)
+                Positioned(
+                  bottom: 0,
                   left: 0,
                   right: 0,
                   child: Container(height: 2, color: AppColors.primary),
@@ -687,6 +703,12 @@ class _SemGoalCardTile extends ConsumerWidget {
     final primaryCat =
         goal.categories.isNotEmpty ? goal.categories.first : 'other';
     final catC = resolveCatColor(cats, primaryCat);
+    final linkedVision = goal.futureGoalId != null
+        ? ref
+            .watch(futureGoalsProvider)
+            .where((g) => g.id == goal.futureGoalId)
+            .firstOrNull
+        : null;
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -707,25 +729,75 @@ class _SemGoalCardTile extends ConsumerWidget {
             Expanded(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                    AppSpacing.md - goalCatBarWidth + depth * 16.0, 6, AppSpacing.md, 6),
+                    AppSpacing.md - goalCatBarWidth + depth * 16.0,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.sm),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: catC.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                    GestureDetector(
+                      onTap: () => notifier.toggleDone(goal.id),
+                      behavior: HitTestBehavior.opaque,
+                      child: Tooltip(
+                        message: goal.isDone ? s.markUndone : s.markDone,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: catC.withValues(
+                                alpha: goal.isDone ? 0.25 : 0.15),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: Icon(
+                              goal.isDone
+                                  ? Icons.check
+                                  : resolveCatIcon(cats, primaryCat),
+                              color: catC,
+                              size: 20),
+                        ),
                       ),
-                      child: Icon(resolveCatIcon(cats, primaryCat), color: catC, size: 20),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(goal.title,
-                              style: Theme.of(context).textTheme.titleMedium),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                decoration: goal.isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color:
+                                    goal.isDone ? AppColors.textTertiary : null,
+                              ),
+                              // Clamped like the vision card so a long title
+                              // can't make rows different heights
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          if (linkedVision != null)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.stars,
+                                    size: 12, color: AppColors.primary),
+                                const SizedBox(width: 2),
+                                Flexible(
+                                  child: Text(
+                                    linkedVision.title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(color: AppColors.primary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           if (goal.notes != null)
                             Text(
                               goal.notes!,

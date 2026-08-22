@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
@@ -9,6 +11,7 @@ import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/tasks_provider.dart';
+import '../providers/trash_provider.dart';
 import '../providers/inspirations_provider.dart';
 import '../providers/date_provider.dart';
 import '../providers/settings_provider.dart';
@@ -19,6 +22,8 @@ import '../providers/profile_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/drag_reorder.dart';
+import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
@@ -61,7 +66,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final selectedDate = ref.watch(dateProvider);
     final dateFormat = ref.watch(settingsProvider);
     final now = ref.watch(effectiveNowProvider);
-    final isToday = selectedDate.year == now.year &&
+    final isToday =
+        selectedDate.year == now.year &&
         selectedDate.month == now.month &&
         selectedDate.day == now.day;
     final weekEnd = _weekStart.add(const Duration(days: 6));
@@ -81,20 +87,21 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final greeting = now.hour < 12
         ? s.greetingMorning(greetName)
         : now.hour < 18
-            ? s.greetingAfternoon(greetName)
-            : s.greetingEvening(greetName);
+        ? s.greetingAfternoon(greetName)
+        : s.greetingEvening(greetName);
     final todayDate = DateTime(now.year, now.month, now.day);
     final todayTasks = ref.watch(tasksForDateProvider(todayDate));
-    final todayDone =
-        todayTasks.where((t) => t.isCompletedOn(todayDate)).length;
+    final todayDone = todayTasks.where((t) => t.isCompletedOn(todayDate)).length;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageHorizontal, AppSpacing.pageTop,
-            AppSpacing.pageHorizontal, 0,
+            AppSpacing.pageHorizontal,
+            AppSpacing.pageTop,
+            AppSpacing.pageHorizontal,
+            0,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,18 +121,17 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   children: [
                     Text(
                       greeting,
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${formatDate(todayDate, dateFormat)} · '
                       '${s.todayStatus(todayTasks.length, todayDone)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -141,28 +147,32 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, AppSpacing.sm, AppSpacing.pageHorizontal, AppSpacing.xs),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.sm,
+            AppSpacing.pageHorizontal,
+            AppSpacing.xs,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               SegmentedButton<int>(
                 segments: [
                   ButtonSegment(
-                      value: 0,
-                      label: FittedBox(
-                          fit: BoxFit.scaleDown, child: Text(s.allTasks))),
+                    value: 0,
+                    label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.allTasks)),
+                  ),
                   ButtonSegment(
-                      value: 1,
-                      label: FittedBox(
-                          fit: BoxFit.scaleDown, child: Text(s.dailyTasks))),
+                    value: 1,
+                    label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.dailyTasks)),
+                  ),
                   ButtonSegment(
-                      value: 2,
-                      label: FittedBox(
-                          fit: BoxFit.scaleDown, child: Text(s.weeklyTasks))),
+                    value: 2,
+                    label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.weeklyTasks)),
+                  ),
                 ],
                 selected: {taskView},
-                onSelectionChanged: (v) =>
-                    ref.read(taskViewProvider.notifier).state = v.first,
+                onSelectionChanged: (v) => ref.read(taskViewProvider.notifier).state = v.first,
                 showSelectedIcon: false,
                 style: SegmentedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
@@ -175,12 +185,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         if (isFiltered)
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageHorizontal, 4, AppSpacing.pageHorizontal, 0),
+              AppSpacing.pageHorizontal,
+              4,
+              AppSpacing.pageHorizontal,
+              0,
+            ),
             child: Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(AppRadius.full),
@@ -189,8 +202,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.filter_list,
-                          size: 14, color: AppColors.primary),
+                      const Icon(Icons.filter_list, size: 14, color: AppColors.primary),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
                         '${s.filters} · ${targetFilter.length + goalFilter.length}',
@@ -203,13 +215,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       const SizedBox(width: 6),
                       GestureDetector(
                         onTap: () {
-                          ref.read(taskTargetFilterProvider.notifier).state =
-                              const {};
-                          ref.read(taskGoalFilterProvider.notifier).state =
-                              const {};
+                          ref.read(taskTargetFilterProvider.notifier).state = const {};
+                          ref.read(taskGoalFilterProvider.notifier).state = const {};
                         },
-                        child: const Icon(Icons.close,
-                            size: 14, color: AppColors.primary),
+                        child: const Icon(Icons.close, size: 14, color: AppColors.primary),
                       ),
                     ],
                   ),
@@ -299,12 +308,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ),
                 IconButton(
                   icon: Icon(
-                    isFiltered
-                        ? Icons.filter_list
-                        : Icons.filter_list_outlined,
-                    color: isFiltered
-                        ? AppColors.primary
-                        : AppColors.textTertiary,
+                    isFiltered ? Icons.filter_list : Icons.filter_list_outlined,
+                    color: isFiltered ? AppColors.primary : AppColors.textTertiary,
                     size: 20,
                   ),
                   visualDensity: VisualDensity.compact,
@@ -318,8 +323,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
               ? _WeeklyGrid(weekStart: _weekStart)
               : SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageHorizontal, 12,
-                    AppSpacing.pageHorizontal, AppSpacing.xl,
+                    AppSpacing.pageHorizontal,
+                    12,
+                    AppSpacing.pageHorizontal,
+                    AppSpacing.xl,
                   ),
                   child: isDesktop
                       ? Row(
@@ -350,10 +357,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                     height: 40,
                                     child: Align(
                                       alignment: Alignment.centerLeft,
-                                      child: Text(s.progressOverview,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleLarge),
+                                      child: Text(
+                                        s.progressOverview,
+                                        style: Theme.of(context).textTheme.titleLarge,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: AppSpacing.sm),
@@ -439,12 +446,16 @@ class _WeeklyGridState extends ConsumerState<_WeeklyGrid> {
     return SingleChildScrollView(
       controller: _scrollCtrl,
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 8, AppSpacing.pageHorizontal, 80),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageHorizontal,
+        8,
+        AppSpacing.pageHorizontal,
+        80,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (int i = 0; i < 7; i++)
-            _DayColumn(date: widget.weekStart.add(Duration(days: i))),
+          for (int i = 0; i < 7; i++) _DayColumn(date: widget.weekStart.add(Duration(days: i))),
         ],
       ),
     );
@@ -461,20 +472,27 @@ class _DayColumn extends ConsumerWidget {
     final normalDate = DateTime(date.year, date.month, date.day);
     // Weekly view honors the same goal filters as the other views
     final expandedTargetFilter = _expandSemGoalIds(
-        ref.watch(taskTargetFilterProvider), ref.watch(semesterGoalsProvider));
+      ref.watch(taskTargetFilterProvider),
+      ref.watch(semesterGoalsProvider),
+    );
     final expandedGoalFilter = _expandFutureGoalIds(
-        ref.watch(taskGoalFilterProvider), ref.watch(futureGoalsProvider));
-    final tasks = ref.watch(tasksForDateProvider(normalDate))
-        .where((t) =>
-            _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+      ref.watch(taskGoalFilterProvider),
+      ref.watch(futureGoalsProvider),
+    );
+    final tasks = ref
+        .watch(tasksForDateProvider(normalDate))
+        .where((t) => _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
         .toList();
     final selectedDate = ref.watch(dateProvider);
     final now = DateTime.now();
     final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
-    final isFocused = date.year == selectedDate.year &&
+    final isFocused =
+        date.year == selectedDate.year &&
         date.month == selectedDate.month &&
         date.day == selectedDate.day;
-    final headerColor = isToday ? AppColors.primary : (isFocused ? AppColors.primary : AppColors.textTertiary);
+    final headerColor = isToday
+        ? AppColors.primary
+        : (isFocused ? AppColors.primary : AppColors.textTertiary);
 
     return Container(
       width: 130,
@@ -521,8 +539,7 @@ class _DayColumn extends ConsumerWidget {
                 child: Text('–', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
               )
             else
-              for (final task in tasks)
-                _WeekTaskTile(task: task, date: normalDate),
+              for (final task in tasks) _WeekTaskTile(task: task, date: normalDate),
           ],
         ),
       ),
@@ -608,8 +625,7 @@ class _SummaryCard extends ConsumerWidget {
                 child: InkWell(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => const TaskHistoryScreen()),
+                    MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
                   ),
                   child: Tooltip(
                     message: s.taskHistory,
@@ -625,18 +641,15 @@ class _SummaryCard extends ConsumerWidget {
                             value: value,
                             strokeWidth: 7,
                             strokeCap: StrokeCap.round,
-                            color: allDone
-                                ? AppColors.success
-                                : AppColors.primary,
+                            color: allDone ? AppColors.success : AppColors.primary,
                             backgroundColor: AppColors.surfaceVariant,
                           ),
                           Center(
                             child: Text(
                               total == 0 ? '—' : '${(value * 100).round()}%',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -661,23 +674,16 @@ class _SummaryCard extends ConsumerWidget {
                       tween: Tween(begin: 0.6, end: 1),
                       duration: const Duration(milliseconds: 500),
                       curve: Curves.elasticOut,
-                      builder: (_, v, child) => Transform.scale(
-                        scale: v,
-                        alignment: Alignment.centerLeft,
-                        child: child,
-                      ),
+                      builder: (_, v, child) =>
+                          Transform.scale(scale: v, alignment: Alignment.centerLeft, child: child),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.celebration,
-                              size: 16, color: AppColors.warning),
+                          const Icon(Icons.celebration, size: 16, color: AppColors.warning),
                           const SizedBox(width: AppSpacing.xs),
                           Text(
                             s.allDoneToday,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.success,
                               fontWeight: FontWeight.w600,
                             ),
@@ -702,9 +708,7 @@ class _InspirationsQuickList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final active = ref.watch(inspirationsProvider)
-        .where((i) => !i.isCompleted)
-        .toList();
+    final active = ref.watch(inspirationsProvider).where((i) => !i.isCompleted).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -736,8 +740,7 @@ class _InspirationsQuickList extends ConsumerWidget {
               : Column(
                   children: [
                     for (int i = 0; i < active.length; i++) ...[
-                      if (i > 0)
-                        const Divider(height: 1, indent: AppSpacing.md),
+                      if (i > 0) const Divider(height: 1, indent: AppSpacing.md),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,
@@ -748,25 +751,25 @@ class _InspirationsQuickList extends ConsumerWidget {
                           children: [
                             const Padding(
                               padding: EdgeInsets.only(top: 2),
-                              child: Icon(Icons.lightbulb_outline,
-                                  size: 16, color: AppColors.primary),
+                              child: Icon(
+                                Icons.lightbulb_outline,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(active[i].title,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium),
+                                  Text(
+                                    active[i].title,
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
                                   if (active[i].content != null)
                                     Text(
                                       active[i].content!,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                         color: AppColors.textTertiary,
                                       ),
                                       maxLines: 1,
@@ -799,8 +802,12 @@ class _TasksSection extends ConsumerWidget {
     final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
     final expandedTargetFilter = _expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
     final expandedGoalFilter = _expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
-    final tasks = ref.watch(filteredTasksProvider)
-        .where((t) => !t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+    final tasks = ref
+        .watch(filteredTasksProvider)
+        .where(
+          (t) =>
+              !t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter),
+        )
         .toList();
 
     return Column(
@@ -849,14 +856,7 @@ class _TasksSection extends ConsumerWidget {
                       compact: true,
                     ),
                   )
-                : Column(
-                    children: [
-                      for (var i = 0; i < tasks.length; i++) ...[
-                        if (i > 0) const Divider(height: 1, indent: 56),
-                        _TaskTile(task: tasks[i]),
-                      ],
-                    ],
-                  ),
+                : _DraggableTaskList(tasks: tasks),
           ),
         ),
       ],
@@ -866,7 +866,11 @@ class _TasksSection extends ConsumerWidget {
 
 bool _passesFilter(Task t, Set<String> targetIds, Set<String> goalIds) {
   if (targetIds.isEmpty && goalIds.isEmpty) return true;
-  if (targetIds.isNotEmpty && t.linkedTargetId != null && targetIds.contains(t.linkedTargetId)) return true;
+  if (targetIds.isNotEmpty &&
+      t.linkedTargetId != null &&
+      targetIds.contains(t.linkedTargetId)) {
+    return true;
+  }
   if (goalIds.isNotEmpty && t.linkedGoalId != null && goalIds.contains(t.linkedGoalId)) return true;
   return false;
 }
@@ -879,7 +883,10 @@ Set<String> _expandSemGoalIds(Set<String> selected, List<SemesterGoal> all) {
       if (expanded.add(g.id)) collect(g.id);
     }
   }
-  for (final id in List<String>.from(selected)) { collect(id); }
+
+  for (final id in List<String>.from(selected)) {
+    collect(id);
+  }
   return expanded;
 }
 
@@ -891,7 +898,10 @@ Set<String> _expandFutureGoalIds(Set<String> selected, List<FutureGoal> all) {
       if (expanded.add(g.id)) collect(g.id);
     }
   }
-  for (final id in List<String>.from(selected)) { collect(id); }
+
+  for (final id in List<String>.from(selected)) {
+    collect(id);
+  }
   return expanded;
 }
 
@@ -903,6 +913,7 @@ List<({SemesterGoal goal, int depth})> _buildTargetTree(List<SemesterGoal> all) 
       add(g.id, depth + 1);
     }
   }
+
   add(null, 0);
   return result;
 }
@@ -915,6 +926,7 @@ List<({FutureGoal goal, int depth})> _buildGoalTree(List<FutureGoal> all) {
       add(g.id, depth + 1);
     }
   }
+
   add(null, 0);
   return result;
 }
@@ -940,7 +952,10 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
               indicatorColor: AppColors.primary,
-              tabs: [Tab(text: s.targets), Tab(text: s.goals)],
+              tabs: [
+                Tab(text: s.targets),
+                Tab(text: s.goals),
+              ],
             ),
             content: SizedBox(
               height: 320,
@@ -950,25 +965,27 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                   // Targets tab
                   targetTree.isEmpty
                       ? Center(
-                          child: Text(s.noTargets,
-                              style: const TextStyle(color: AppColors.textTertiary)),
+                          child: Text(
+                            s.noTargets,
+                            style: const TextStyle(color: AppColors.textTertiary),
+                          ),
                         )
                       : ListView(
                           children: [
                             for (final item in targetTree)
                               CheckboxListTile(
                                 dense: true,
-                                contentPadding: EdgeInsets.only(
-                                  left: 8.0 + item.depth * 20.0,
-                                ),
+                                contentPadding: EdgeInsets.only(left: 8.0 + item.depth * 20.0),
                                 value: targetFilter.contains(item.goal.id),
                                 title: Text(item.goal.title),
                                 subtitle: Text(
-                                    formatSemester(item.goal.semester, semSettings, s),
-                                    style: const TextStyle(fontSize: 12)),
+                                  formatSemester(item.goal.semester, semSettings, s),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
                                 onChanged: (v) {
                                   final next = Set<String>.from(
-                                      dlgRef.read(taskTargetFilterProvider));
+                                    dlgRef.read(taskTargetFilterProvider),
+                                  );
                                   if (v == true) {
                                     next.add(item.goal.id);
                                     void addDesc(String pid) {
@@ -977,6 +994,7 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                                         addDesc(g.id);
                                       }
                                     }
+
                                     addDesc(item.goal.id);
                                   } else {
                                     next.remove(item.goal.id);
@@ -986,16 +1004,18 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                                         removeDesc(g.id);
                                       }
                                     }
+
                                     removeDesc(item.goal.id);
                                     String? pid = item.goal.parentId;
                                     while (pid != null) {
                                       next.remove(pid);
-                                      pid = allTargets.where((g) => g.id == pid).firstOrNull?.parentId;
+                                      pid = allTargets
+                                          .where((g) => g.id == pid)
+                                          .firstOrNull
+                                          ?.parentId;
                                     }
                                   }
-                                  dlgRef
-                                      .read(taskTargetFilterProvider.notifier)
-                                      .state = next;
+                                  dlgRef.read(taskTargetFilterProvider.notifier).state = next;
                                 },
                               ),
                           ],
@@ -1003,28 +1023,29 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                   // Goals tab
                   goalTree.isEmpty
                       ? Center(
-                          child: Text(s.noGoals,
-                              style: const TextStyle(color: AppColors.textTertiary)),
+                          child: Text(
+                            s.noGoals,
+                            style: const TextStyle(color: AppColors.textTertiary),
+                          ),
                         )
                       : ListView(
                           children: [
                             for (final item in goalTree)
                               CheckboxListTile(
                                 dense: true,
-                                contentPadding: EdgeInsets.only(
-                                  left: 8.0 + item.depth * 20.0,
-                                ),
+                                contentPadding: EdgeInsets.only(left: 8.0 + item.depth * 20.0),
                                 value: goalFilter.contains(item.goal.id),
                                 title: Text(item.goal.title),
                                 subtitle: item.goal.startSemester != null
                                     ? Text(
-                                        formatSemester(item.goal.startSemester!,
-                                            semSettings, s),
-                                        style: const TextStyle(fontSize: 12))
+                                        formatSemester(item.goal.startSemester!, semSettings, s),
+                                        style: const TextStyle(fontSize: 12),
+                                      )
                                     : null,
                                 onChanged: (v) {
                                   final next = Set<String>.from(
-                                      dlgRef.read(taskGoalFilterProvider));
+                                    dlgRef.read(taskGoalFilterProvider),
+                                  );
                                   if (v == true) {
                                     next.add(item.goal.id);
                                     void addDesc(String pid) {
@@ -1033,6 +1054,7 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                                         addDesc(g.id);
                                       }
                                     }
+
                                     addDesc(item.goal.id);
                                   } else {
                                     next.remove(item.goal.id);
@@ -1042,16 +1064,18 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                                         removeDesc(g.id);
                                       }
                                     }
+
                                     removeDesc(item.goal.id);
                                     String? pid = item.goal.parentId;
                                     while (pid != null) {
                                       next.remove(pid);
-                                      pid = allGoals.where((g) => g.id == pid).firstOrNull?.parentId;
+                                      pid = allGoals
+                                          .where((g) => g.id == pid)
+                                          .firstOrNull
+                                          ?.parentId;
                                     }
                                   }
-                                  dlgRef
-                                      .read(taskGoalFilterProvider.notifier)
-                                      .state = next;
+                                  dlgRef.read(taskGoalFilterProvider.notifier).state = next;
                                 },
                               ),
                           ],
@@ -1090,8 +1114,12 @@ class _CompletedTasksSection extends ConsumerWidget {
     final goalFilter = ref.watch(taskGoalFilterProvider);
     final expandedTargetFilter = _expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
     final expandedGoalFilter = _expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
-    final completed = ref.watch(filteredTasksProvider)
-        .where((t) => t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+    final completed = ref
+        .watch(filteredTasksProvider)
+        .where(
+          (t) =>
+              t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter),
+        )
         .toList();
 
     if (completed.isEmpty) return const SizedBox.shrink();
@@ -1113,7 +1141,7 @@ class _CompletedTasksSection extends ConsumerWidget {
             child: Column(
               children: [
                 for (var i = 0; i < completed.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, indent: 56),
+                  if (i > 0) const Divider(height: 1, indent: _taskTitleIndent),
                   _TaskTile(task: completed[i]),
                 ],
               ],
@@ -1125,9 +1153,207 @@ class _CompletedTasksSection extends ConsumerWidget {
   }
 }
 
+// Left inset where a task tile's title starts: color bar + padding + checkbox + gap
+const double _taskTitleIndent = 62.0;
+
+// Task list with drag-to-reorder and one level of subtasks. Mirrors the goal
+// screens' Draggable/DragTarget pattern: dropping on a row's top edge inserts
+// before it, dropping on the body makes the task a subtask of that row
+class _DraggableTaskList extends ConsumerStatefulWidget {
+  final List<Task> tasks;
+  const _DraggableTaskList({required this.tasks});
+
+  @override
+  ConsumerState<_DraggableTaskList> createState() => _DraggableTaskListState();
+}
+
+class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
+  String? _draggingId;
+  String? _hoveredId;
+  DropZone _hoverZone = DropZone.before;
+  final _rowCtxs = <String, BuildContext>{};
+
+  // Subtasks are capped at one level, so a row only accepts children when it is
+  // top-level and the dragged task has no children of its own
+  bool _canNestInto(Task row, String draggedId) {
+    if (row.parentTaskId != null) return false;
+    if (row.id == draggedId) return false;
+    return !ref.read(tasksProvider).any((t) => t.parentTaskId == draggedId);
+  }
+
+  void _onAccept(String draggedId, Task row, List<Task> siblings, int index) {
+    final notifier = ref.read(tasksProvider.notifier);
+    switch (_hoverZone) {
+      case DropZone.before:
+        final prev = index > 0 ? siblings[index - 1].sortOrder : null;
+        notifier.reorderTask(
+            draggedId, row.parentTaskId, orderBetween(prev, row.sortOrder));
+      case DropZone.after:
+        final next =
+            index < siblings.length - 1 ? siblings[index + 1].sortOrder : null;
+        notifier.reorderTask(
+            draggedId, row.parentTaskId, orderBetween(row.sortOrder, next));
+      case DropZone.into:
+        final childOrders = ref
+            .read(tasksProvider)
+            .where((t) => t.parentTaskId == row.id)
+            .map((t) => t.sortOrder);
+        notifier.reorderTask(draggedId, row.id, orderAfterLast(childOrders));
+    }
+    setState(() {
+      _draggingId = null;
+      _hoveredId = null;
+    });
+  }
+
+  Widget _buildRow(Task task, int depth, List<Task> siblings, int index) {
+    final isHovered = _hoveredId == task.id;
+    final tile = _TaskTile(task: task, depth: depth);
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) => details.data != task.id,
+      onMove: (details) {
+        final storedCtx = _rowCtxs[task.id];
+        if (storedCtx == null) return;
+        final box = storedCtx.findRenderObject() as RenderBox?;
+        if (box == null) return;
+        // details.offset is the pointer because the Draggable below uses
+        // pointerDragAnchorStrategy
+        final zone = dropZoneFor(box, details.offset,
+            canNest: _canNestInto(task, details.data));
+        if (_hoveredId != task.id || _hoverZone != zone) {
+          setState(() {
+            _hoveredId = task.id;
+            _hoverZone = zone;
+          });
+        }
+      },
+      onLeave: (_) {
+        if (_hoveredId == task.id) setState(() => _hoveredId = null);
+      },
+      onAcceptWithDetails: (details) => _onAccept(details.data, task, siblings, index),
+      builder: (dragCtx, _, _) {
+        _rowCtxs[task.id] = dragCtx;
+        final draggable = kIsWeb
+            ? Draggable<String>(
+                data: task.id,
+                dragAnchorStrategy: pointerDragAnchorStrategy,
+                feedback: _dragFeedback(task),
+                childWhenDragging: Opacity(opacity: 0.3, child: tile),
+                onDragStarted: () => setState(() => _draggingId = task.id),
+                onDragEnd: (_) => setState(() {
+                  _draggingId = null;
+                  _hoveredId = null;
+                }),
+                child: tile,
+              )
+            : LongPressDraggable<String>(
+                data: task.id,
+                dragAnchorStrategy: pointerDragAnchorStrategy,
+                feedback: _dragFeedback(task),
+                childWhenDragging: Opacity(opacity: 0.3, child: tile),
+                onDragStarted: () => setState(() => _draggingId = task.id),
+                onDragEnd: (_) => setState(() {
+                  _draggingId = null;
+                  _hoveredId = null;
+                }),
+                child: tile,
+              );
+
+        // Stack, not a border on the Container: a border adds layout height
+        // and makes the row jump while hovering
+        return Stack(
+          children: [
+            ColoredBox(
+              color: isHovered && _hoverZone == DropZone.into
+                  ? AppColors.primaryLight
+                  : Colors.transparent,
+              child: draggable,
+            ),
+            if (isHovered && _hoverZone == DropZone.before)
+              const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ColoredBox(
+                      color: AppColors.primary, child: SizedBox(height: 2))),
+            if (isHovered && _hoverZone == DropZone.after)
+              const Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: ColoredBox(
+                      color: AppColors.primary, child: SizedBox(height: 2))),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _dragFeedback(Task task) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          child: Text(task.title, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = widget.tasks;
+    final topLevel = tasks.where((t) => t.parentTaskId == null).toList();
+    final rows = <Widget>[];
+
+    for (var i = 0; i < topLevel.length; i++) {
+      final parent = topLevel[i];
+      if (rows.isNotEmpty) {
+        rows.add(const Divider(height: 1, indent: _taskTitleIndent));
+      }
+      rows.add(_buildRow(parent, 0, topLevel, i));
+
+      final children = tasks.where((t) => t.parentTaskId == parent.id).toList();
+      for (var j = 0; j < children.length; j++) {
+        rows.add(const Divider(height: 1, indent: _taskTitleIndent));
+        rows.add(_buildRow(children[j], 1, children, j));
+      }
+    }
+
+    // Tail drop zone: promotes a dragged subtask back to top level
+    if (_draggingId != null && topLevel.isNotEmpty) {
+      rows.add(
+        DragTarget<String>(
+          onAcceptWithDetails: (details) {
+            final lastOrder = topLevel.last.sortOrder;
+            ref.read(tasksProvider.notifier).reorderTask(details.data, null, lastOrder + 1000);
+            setState(() {
+              _draggingId = null;
+              _hoveredId = null;
+            });
+          },
+          builder: (_, candidate, _) => Container(
+            height: 40,
+            alignment: Alignment.center,
+            color: candidate.isNotEmpty ? AppColors.primaryLight : Colors.transparent,
+            child: const Icon(Icons.vertical_align_bottom, size: 16, color: AppColors.textTertiary),
+          ),
+        ),
+      );
+    }
+
+    return Column(children: rows);
+  }
+}
+
 class _TaskTile extends ConsumerWidget {
   final Task task;
-  const _TaskTile({required this.task});
+  final int depth;
+  const _TaskTile({required this.task, this.depth = 0});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1147,23 +1373,40 @@ class _TaskTile extends ConsumerWidget {
         : null;
 
     final targetColor = linkedTarget != null
-        ? resolveCatColor(cats,
-            linkedTarget.categories.isNotEmpty ? linkedTarget.categories.first : 'other')
+        ? resolveCatColor(
+            cats,
+            linkedTarget.categories.isNotEmpty ? linkedTarget.categories.first : 'other',
+          )
         : null;
     final goalColor = linkedGoal != null
-        ? resolveCatColor(cats,
-            linkedGoal.categories.isNotEmpty ? linkedGoal.categories.first : 'other')
+        ? resolveCatColor(
+            cats,
+            linkedGoal.categories.isNotEmpty ? linkedGoal.categories.first : 'other',
+          )
         : null;
 
-    final hasSubtitle = task.content != null ||
+    final hasSubtitle =
+        task.content != null ||
         task.dueTime != null ||
         (task.recurrence != null && !task.recurrence!.isNone) ||
         linkedTarget != null ||
         linkedGoal != null;
 
     final tile = ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      contentPadding: EdgeInsets.fromLTRB(
+        AppSpacing.sm + depth * 20.0,
+        AppSpacing.xs,
+        AppSpacing.sm,
+        AppSpacing.xs,
+      ),
+      // Drop ListTile's 72dp two-line floor so the row hugs its content, and
+      // center it so a link-less task doesn't sit high against the checkbox
+      minTileHeight: 0,
+      minLeadingWidth: 0,
+      horizontalTitleGap: AppSpacing.sm,
+      titleAlignment: ListTileTitleAlignment.center,
       leading: Checkbox(
+        visualDensity: VisualDensity.compact,
         value: isCompleted,
         onChanged: (_) => ref.read(tasksProvider.notifier).toggleOnDate(task.id, effectiveDate),
       ),
@@ -1174,69 +1417,85 @@ class _TaskTile extends ConsumerWidget {
           color: isCompleted ? AppColors.textTertiary : null,
         ),
       ),
-      subtitle: hasSubtitle ? Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (task.content != null)
-            Text(task.content!, style: Theme.of(context).textTheme.bodySmall),
-          if (task.dueTime != null)
-            Row(
+      subtitle: hasSubtitle
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.access_time, size: 12, color: _dueColor(task.dueTime!)),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  _formatDueTime(task.dueTime!),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _dueColor(task.dueTime!),
+                if (task.content != null)
+                  Text(task.content!, style: Theme.of(context).textTheme.bodySmall),
+                if (task.dueTime != null)
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 12, color: _dueColor(task.dueTime!)),
+                      const SizedBox(width: AppSpacing.xs),
+                      // Flexible + ellipsis: a bare Text in a Row gets unbounded
+                      // width and overflows once the label grows
+                      Flexible(
+                        child: Text(
+                          _formatDueTime(task.dueTime!),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: _dueColor(task.dueTime!)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (task.recurrence != null && !task.recurrence!.isNone) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            _recurrenceShort(task.recurrence!, s, task.createdAt),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                else if (task.recurrence != null && !task.recurrence!.isNone)
+                  Row(
+                    children: [
+                      Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          _recurrenceShort(task.recurrence!, s, task.createdAt),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                if (task.recurrence != null && !task.recurrence!.isNone) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                  const SizedBox(width: 2),
+                if (linkedTarget != null)
                   Text(
-                    _recurrenceShort(task.recurrence!, s),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    '→ ${linkedTarget.title}',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
+                if (linkedGoal != null)
+                  Text(
+                    '⭐ ${linkedGoal.title}',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
               ],
             )
-          else if (task.recurrence != null && !task.recurrence!.isNone)
-            Row(
-              children: [
-                Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                const SizedBox(width: 2),
-                Text(
-                  _recurrenceShort(task.recurrence!, s),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          if (linkedTarget != null)
-            Text(
-              '→ ${linkedTarget.title}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.primary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          if (linkedGoal != null)
-            Text(
-              '⭐ ${linkedGoal.title}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.primary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-        ],
-      ) : null,
+          : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1258,9 +1517,17 @@ class _TaskTile extends ConsumerWidget {
             ),
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 20),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
             onPressed: () async {
               if (await _confirmDelete(context, s)) {
-                ref.read(tasksProvider.notifier).remove(task.id);
+                // Snapshot every removed task (parent + subtasks) so all of
+                // them can be restored from the trash
+                final removed = ref.read(tasksProvider.notifier).remove(task.id);
+                final trash = ref.read(trashProvider.notifier);
+                for (final t in removed) {
+                  trash.addTask(t);
+                }
               }
             },
           ),
@@ -1269,13 +1536,19 @@ class _TaskTile extends ConsumerWidget {
       onTap: () => _showEditTaskSheet(context, ref, task),
     );
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _linkColorBar(targetColor, goalColor),
-          Expanded(child: tile),
-        ],
+    // ListTile paints its ink splash on the nearest Material ancestor. The card
+    // container and the drag-hover highlight are both DecoratedBoxes that would
+    // otherwise sit in between and swallow the splash
+    return Material(
+      type: MaterialType.transparency,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _linkColorBar(targetColor, goalColor),
+            Expanded(child: tile),
+          ],
+        ),
       ),
     );
   }
@@ -1285,7 +1558,8 @@ class _TaskTile extends ConsumerWidget {
 // target/goal; split top/bottom when both are linked with different colors.
 Widget _linkColorBar(Color? top, Color? bottom) {
   const width = 6.0;
-  if (top == null && bottom == null) return const SizedBox(width: 0);
+  // Always reserve the bar's width so linked and unlinked tiles stay aligned
+  if (top == null && bottom == null) return const SizedBox(width: width);
   if (bottom == null) return Container(width: width, color: top);
   if (top == null) return Container(width: width, color: bottom);
   if (top.toARGB32() == bottom.toARGB32()) {
@@ -1304,22 +1578,23 @@ Widget _linkColorBar(Color? top, Color? bottom) {
 
 Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
   return await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      content: Text('${s.delete}？'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+        context: context,
+        builder: (ctx) => AlertDialog(
+          content: Text('${s.delete}？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: Text(s.delete),
+            ),
+          ],
         ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-          child: Text(s.delete),
-        ),
-      ],
-    ),
-  ) ?? false;
+      ) ??
+      false;
 }
 
 // ─── Date+time picker (clock style) ──────────────────────────────────────────
@@ -1336,10 +1611,8 @@ Future<DateTime?> _showDateTimePicker(BuildContext context, DateTime initial) as
   final time = await showTimePicker(
     context: context,
     initialTime: TimeOfDay.fromDateTime(initial),
-    builder: (ctx, child) => MediaQuery(
-      data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-      child: child!,
-    ),
+    builder: (ctx, child) =>
+        MediaQuery(data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true), child: child!),
   );
   if (time == null) return null;
 
@@ -1350,28 +1623,55 @@ Future<DateTime?> _showDateTimePicker(BuildContext context, DateTime initial) as
 
 String _recurrenceLabel(RecurrenceType type, AppStrings s) {
   switch (type) {
-    case RecurrenceType.none:       return s.repeatNone;
-    case RecurrenceType.daily:      return s.repeatDaily;
-    case RecurrenceType.weekly:     return s.repeatWeekly;
-    case RecurrenceType.monthly:    return s.repeatMonthly;
-    case RecurrenceType.everyNDays: return s.repeatEveryNDays;
+    case RecurrenceType.none:
+      return s.repeatNone;
+    case RecurrenceType.daily:
+      return s.repeatDaily;
+    case RecurrenceType.weekly:
+      return s.repeatWeekly;
+    case RecurrenceType.monthly:
+      return s.repeatMonthly;
+    case RecurrenceType.everyNDays:
+      return s.repeatEveryNDays;
   }
 }
 
-String _recurrenceShort(RecurrenceRule rule, AppStrings s) {
+// createdAt is needed because weekly/monthly with nothing selected fall back to
+// the task's creation date, and that fallback has to be visible to the user
+String _recurrenceShort(RecurrenceRule rule, AppStrings s, DateTime createdAt) {
   switch (rule.type) {
-    case RecurrenceType.none:       return '';
-    case RecurrenceType.daily:      return s.repeatDaily;
-    case RecurrenceType.weekly:     return s.repeatWeekly;
-    case RecurrenceType.monthly:    return s.repeatMonthly;
-    case RecurrenceType.everyNDays: return '${rule.interval}${s.repeatInterval}';
+    case RecurrenceType.none:
+      return '';
+    case RecurrenceType.daily:
+      return s.repeatDaily;
+    case RecurrenceType.weekly:
+      // Falling back to the creation weekday renders exactly like an explicit
+      // pick, so "每週四" means the same thing either way
+      final weekdays =
+          rule.weekdays.isEmpty ? [createdAt.weekday] : rule.weekdays;
+      return s.repeatWeeklyOn(
+          [for (final d in weekdays) s.weekdayShort(d)].join(' '));
+    case RecurrenceType.monthly:
+      final monthDays =
+          rule.monthDays.isEmpty ? [createdAt.day] : rule.monthDays;
+      return s.repeatMonthlyOn([
+        for (final d in monthDays)
+          d == kLastDayOfMonth ? s.repeatMonthLastDay : s.monthDayShort(d),
+      ].join(' '));
+    case RecurrenceType.everyNDays:
+      return s.repeatEveryNDaysShort(rule.safeInterval);
   }
 }
 
 Future<RecurrenceRule?> _showRecurrencePicker(
-  BuildContext context, AppStrings s, RecurrenceRule? current) async {
+  BuildContext context,
+  AppStrings s,
+  RecurrenceRule? current,
+) async {
   var type = current?.type ?? RecurrenceType.none;
   var interval = current?.interval ?? 2;
+  final weekdays = {...?current?.weekdays};
+  final monthDays = {...?current?.monthDays};
   final intervalCtrl = TextEditingController(text: '$interval');
 
   return showDialog<RecurrenceRule>(
@@ -1379,33 +1679,118 @@ Future<RecurrenceRule?> _showRecurrencePicker(
     builder: (dlgCtx) => StatefulBuilder(
       builder: (dlgCtx, setState) => AlertDialog(
         title: Text(s.repeat),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
+        content: SizedBox(
+          width: 320,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final t in RecurrenceType.values)
-                  ChoiceChip(
-                    label: Text(_recurrenceLabel(t, s)),
-                    selected: type == t,
-                    onSelected: (_) => setState(() => type = t),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    for (final t in RecurrenceType.values)
+                      ChoiceChip(
+                        label: Text(_recurrenceLabel(t, s)),
+                        selected: type == t,
+                        onSelected: (_) => setState(() => type = t),
+                      ),
+                  ],
+                ),
+                if (type == RecurrenceType.weekly)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        for (var d = 1; d <= 7; d++)
+                          FilterChip(
+                            label: Text(s.weekdayShort(d)),
+                            selected: weekdays.contains(d),
+                            onSelected: (_) => setState(() {
+                              if (weekdays.contains(d)) {
+                                weekdays.remove(d);
+                              } else {
+                                weekdays.add(d);
+                              }
+                            }),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                      ],
+                    ),
+                  ),
+                if (type == RecurrenceType.monthly) ...[
+                  // 31 chips would make the dialog very tall, so the day grid
+                  // scrolls on its own. A nested vertical scroller needs an
+                  // explicit height — the outer one passes unbounded height
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SizedBox(
+                      height: 120,
+                      child: SingleChildScrollView(
+                        child: Wrap(
+                          spacing: AppSpacing.xs,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            for (var d = 1; d <= 31; d++)
+                              FilterChip(
+                                label: Text('$d'),
+                                selected: monthDays.contains(d),
+                                onSelected: (_) => setState(() {
+                                  if (monthDays.contains(d)) {
+                                    monthDays.remove(d);
+                                  } else {
+                                    monthDays.add(d);
+                                  }
+                                }),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Pinned outside the scroller so it's always reachable
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: FilterChip(
+                      label: Text(s.repeatMonthLastDay),
+                      selected: monthDays.contains(kLastDayOfMonth),
+                      onSelected: (_) => setState(() {
+                        if (monthDays.contains(kLastDayOfMonth)) {
+                          monthDays.remove(kLastDayOfMonth);
+                        } else {
+                          monthDays.add(kLastDayOfMonth);
+                        }
+                      }),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+                if (type == RecurrenceType.everyNDays)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: TextField(
+                      controller: intervalCtrl,
+                      decoration: InputDecoration(labelText: s.repeatInterval),
+                      keyboardType: TextInputType.number,
+                      // Digits only: a 0 or a negative value would break the
+                      // modulo in _recurringAppliesTo
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: (v) {
+                        final parsed = int.tryParse(v);
+                        if (parsed != null && parsed >= 1) interval = parsed;
+                      },
+                    ),
                   ),
               ],
             ),
-            if (type == RecurrenceType.everyNDays)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: TextField(
-                  controller: intervalCtrl,
-                  decoration: InputDecoration(labelText: s.repeatInterval),
-                  keyboardType: TextInputType.number,
-                  onChanged: (v) => interval = int.tryParse(v) ?? interval,
-                ),
-              ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1415,7 +1800,14 @@ Future<RecurrenceRule?> _showRecurrencePicker(
           FilledButton(
             onPressed: () => Navigator.pop(
               dlgCtx,
-              RecurrenceRule(type: type, interval: interval),
+              RecurrenceRule(
+                type: type,
+                // Re-clamped here too: the field can still be left empty or
+                // mid-edit when OK is tapped
+                interval: interval >= 1 ? interval : 1,
+                weekdays: type == RecurrenceType.weekly ? (weekdays.toList()..sort()) : const [],
+                monthDays: type == RecurrenceType.monthly ? (monthDays.toList()..sort()) : const [],
+              ),
             ),
             child: Text(MaterialLocalizations.of(dlgCtx).okButtonLabel),
           ),
@@ -1428,8 +1820,11 @@ Future<RecurrenceRule?> _showRecurrencePicker(
 // ─── Target / Goal selectors ──────────────────────────────────────────────────
 
 void _showTargetSelector(
-  BuildContext context, WidgetRef ref, AppStrings s,
-  String? currentId, ValueChanged<String?> onSelect,
+  BuildContext context,
+  WidgetRef ref,
+  AppStrings s,
+  String? currentId,
+  ValueChanged<String?> onSelect,
 ) {
   final targets = ref.read(semesterGoalsProvider);
   final semSettings = ref.read(semesterSettingsProvider);
@@ -1446,7 +1841,10 @@ void _showTargetSelector(
               title: Text(s.noLink),
               selected: currentId == null,
               selectedColor: AppColors.primary,
-              onTap: () { onSelect(null); Navigator.pop(dlgCtx); },
+              onTap: () {
+                onSelect(null);
+                Navigator.pop(dlgCtx);
+              },
             ),
             for (final g in targets)
               ListTile(
@@ -1454,22 +1852,30 @@ void _showTargetSelector(
                 subtitle: Text(formatSemester(g.semester, semSettings, s)),
                 selected: g.id == currentId,
                 selectedColor: AppColors.primary,
-                onTap: () { onSelect(g.id); Navigator.pop(dlgCtx); },
+                onTap: () {
+                  onSelect(g.id);
+                  Navigator.pop(dlgCtx);
+                },
               ),
           ],
         ),
       ),
-      actions: [TextButton(
-        onPressed: () => Navigator.pop(dlgCtx),
-        child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-      )],
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+      ],
     ),
   );
 }
 
 void _showGoalSelectorForTask(
-  BuildContext context, WidgetRef ref, AppStrings s,
-  String? currentId, ValueChanged<String?> onSelect,
+  BuildContext context,
+  WidgetRef ref,
+  AppStrings s,
+  String? currentId,
+  ValueChanged<String?> onSelect,
 ) {
   final goals = ref.read(futureGoalsProvider);
   showDialog(
@@ -1485,22 +1891,30 @@ void _showGoalSelectorForTask(
               title: Text(s.noLink),
               selected: currentId == null,
               selectedColor: AppColors.primary,
-              onTap: () { onSelect(null); Navigator.pop(dlgCtx); },
+              onTap: () {
+                onSelect(null);
+                Navigator.pop(dlgCtx);
+              },
             ),
             for (final g in goals)
               ListTile(
                 title: Text(g.title),
                 selected: g.id == currentId,
                 selectedColor: AppColors.primary,
-                onTap: () { onSelect(g.id); Navigator.pop(dlgCtx); },
+                onTap: () {
+                  onSelect(g.id);
+                  Navigator.pop(dlgCtx);
+                },
               ),
           ],
         ),
       ),
-      actions: [TextButton(
-        onPressed: () => Navigator.pop(dlgCtx),
-        child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-      )],
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+      ],
     ),
   );
 }
@@ -1518,23 +1932,17 @@ Widget _linkRow({
     borderRadius: BorderRadius.circular(AppRadius.md),
     onTap: onTap,
     child: Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md, vertical: 12,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
+      // Midpoint of the original (16/12) and the too-tight first pass (8/6)
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md)),
       child: Row(
         children: [
-          Icon(icon, size: 18,
-              color: active ? AppColors.primary : AppColors.textTertiary),
+          Icon(icon, size: 18, color: active ? AppColors.primary : AppColors.textTertiary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                color: active ? AppColors.primary : AppColors.textSecondary,
-              ),
+              style: TextStyle(color: active ? AppColors.primary : AppColors.textSecondary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1542,8 +1950,7 @@ Widget _linkRow({
           if (onClear != null && active)
             GestureDetector(
               onTap: onClear,
-              child: const Icon(Icons.close, size: 16,
-                  color: AppColors.textTertiary),
+              child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary),
             ),
         ],
       ),
@@ -1554,23 +1961,28 @@ Widget _linkRow({
 // ─── Add task sheet ───────────────────────────────────────────────────────────
 
 // Public so HomeScreen FAB can call it
-void showAddTaskSheet(BuildContext context, WidgetRef ref) {
+void showAddTaskSheet(BuildContext context, WidgetRef ref, {String? parentTaskId}) {
+  // The task doesn't exist yet, so the weekly/monthly fallback preview is
+  // relative to now — which is what its createdAt will be on submit
+  final labelCreatedAt = DateTime.now();
   final titleController = TextEditingController();
   final contentController = TextEditingController();
   final s = ref.read(stringsProvider);
   final semSettings = ref.read(semesterSettingsProvider);
+  // Sheet state must outlive the modal route builder: Flutter re-invokes that
+  // builder whenever MediaQuery changes (e.g. the keyboard hides when a picker
+  // dialog opens), which would otherwise reset every field to its default
+  var priority = 1;
+  DateTime? dueTime;
+  RecurrenceRule? recurrence;
+  String? linkedTargetId;
+  String? linkedGoalId;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetCtx) {
-      var priority = 1;
-      DateTime? dueTime;
-      RecurrenceRule? recurrence;
-      String? linkedTargetId;
-      String? linkedGoalId;
-
       return StatefulBuilder(
         builder: (sheetCtx, setState) {
           final targets = ref.read(semesterGoalsProvider);
@@ -1582,140 +1994,132 @@ void showAddTaskSheet(BuildContext context, WidgetRef ref) {
               ? goals.where((g) => g.id == linkedGoalId).firstOrNull
               : null;
 
-          return Container(
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-            ),
-            padding: EdgeInsets.only(
-              left: AppSpacing.pageHorizontal,
-              right: AppSpacing.pageHorizontal,
-              top: AppSpacing.lg,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
+          return SheetBody(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.addTask, style: Theme.of(sheetCtx).textTheme.titleLarge),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: titleController,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: s.titleField),
+                  onSubmitted: (_) => _submitTask(
+                    sheetCtx,
+                    ref,
+                    titleController,
+                    contentController,
+                    priority,
+                    dueTime,
+                    recurrence,
+                    linkedTargetId,
+                    linkedGoalId,
+                    parentTaskId: parentTaskId,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: contentController,
+                  maxLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: s.taskNotes, isDense: true),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _linkRow(
+                  icon: Icons.calendar_today_outlined,
+                  label: dueTime != null ? _formatDueTime(dueTime!) : s.dueTime,
+                  active: dueTime != null,
+                  onTap: () async {
+                    final result = await _showDateTimePicker(sheetCtx, dueTime ?? DateTime.now());
+                    if (result != null) setState(() => dueTime = result);
+                  },
+                  onClear: () => setState(() => dueTime = null),
+                ),
+                const SizedBox(height: 2),
+                _linkRow(
+                  icon: Icons.repeat,
+                  label: (recurrence == null || recurrence!.isNone)
+                      ? s.repeatNone
+                      : _recurrenceShort(recurrence!, s, labelCreatedAt),
+                  active: recurrence != null && !recurrence!.isNone,
+                  onTap: () async {
+                    final result = await _showRecurrencePicker(sheetCtx, s, recurrence);
+                    if (result != null) setState(() => recurrence = result);
+                  },
+                  onClear: () =>
+                      setState(() => recurrence = const RecurrenceRule(type: RecurrenceType.none)),
+                ),
+                const SizedBox(height: 2),
+                _linkRow(
+                  icon: Icons.flag_outlined,
+                  label: linkedTarget != null
+                      ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
+                      : s.linkedTarget,
+                  active: linkedTarget != null,
+                  onTap: () => _showTargetSelector(
+                    sheetCtx,
+                    ref,
+                    s,
+                    linkedTargetId,
+                    (id) => setState(() => linkedTargetId = id),
+                  ),
+                  onClear: () => setState(() => linkedTargetId = null),
+                ),
+                const SizedBox(height: 2),
+                _linkRow(
+                  icon: Icons.stars_outlined,
+                  label: linkedGoal != null ? linkedGoal.title : s.linkedGoal,
+                  active: linkedGoal != null,
+                  onTap: () => _showGoalSelectorForTask(
+                    sheetCtx,
+                    ref,
+                    s,
+                    linkedGoalId,
+                    (id) => setState(() => linkedGoalId = id),
+                  ),
+                  onClear: () => setState(() => linkedGoalId = null),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Text(s.priority, style: Theme.of(sheetCtx).textTheme.bodyMedium),
+                    const SizedBox(width: 12),
+                    SegmentedButton<int>(
+                      segments: [
+                        ButtonSegment(value: 1, label: Text(s.priorityLow)),
+                        ButtonSegment(value: 2, label: Text(s.priorityMed)),
+                        ButtonSegment(value: 3, label: Text(s.priorityHigh)),
+                      ],
+                      selected: {priority},
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
+                      onSelectionChanged: (v) => setState(() => priority = v.first),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(s.addTask,
-                      style: Theme.of(sheetCtx).textTheme.titleLarge),
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(labelText: s.titleField),
-                    onSubmitted: (_) => _submitTask(sheetCtx, ref,
-                        titleController, contentController, priority,
-                        dueTime, recurrence, linkedTargetId, linkedGoalId),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: contentController,
-                    maxLines: 1,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: s.taskNotes,
-                      isDense: true,
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => _submitTask(
+                      sheetCtx,
+                      ref,
+                      titleController,
+                      contentController,
+                      priority,
+                      dueTime,
+                      recurrence,
+                      linkedTargetId,
+                      linkedGoalId,
                     ),
+                    child: Text(s.add),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _linkRow(
-                    icon: Icons.calendar_today_outlined,
-                    label: dueTime != null
-                        ? _formatDueTime(dueTime!)
-                        : s.dueTime,
-                    active: dueTime != null,
-                    onTap: () async {
-                      final result = await _showDateTimePicker(
-                          sheetCtx, dueTime ?? DateTime.now());
-                      if (result != null) setState(() => dueTime = result);
-                    },
-                    onClear: () => setState(() => dueTime = null),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _linkRow(
-                    icon: Icons.repeat,
-                    label: (recurrence == null || recurrence!.isNone)
-                        ? s.repeatNone
-                        : _recurrenceShort(recurrence!, s),
-                    active: recurrence != null && !recurrence!.isNone,
-                    onTap: () async {
-                      final result =
-                          await _showRecurrencePicker(sheetCtx, s, recurrence);
-                      if (result != null) setState(() => recurrence = result);
-                    },
-                    onClear: () => setState(
-                        () => recurrence = const RecurrenceRule(
-                            type: RecurrenceType.none)),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _linkRow(
-                    icon: Icons.flag_outlined,
-                    label: linkedTarget != null
-                        ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
-                        : s.linkedTarget,
-                    active: linkedTarget != null,
-                    onTap: () => _showTargetSelector(
-                        sheetCtx, ref, s, linkedTargetId,
-                        (id) => setState(() => linkedTargetId = id)),
-                    onClear: () => setState(() => linkedTargetId = null),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _linkRow(
-                    icon: Icons.stars_outlined,
-                    label: linkedGoal != null
-                        ? linkedGoal.title
-                        : s.linkedGoal,
-                    active: linkedGoal != null,
-                    onTap: () => _showGoalSelectorForTask(
-                        sheetCtx, ref, s, linkedGoalId,
-                        (id) => setState(() => linkedGoalId = id)),
-                    onClear: () => setState(() => linkedGoalId = null),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Text(s.priority,
-                          style: Theme.of(sheetCtx).textTheme.bodyMedium),
-                      const SizedBox(width: 12),
-                      SegmentedButton<int>(
-                        segments: [
-                          ButtonSegment(value: 1, label: Text(s.priorityLow)),
-                          ButtonSegment(value: 2, label: Text(s.priorityMed)),
-                          ButtonSegment(value: 3, label: Text(s.priorityHigh)),
-                        ],
-                        selected: {priority},
-                        onSelectionChanged: (v) =>
-                            setState(() => priority = v.first),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () => _submitTask(sheetCtx, ref,
-                          titleController, contentController, priority,
-                          dueTime, recurrence, linkedTargetId, linkedGoalId),
-                      child: Text(s.add),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         },
@@ -1725,22 +2129,25 @@ void showAddTaskSheet(BuildContext context, WidgetRef ref) {
 }
 
 void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
+  final labelCreatedAt = task.createdAt;
   final titleController = TextEditingController(text: task.title);
   final contentController = TextEditingController(text: task.content ?? '');
   final s = ref.read(stringsProvider);
   final semSettings = ref.read(semesterSettingsProvider);
+  // Sheet state must outlive the modal route builder: Flutter re-invokes that
+  // builder whenever MediaQuery changes (e.g. the keyboard hides when a picker
+  // dialog opens), which would otherwise reset every field to its default
+  var priority = task.priority;
+  DateTime? dueTime = task.dueTime;
+  RecurrenceRule? recurrence = task.recurrence;
+  String? linkedTargetId = task.linkedTargetId;
+  String? linkedGoalId = task.linkedGoalId;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetCtx) {
-      var priority = task.priority;
-      DateTime? dueTime = task.dueTime;
-      RecurrenceRule? recurrence = task.recurrence;
-      String? linkedTargetId = task.linkedTargetId;
-      String? linkedGoalId = task.linkedGoalId;
-
       return StatefulBuilder(
         builder: (sheetCtx, setState) {
           final targets = ref.read(semesterGoalsProvider);
@@ -1752,160 +2159,154 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
               ? goals.where((g) => g.id == linkedGoalId).firstOrNull
               : null;
 
-          return Container(
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-            ),
-            padding: EdgeInsets.only(
-              left: AppSpacing.pageHorizontal,
-              right: AppSpacing.pageHorizontal,
-              top: AppSpacing.lg,
-              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
+          return SheetBody(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.editTask, style: Theme.of(sheetCtx).textTheme.titleLarge),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${s.createdAtLabel}：${_formatCreatedAt(task.createdAt)}',
+                  style: Theme.of(
+                    sheetCtx,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: titleController,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: s.titleField),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: contentController,
+                  maxLines: 1,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: s.taskNotes, isDense: true),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _linkRow(
+                  icon: Icons.calendar_today_outlined,
+                  label: dueTime != null ? _formatDueTime(dueTime!) : s.dueTime,
+                  active: dueTime != null,
+                  onTap: () async {
+                    final result = await _showDateTimePicker(sheetCtx, dueTime ?? DateTime.now());
+                    if (result != null) setState(() => dueTime = result);
+                  },
+                  onClear: () => setState(() => dueTime = null),
+                ),
+                const SizedBox(height: 2),
+                _linkRow(
+                  icon: Icons.repeat,
+                  label: (recurrence == null || recurrence!.isNone)
+                      ? s.repeatNone
+                      : _recurrenceShort(recurrence!, s, labelCreatedAt),
+                  active: recurrence != null && !recurrence!.isNone,
+                  onTap: () async {
+                    final result = await _showRecurrencePicker(sheetCtx, s, recurrence);
+                    if (result != null) setState(() => recurrence = result);
+                  },
+                  onClear: () =>
+                      setState(() => recurrence = const RecurrenceRule(type: RecurrenceType.none)),
+                ),
+                const SizedBox(height: 2),
+                _linkRow(
+                  icon: Icons.flag_outlined,
+                  label: linkedTarget != null
+                      ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
+                      : s.linkedTarget,
+                  active: linkedTarget != null,
+                  onTap: () => _showTargetSelector(
+                    sheetCtx,
+                    ref,
+                    s,
+                    linkedTargetId,
+                    (id) => setState(() => linkedTargetId = id),
+                  ),
+                  onClear: () => setState(() => linkedTargetId = null),
+                ),
+                const SizedBox(height: 2),
+                _linkRow(
+                  icon: Icons.stars_outlined,
+                  label: linkedGoal != null ? linkedGoal.title : s.linkedGoal,
+                  active: linkedGoal != null,
+                  onTap: () => _showGoalSelectorForTask(
+                    sheetCtx,
+                    ref,
+                    s,
+                    linkedGoalId,
+                    (id) => setState(() => linkedGoalId = id),
+                  ),
+                  onClear: () => setState(() => linkedGoalId = null),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Text(s.priority, style: Theme.of(sheetCtx).textTheme.bodyMedium),
+                    const SizedBox(width: 12),
+                    SegmentedButton<int>(
+                      segments: [
+                        ButtonSegment(value: 1, label: Text(s.priorityLow)),
+                        ButtonSegment(value: 2, label: Text(s.priorityMed)),
+                        ButtonSegment(value: 3, label: Text(s.priorityHigh)),
+                      ],
+                      selected: {priority},
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
+                      onSelectionChanged: (v) => setState(() => priority = v.first),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(s.editTask,
-                      style: Theme.of(sheetCtx).textTheme.titleLarge),
+                  ],
+                ),
+                // Subtasks are one level deep, so only top-level tasks offer this
+                if (task.parentTaskId == null) ...[
                   const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    '${s.createdAtLabel}：${_formatCreatedAt(task.createdAt)}',
-                    style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(labelText: s.titleField),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: contentController,
-                    maxLines: 1,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: s.taskNotes,
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _linkRow(
-                    icon: Icons.calendar_today_outlined,
-                    label: dueTime != null
-                        ? _formatDueTime(dueTime!)
-                        : s.dueTime,
-                    active: dueTime != null,
-                    onTap: () async {
-                      final result = await _showDateTimePicker(
-                          sheetCtx, dueTime ?? DateTime.now());
-                      if (result != null) setState(() => dueTime = result);
-                    },
-                    onClear: () => setState(() => dueTime = null),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _linkRow(
-                    icon: Icons.repeat,
-                    label: (recurrence == null || recurrence!.isNone)
-                        ? s.repeatNone
-                        : _recurrenceShort(recurrence!, s),
-                    active: recurrence != null && !recurrence!.isNone,
-                    onTap: () async {
-                      final result =
-                          await _showRecurrencePicker(sheetCtx, s, recurrence);
-                      if (result != null) setState(() => recurrence = result);
-                    },
-                    onClear: () => setState(
-                        () => recurrence = const RecurrenceRule(
-                            type: RecurrenceType.none)),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _linkRow(
-                    icon: Icons.flag_outlined,
-                    label: linkedTarget != null
-                        ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
-                        : s.linkedTarget,
-                    active: linkedTarget != null,
-                    onTap: () => _showTargetSelector(
-                        sheetCtx, ref, s, linkedTargetId,
-                        (id) => setState(() => linkedTargetId = id)),
-                    onClear: () => setState(() => linkedTargetId = null),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _linkRow(
-                    icon: Icons.stars_outlined,
-                    label: linkedGoal != null
-                        ? linkedGoal.title
-                        : s.linkedGoal,
-                    active: linkedGoal != null,
-                    onTap: () => _showGoalSelectorForTask(
-                        sheetCtx, ref, s, linkedGoalId,
-                        (id) => setState(() => linkedGoalId = id)),
-                    onClear: () => setState(() => linkedGoalId = null),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Text(s.priority,
-                          style: Theme.of(sheetCtx).textTheme.bodyMedium),
-                      const SizedBox(width: 12),
-                      SegmentedButton<int>(
-                        segments: [
-                          ButtonSegment(value: 1, label: Text(s.priorityLow)),
-                          ButtonSegment(value: 2, label: Text(s.priorityMed)),
-                          ButtonSegment(value: 3, label: Text(s.priorityHigh)),
-                        ],
-                        selected: {priority},
-                        onSelectionChanged: (v) =>
-                            setState(() => priority = v.first),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.subdirectory_arrow_right, size: 18),
+                      label: Text(s.addSubtask),
                       onPressed: () {
-                        final title = titleController.text.trim();
-                        if (title.isEmpty) return;
-                        ref.read(tasksProvider.notifier).update(Task(
-                          id: task.id,
-                          title: title,
-                          content: contentController.text.trim().isEmpty
-                              ? null
-                              : contentController.text.trim(),
-                          priority: priority,
-                          dueTime: dueTime,
-                          isCompleted: task.isCompleted,
-                          createdAt: task.createdAt,
-                          recurrence: recurrence,
-                          linkedTargetId: linkedTargetId,
-                          linkedGoalId: linkedGoalId,
-                        ));
                         Navigator.pop(sheetCtx);
+                        showAddTaskSheet(context, ref, parentTaskId: task.id);
                       },
-                      child: Text(s.save),
                     ),
                   ),
                 ],
-              ),
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) return;
+                      // copyWith, not a hand-built Task: every field has a
+                      // default, so rebuilding by hand silently resets any
+                      // field the author forgets to carry over
+                      ref
+                          .read(tasksProvider.notifier)
+                          .update(
+                            task.copyWith(
+                              title: title,
+                              content: contentController.text.trim().isEmpty
+                                  ? null
+                                  : contentController.text.trim(),
+                              priority: priority,
+                              dueTime: dueTime,
+                              recurrence: recurrence,
+                              linkedTargetId: linkedTargetId,
+                              linkedGoalId: linkedGoalId,
+                            ),
+                          );
+                      Navigator.pop(sheetCtx);
+                    },
+                    child: Text(s.save),
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -1923,19 +2324,23 @@ void _submitTask(
   DateTime? dueTime,
   RecurrenceRule? recurrence,
   String? linkedTargetId,
-  String? linkedGoalId,
-) {
+  String? linkedGoalId, {
+  String? parentTaskId,
+}) {
   final title = titleCtrl.text.trim();
   if (title.isEmpty) return;
-  ref.read(tasksProvider.notifier).add(
-    title,
-    content: contentCtrl.text.trim().isEmpty ? null : contentCtrl.text.trim(),
-    priority: priority,
-    dueTime: dueTime,
-    recurrence: recurrence,
-    linkedTargetId: linkedTargetId,
-    linkedGoalId: linkedGoalId,
-  );
+  ref
+      .read(tasksProvider.notifier)
+      .add(
+        title,
+        content: contentCtrl.text.trim().isEmpty ? null : contentCtrl.text.trim(),
+        priority: priority,
+        dueTime: dueTime,
+        recurrence: recurrence,
+        linkedTargetId: linkedTargetId,
+        linkedGoalId: linkedGoalId,
+        parentTaskId: parentTaskId,
+      );
   Navigator.pop(context);
 }
 
@@ -1957,7 +2362,10 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
         left: AppSpacing.pageHorizontal,
         right: AppSpacing.pageHorizontal,
         top: AppSpacing.lg,
-        bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+        bottom:
+            MediaQuery.of(sheetCtx).viewInsets.bottom +
+            MediaQuery.of(sheetCtx).viewPadding.bottom +
+            AppSpacing.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1974,8 +2382,7 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text(s.addInspiration,
-              style: Theme.of(sheetCtx).textTheme.titleLarge),
+          Text(s.addInspiration, style: Theme.of(sheetCtx).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
           TextField(
             controller: titleController,
@@ -1997,12 +2404,14 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
               onPressed: () {
                 final title = titleController.text.trim();
                 if (title.isEmpty) return;
-                ref.read(inspirationsProvider.notifier).add(
-                  title,
-                  content: contentController.text.trim().isEmpty
-                      ? null
-                      : contentController.text.trim(),
-                );
+                ref
+                    .read(inspirationsProvider.notifier)
+                    .add(
+                      title,
+                      content: contentController.text.trim().isEmpty
+                          ? null
+                          : contentController.text.trim(),
+                    );
                 Navigator.pop(sheetCtx);
               },
               child: Text(s.add),

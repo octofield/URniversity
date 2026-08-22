@@ -17,6 +17,7 @@ class StringsEn implements AppStrings {
   @override String get tasks => 'Tasks';
   @override String get noTasks => 'No tasks yet';
   @override String get addTask => 'Add Task';
+  @override String get addSubtask => 'Add Subtask';
   @override String get taskNotes => 'Notes (optional)';
   @override String get priority => 'Priority:';
   @override String get priorityLow => 'Low';
@@ -35,6 +36,11 @@ class StringsEn implements AppStrings {
   @override String get repeatMonthly => 'Monthly';
   @override String get repeatEveryNDays => 'Every N days';
   @override String get repeatInterval => 'Interval (days)';
+  @override String repeatWeeklyOn(String days) => 'Weekly $days';
+  @override String repeatMonthlyOn(String days) => 'Monthly $days';
+  @override String monthDayShort(int day) => '$day';
+  @override String repeatEveryNDaysShort(int n) => 'Every $n days';
+  @override String get repeatMonthLastDay => 'Last day';
 
   @override String get inspirations => 'Inspirations';
   @override String get noInspirations => 'No inspirations yet. Tap + to record one.';

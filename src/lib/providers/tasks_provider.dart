@@ -37,7 +37,8 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     if (_userId == userId) return;
     _userId = userId;
     try {
-      final rows = await _db.from('tasks').select().eq('user_id', userId);
+      final rows =
+          await _db.from('tasks').select().eq('user_id', userId).order('sort_order');
       state = (rows as List<dynamic>)
           .map((r) => Task.fromJson(r as Map<String, dynamic>))
           .toList();
@@ -82,7 +83,11 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     RecurrenceRule? recurrence,
     String? linkedTargetId,
     String? linkedGoalId,
+    String? parentTaskId,
   }) {
+    final maxOrder = state
+        .where((t) => t.parentTaskId == parentTaskId)
+        .fold(0, (prev, t) => t.sortOrder > prev ? t.sortOrder : prev);
     final task = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -93,9 +98,30 @@ class TasksNotifier extends StateNotifier<List<Task>> {
       recurrence: recurrence,
       linkedTargetId: linkedTargetId,
       linkedGoalId: linkedGoalId,
+      parentTaskId: parentTaskId,
+      sortOrder: maxOrder + 1000,
     );
     state = [...state, task];
     _upsert(task);
+  }
+
+  // Moves a task within its own group, or between top level and a parent.
+  // Subtasks are capped at one level: a task that has children can't become
+  // a subtask, and a subtask can't gain children
+  void reorderTask(String draggedId, String? newParentId, int newSortOrder) {
+    if (draggedId == newParentId) return;
+    final dragged = state.where((t) => t.id == draggedId).firstOrNull;
+    if (dragged == null) return;
+    if (newParentId != null) {
+      // Can't nest under a subtask, and can't nest a task that has children
+      final newParent = state.where((t) => t.id == newParentId).firstOrNull;
+      if (newParent == null || newParent.parentTaskId != null) return;
+      if (state.any((t) => t.parentTaskId == draggedId)) return;
+    }
+    final updated =
+        dragged.copyWith(parentTaskId: newParentId, sortOrder: newSortOrder);
+    state = [for (final t in state) if (t.id == draggedId) updated else t];
+    _upsert(updated);
   }
 
   void toggleOnDate(String id, DateTime date) {
@@ -127,15 +153,31 @@ class TasksNotifier extends StateNotifier<List<Task>> {
     _upsert(task);
   }
 
-  void remove(String id) {
-    state = state.where((t) => t.id != id).toList();
-    _delete(id);
+  // Returns every task actually removed (the task plus its subtasks) so the
+  // caller can snapshot all of them to the trash — snapshotting only the root
+  // would leave the subtasks unrestorable
+  List<Task> remove(String id) {
+    final removed = state
+        .where((t) => t.id == id || t.parentTaskId == id)
+        .toList();
+    if (removed.isEmpty) return const [];
+    final removedIds = removed.map((t) => t.id).toSet();
+    state = state.where((t) => !removedIds.contains(t.id)).toList();
+    for (final t in removed) {
+      _delete(t.id);
+    }
+    return removed;
   }
 
   void restore(Task task) {
     if (!state.any((t) => t.id == task.id)) {
-      state = [...state, task];
-      _upsert(task);
+      // If the parent is gone, restore at top level rather than orphaning it
+      final restored = task.parentTaskId != null &&
+              !state.any((t) => t.id == task.parentTaskId)
+          ? task.copyWith(parentTaskId: null)
+          : task;
+      state = [...state, restored];
+      _upsert(restored);
     }
   }
 }
@@ -160,11 +202,25 @@ bool _recurringAppliesTo(Task task, DateTime date) {
     case RecurrenceType.none:       return false;
     case RecurrenceType.daily:      return true;
     case RecurrenceType.weekly:
+      // Chosen weekdays if set; otherwise fall back to "same weekday as
+      // creation", which is how tasks created before this option behave
+      final weekdays = task.recurrence!.weekdays;
+      if (weekdays.isNotEmpty) return weekdays.contains(targetDay.weekday);
       return targetDay.difference(createdDay).inDays % 7 == 0;
     case RecurrenceType.monthly:
-      return targetDay.day == createdDay.day;
+      final monthDays = task.recurrence!.monthDays;
+      if (monthDays.isEmpty) return targetDay.day == createdDay.day;
+      // A day the month doesn't have simply doesn't occur that month (e.g. 31
+      // in February); kLastDayOfMonth resolves to whatever the last day is
+      final lastDay = DateTime(targetDay.year, targetDay.month + 1, 0).day;
+      return monthDays.any((d) =>
+          d == kLastDayOfMonth ? targetDay.day == lastDay : targetDay.day == d);
     case RecurrenceType.everyNDays:
-      return targetDay.difference(createdDay).inDays % task.recurrence!.interval == 0;
+      // safeInterval guards against a 0 persisted before validation existed;
+      // a raw 0 here throws on mobile and yields NaN on web
+      return targetDay.difference(createdDay).inDays %
+              task.recurrence!.safeInterval ==
+          0;
   }
 }
 
@@ -173,6 +229,20 @@ bool _taskAppliesTo(Task task, DateTime date) {
   if (_isRecurring(task)) return _recurringAppliesTo(task, date);
   if (task.dueTime == null) return false;
   return _dateOnly(task.dueTime!) == _dateOnly(date);
+}
+
+// Manual drag order wins, with the automatic grouping above as the tiebreaker.
+// Tasks that have never been dragged all share sortOrder 0, so the automatic
+// order is what shows until the user actually reorders something
+List<Task> _applyManualOrder(List<Task> autoOrdered) {
+  final autoIndex = {
+    for (var i = 0; i < autoOrdered.length; i++) autoOrdered[i].id: i,
+  };
+  return [...autoOrdered]..sort((a, b) {
+      final byOrder = a.sortOrder.compareTo(b.sortOrder);
+      if (byOrder != 0) return byOrder;
+      return autoIndex[a.id]!.compareTo(autoIndex[b.id]!);
+    });
 }
 
 final filteredTasksProvider = Provider<List<Task>>((ref) {
@@ -186,7 +256,7 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     final nonRecurring = matching.where((t) => !_isRecurring(t)).toList()
       ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
-    return [...recurring, ...nonRecurring];
+    return _applyManualOrder([...recurring, ...nonRecurring]);
   }
 
   // All tasks: recurring first, then with dueTime, then without dueTime
@@ -196,7 +266,7 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
     ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
   final withoutDue = all.where((t) => !_isRecurring(t) && t.dueTime == null).toList()
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-  return [...recurring, ...withDue, ...withoutDue];
+  return _applyManualOrder([...recurring, ...withDue, ...withoutDue]);
 });
 
 final taskTargetFilterProvider = StateProvider<Set<String>>((ref) => const {});
@@ -218,5 +288,5 @@ final tasksForDateProvider = Provider.family<List<Task>, DateTime>((ref, date) {
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   final nonRecurring = matching.where((t) => !_isRecurring(t)).toList()
     ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
-  return [...recurring, ...nonRecurring];
+  return _applyManualOrder([...recurring, ...nonRecurring]);
 });

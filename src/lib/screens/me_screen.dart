@@ -568,7 +568,9 @@ void _showEditInspirationSheet(
         left: AppSpacing.pageHorizontal,
         right: AppSpacing.pageHorizontal,
         top: AppSpacing.lg,
-        bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+        bottom: MediaQuery.of(sheetCtx).viewInsets.bottom +
+                  MediaQuery.of(sheetCtx).viewPadding.bottom +
+                  AppSpacing.lg,
       ),
       child: SingleChildScrollView(
         child: Column(

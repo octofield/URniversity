@@ -149,10 +149,28 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
   void updateGoal(
     String goalId, {
     required String title,
+    required String semester,
     required List<String> categories,
     String? futureGoalId,
     String? notes,
   }) {
+    final old = state.where((g) => g.id == goalId).firstOrNull;
+    if (old == null) return;
+
+    // Moving to another semester puts the goal last in that semester's list;
+    // sortOrder is only meaningful within one (parentId, semester) group
+    final movedSemester = old.semester != semester;
+    final newSortOrder = movedSemester
+        ? state
+                .where((g) => g.parentId == old.parentId && g.semester == semester)
+                .fold(0, (prev, g) => g.sortOrder > prev ? g.sortOrder : prev) +
+            1000
+        : old.sortOrder;
+    // Descendants follow their parent so the whole subtree stays in one semester
+    final subtree = movedSemester
+        ? getWithDescendants(goalId).map((g) => g.id).toSet()
+        : <String>{};
+
     state = [
       for (final g in state)
         if (g.id == goalId)
@@ -160,17 +178,21 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
             id: g.id,
             parentId: g.parentId,
             title: title,
-            semester: g.semester,
+            semester: semester,
             categories: categories.isEmpty ? ['other'] : categories,
             futureGoalId: futureGoalId,
             notes: notes,
             isDone: g.isDone,
+            sortOrder: newSortOrder,
           )
+        else if (subtree.contains(g.id))
+          g.copyWith(semester: semester)
         else
           g,
     ];
-    final updated = state.where((g) => g.id == goalId).firstOrNull;
-    if (updated != null) _upsert(updated);
+    for (final g in state.where((g) => g.id == goalId || subtree.contains(g.id))) {
+      _upsert(g);
+    }
   }
 
   void toggleDone(String goalId) {
