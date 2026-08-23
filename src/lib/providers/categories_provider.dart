@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/category.dart';
+import 'synced_list_notifier.dart';
 import '../models/future_goal.dart';
 import '../utils/category_helpers.dart';
 
@@ -11,7 +12,9 @@ List<CategoryEntry> _defaultCategories() => [
 ];
 
 class CategoriesNotifier extends StateNotifier<List<CategoryEntry>> {
-  CategoriesNotifier() : super(_defaultCategories());
+  CategoriesNotifier(this.ref) : super(_defaultCategories());
+
+  final Ref ref;
 
   String? _userId;
   SupabaseClient get _db => Supabase.instance.client;
@@ -56,7 +59,7 @@ class CategoriesNotifier extends StateNotifier<List<CategoryEntry>> {
         'styles': {for (final c in state) c.id: c.toJson()},
       },
       onConflict: 'user_id',
-    ).catchError((_) {});
+    ).catchError((Object e) => reportSyncError(ref, e));
   }
 
   void add(String name) {
@@ -95,5 +98,5 @@ class CategoriesNotifier extends StateNotifier<List<CategoryEntry>> {
 }
 
 final categoriesProvider = StateNotifierProvider<CategoriesNotifier, List<CategoryEntry>>(
-  (ref) => CategoriesNotifier(),
+  (ref) => CategoriesNotifier(ref),
 );

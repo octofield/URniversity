@@ -6,6 +6,9 @@ import '../core/theme/app_spacing.dart';
 import '../models/inspiration.dart';
 import '../providers/inspirations_provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/confirm_dialog.dart';
+import '../widgets/sheet_body.dart';
+
 class InspirationsScreen extends ConsumerWidget {
   const InspirationsScreen({super.key});
 
@@ -111,7 +114,7 @@ class _InspirationCard extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 18),
             onPressed: () async {
-              if (await _confirmDelete(context, s)) {
+              if (await confirmDelete(context, s)) {
                 ref.read(inspirationsProvider.notifier).remove(item.id);
               }
             },
@@ -122,78 +125,37 @@ class _InspirationCard extends ConsumerWidget {
   }
 }
 
-Future<bool> _confirmDelete(BuildContext context, dynamic s) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          content: Text('${s.delete}？'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-              child: Text(s.delete),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
-
 void _showEditSheet(BuildContext context, WidgetRef ref, Inspiration item) {
   final titleCtrl = TextEditingController(text: item.title);
   final contentCtrl = TextEditingController(text: item.content ?? '');
   final s = ref.read(stringsProvider);
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetCtx) => Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.pageHorizontal,
-        right: AppSpacing.pageHorizontal,
-        top: AppSpacing.lg,
-        bottom: MediaQuery.of(sheetCtx).viewInsets.bottom +
-                  MediaQuery.of(sheetCtx).viewPadding.bottom +
-                  AppSpacing.lg,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(AppRadius.full)),
-              ),
+  showAppSheet(
+    context,
+    builder: (sheetCtx) => SheetBody(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.inspirations, style: Theme.of(sheetCtx).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.md),
+          TextField(controller: titleCtrl, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.titleField)),
+          const SizedBox(height: 12),
+          TextField(controller: contentCtrl, maxLines: 3, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.inspirationDetails)),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                final title = titleCtrl.text.trim();
+                if (title.isEmpty) return;
+                ref.read(inspirationsProvider.notifier).update(item.copyWith(title: title, content: contentCtrl.text.trim().isEmpty ? null : contentCtrl.text.trim()));
+                Navigator.pop(sheetCtx);
+              },
+              child: Text(s.save),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(s.inspirations, style: Theme.of(sheetCtx).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.md),
-            TextField(controller: titleCtrl, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.titleField)),
-            const SizedBox(height: 12),
-            TextField(controller: contentCtrl, maxLines: 3, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.inspirationDetails)),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  final title = titleCtrl.text.trim();
-                  if (title.isEmpty) return;
-                  ref.read(inspirationsProvider.notifier).update(item.copyWith(title: title, content: contentCtrl.text.trim().isEmpty ? null : contentCtrl.text.trim()));
-                  Navigator.pop(sheetCtx);
-                },
-                child: Text(s.save),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

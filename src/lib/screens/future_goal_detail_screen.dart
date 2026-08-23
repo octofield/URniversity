@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
+import '../core/ui_symbols.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/future_goal.dart';
-import '../l10n/app_strings.dart';
 import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
@@ -14,6 +14,7 @@ import '../providers/tasks_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/confirm_dialog.dart';
 import 'future_screen.dart';
 import 'semester_goal_detail_screen.dart';
 
@@ -117,7 +118,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                               formatSemester(goal.startSemester!, semSettings, s),
                             if (goal.startSemester != null &&
                                 goal.endSemester != null)
-                              '→',
+                              kArrow,
                             if (goal.endSemester != null)
                               formatSemester(goal.endSemester!, semSettings, s),
                           ].join(' '),
@@ -156,7 +157,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
             title: Text(s.addSubgoal,
                 style: const TextStyle(color: AppColors.primary)),
             onTap: () =>
-                showAddFutureGoalSheet(context, ref, parentId: goalId),
+                showFutureGoalSheet(context, ref, parentId: goalId),
           ),
 
           const Divider(),
@@ -166,7 +167,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           if (linkedTasks.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text('—',
+              child: Text(kEmptyValue,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textTertiary,
                   )),
@@ -222,7 +223,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           if (linkedTargets.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text('—',
+              child: Text(kEmptyValue,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textTertiary,
                   )),
@@ -290,7 +291,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: s.editGoal,
-            onPressed: () => showEditFutureGoalSheet(context, ref, goal),
+            onPressed: () => showFutureGoalSheet(context, ref, existing: goal),
           ),
         ],
       ),
@@ -431,14 +432,14 @@ class _GoalTreeTile extends ConsumerWidget {
               icon: const Icon(Icons.edit_outlined, size: 16),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              onPressed: () => showEditFutureGoalSheet(context, ref, goal),
+              onPressed: () => showFutureGoalSheet(context, ref, existing: goal),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 16),
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               onPressed: () async {
-                if (await _confirmDelete(context, s)) {
+                if (await confirmDelete(context, s)) {
                   ref.read(trashProvider.notifier).addFutureGoal(goal);
                   ref.read(futureGoalsProvider.notifier).remove(goal.id);
                 }
@@ -502,26 +503,6 @@ class _CategoryBadge extends ConsumerWidget {
       ),
     );
   }
-}
-
-Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
-  return await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      content: Text('${s.delete}？'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-          child: Text(s.delete),
-        ),
-      ],
-    ),
-  ) ?? false;
 }
 
 void _showTaskSelectorForGoal(

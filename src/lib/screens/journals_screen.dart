@@ -4,10 +4,10 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/journal.dart';
-import '../providers/auth_provider.dart';
 import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/confirm_dialog.dart';
 import 'journal_edit_screen.dart';
 import 'me_screen.dart' show JournalDetailScreen;
 
@@ -69,14 +69,9 @@ class _JournalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final user = ref.watch(currentUserProvider);
-    final profile = ref.watch(profileProvider);
-    final googleName = user?.userMetadata?['full_name'] as String?;
-    final avatarUrl = user?.userMetadata?['avatar_url'] as String?;
-    final displayName = profile?.username?.isNotEmpty == true
-        ? profile!.username!
-        : (googleName ?? user?.email ?? '');
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+    final identity = ref.watch(displayIdentityProvider);
+    // Local so the null check promotes it for NetworkImage
+    final avatarUrl = identity.avatarUrl;
     final d = journal.date;
     final dateStr = '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
@@ -101,7 +96,7 @@ class _JournalCard extends ConsumerWidget {
                     backgroundColor: AppColors.primary,
                     backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
                     child: avatarUrl == null
-                        ? Text(initial, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textOnPrimary))
+                        ? Text(identity.initial, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textOnPrimary))
                         : null,
                   ),
                   const SizedBox(width: 8),
@@ -123,20 +118,7 @@ class _JournalCard extends ConsumerWidget {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          content: Text('${s.delete}？'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-                              child: Text(s.delete),
-                            ),
-                          ],
-                        ),
-                      ) ?? false;
+                      final confirmed = await confirmDelete(context, s);
                       if (confirmed) ref.read(journalProvider.notifier).remove(journal.id);
                     },
                   ),

@@ -3,9 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile.dart';
+import 'synced_list_notifier.dart';
+import 'auth_provider.dart';
+import 'guest_provider.dart';
+import 'settings_provider.dart';
 
 class ProfileNotifier extends StateNotifier<UserProfile?> {
-  ProfileNotifier() : super(null);
+  ProfileNotifier(this.ref) : super(null);
+
+  final Ref ref;
 
   String? _userId;
   SupabaseClient get _db => Supabase.instance.client;
@@ -22,7 +28,9 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
           .maybeSingle();
       // null state = not loaded; const UserProfile() = loaded but no DB row (new user)
       state = row != null ? UserProfile.fromRow(row) : const UserProfile();
-    } catch (_) {}
+    } catch (e) {
+      reportSyncError(ref, e);
+    }
   }
 
   Future<void> loadGuest() async {
@@ -51,7 +59,9 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
     if (state != null) {
       try {
         await _db.from('user_settings').upsert(state!.toRow(userId));
-      } catch (_) {}
+      } catch (e) {
+      reportSyncError(ref, e);
+    }
     }
   }
 
@@ -65,7 +75,7 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
     await _db
         .from('user_settings')
         .upsert({'user_id': _userId, 'username': username})
-        .catchError((_) {});
+        .catchError((Object e) => reportSyncError(ref, e));
   }
 
   // Called from SetupProfileScreen — only sets username and avatar, preserves rest.
@@ -87,7 +97,7 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
       'user_id': _userId,
       'username': username.isNotEmpty ? username : null,
       'avatar_index': avatarIndex,
-    }).catchError((_) {});
+    }).catchError((Object e) => reportSyncError(ref, e));
   }
 
   Future<void> updateInfo({
@@ -115,7 +125,7 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
     await _db
         .from('user_settings')
         .upsert(updated.toRow(_userId!))
-        .catchError((_) {});
+        .catchError((Object e) => reportSyncError(ref, e));
   }
 
   Future<void> deleteAllData(String userId) async {
@@ -124,15 +134,58 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
     for (final table in tables) {
       try {
         await _db.from(table).delete().eq('user_id', userId);
-      } catch (_) {}
+      } catch (e) {
+      reportSyncError(ref, e);
+    }
     }
     try {
       await _db.from('user_settings').delete().eq('user_id', userId);
-    } catch (_) {}
+    } catch (e) {
+      reportSyncError(ref, e);
+    }
     clear();
   }
 }
 
 final profileProvider = StateNotifierProvider<ProfileNotifier, UserProfile?>(
-  (ref) => ProfileNotifier(),
+  (ref) => ProfileNotifier(ref),
 );
+
+// What the UI shows for the current account. The name falls back from the
+// profile username to the Google name to the email, and to the guest label in
+// guest mode; hasRealName says whether that fallback was reached, which the Me
+// page uses to dim the placeholder
+class DisplayIdentity {
+  final String name;
+  final String initial;
+  final String? avatarUrl;
+  final bool hasRealName;
+
+  const DisplayIdentity({
+    required this.name,
+    required this.initial,
+    required this.avatarUrl,
+    required this.hasRealName,
+  });
+}
+
+final displayIdentityProvider = Provider<DisplayIdentity>((ref) {
+  final s = ref.watch(stringsProvider);
+  final user = ref.watch(currentUserProvider);
+  final profile = ref.watch(profileProvider);
+  final isGuest = ref.watch(guestModeProvider);
+
+  final googleName = isGuest ? null : user?.userMetadata?['full_name'] as String?;
+  final avatarUrl = isGuest ? null : user?.userMetadata?['avatar_url'] as String?;
+  final username = profile?.username;
+  final name = username?.isNotEmpty == true
+      ? username!
+      : (isGuest ? s.guest : (googleName ?? user?.email ?? ''));
+
+  return DisplayIdentity(
+    name: name,
+    initial: name.isNotEmpty ? name[0].toUpperCase() : '?',
+    avatarUrl: avatarUrl,
+    hasRealName: username?.isNotEmpty == true || (!isGuest && googleName != null),
+  );
+});

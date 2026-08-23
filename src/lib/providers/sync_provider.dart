@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_provider.dart';
+import 'synced_list_notifier.dart';
 import 'tasks_provider.dart';
 import 'future_goals_provider.dart';
 import 'semester_goals_provider.dart';
@@ -167,7 +168,9 @@ Future<void> _loadSettings(Ref ref, String uid) async {
     if (showCounter != null) {
       ref.read(showDayCounterProvider.notifier).state = showCounter;
     }
-  } catch (_) {}
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
 }
 
 Future<void> _saveSettings(Ref ref) async {
@@ -185,7 +188,9 @@ Future<void> _saveSettings(Ref ref) async {
       'default_task_view': ref.read(defaultTaskViewProvider),
       'show_day_counter': ref.read(showDayCounterProvider),
     });
-  } catch (_) {}
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
 }
 
 AppLanguage _langFromString(String s) {

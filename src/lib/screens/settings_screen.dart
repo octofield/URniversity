@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
+import '../core/ui_symbols.dart';
+import '../l10n/app_strings.dart';
 import '../providers/guest_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
@@ -56,7 +58,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           ListTile(
             title: Text(s.dateFormat),
-            subtitle: Text(formatDate(DateTime.now(), currentFmt)),
+            subtitle: Text(formatDate(DateTime.now(), currentFmt, s)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showDateFormatDialog(context, ref, s, currentFmt),
           ),
@@ -137,8 +139,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: Text(s.devTimeOverride),
               subtitle: Text(
                 dev.customTime != null
-                    ? formatDate(dev.customTime!, DateDisplayFormat.yyyymmdd)
-                    : '—',
+                    ? formatDate(dev.customTime!, DateDisplayFormat.yyyymmdd, s)
+                    : kEmptyValue,
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () async {
@@ -171,12 +173,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ListTile(
               title: Text(s.logout, style: const TextStyle(color: AppColors.error)),
               leading: const Icon(Icons.logout, color: AppColors.error),
-              onTap: () => _confirmLogout(context),
+              onTap: () => _confirmLogout(context, s),
             ),
             ListTile(
               title: Text(s.deleteAccount, style: const TextStyle(color: AppColors.error)),
               leading: const Icon(Icons.delete_forever_outlined, color: AppColors.error),
-              onTap: () => _showDeleteAccountDialog(context, ref),
+              onTap: () => _showDeleteAccountDialog(context, ref, s),
             ),
           ],
         ],
@@ -197,11 +199,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 }
 
 void _confirmExitGuest(BuildContext context, WidgetRef ref) {
+  final s = ref.read(stringsProvider);
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('退出訪客模式'),
-      content: const Text('退出後所有訪客資料將會清除，無法復原。確定繼續？'),
+      title: Text(s.exitGuestMode),
+      content: Text(s.exitGuestConfirm),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
@@ -214,14 +217,14 @@ void _confirmExitGuest(BuildContext context, WidgetRef ref) {
             Navigator.of(context).popUntil((route) => route.isFirst);
           },
           style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-          child: const Text('退出'),
+          child: Text(s.exitAction),
         ),
       ],
     ),
   );
 }
 
-void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
+void _showDeleteAccountDialog(BuildContext context, WidgetRef ref, AppStrings s) {
   final user = Supabase.instance.client.auth.currentUser;
   final isGoogle = user?.identities?.any((i) => i.provider == 'google') ?? false;
 
@@ -232,16 +235,17 @@ void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
       isGoogle: isGoogle,
       ref: ref,
       outerContext: context,
+      s: s,
     ),
   );
 }
 
-void _confirmLogout(BuildContext context) {
+void _confirmLogout(BuildContext context, AppStrings s) {
   showDialog(
     context: context,
     builder: (dlgCtx) => AlertDialog(
-      title: const Text('登出'),
-      content: const Text('確定要登出嗎？'),
+      title: Text(s.logout),
+      content: Text(s.logoutConfirm),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dlgCtx),
@@ -255,7 +259,7 @@ void _confirmLogout(BuildContext context) {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           },
-          child: const Text('登出', style: TextStyle(color: AppColors.error)),
+          child: Text(s.logout, style: const TextStyle(color: AppColors.error)),
         ),
       ],
     ),
@@ -339,7 +343,7 @@ void _showDateFormatDialog(BuildContext context, WidgetRef ref,
         final isSelected = format == current;
         return ListTile(
           title: Text(dateFormatLabel(format, s)),
-          subtitle: Text(formatDate(exampleDate, format)),
+          subtitle: Text(formatDate(exampleDate, format, s)),
           leading: Icon(
             isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
             color: isSelected ? AppColors.primary : null,
@@ -462,11 +466,13 @@ class _DeleteAccountDialog extends StatefulWidget {
   final bool isGoogle;
   final WidgetRef ref;
   final BuildContext outerContext;
+  final AppStrings s;
   const _DeleteAccountDialog({
     required this.email,
     required this.isGoogle,
     required this.ref,
     required this.outerContext,
+    required this.s,
   });
 
   @override
@@ -489,7 +495,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
 
     if (widget.isGoogle) {
       if (_inputCtrl.text.trim().toLowerCase() != widget.email.toLowerCase()) {
-        setState(() { _loading = false; _errorMsg = '信箱不相符'; });
+        setState(() { _loading = false; _errorMsg = widget.s.emailMismatch; });
         return;
       }
     }
@@ -516,21 +522,21 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('刪除帳號'),
+      title: Text(widget.s.deleteAccount),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(widget.isGoogle
-              ? '此操作無法還原，所有資料將永久刪除。\n請輸入你的信箱「${widget.email}」以確認。'
-              : '此操作無法還原，所有資料將永久刪除。\n請輸入密碼以確認。'),
+              ? widget.s.deleteAccountConfirmEmail(widget.email)
+              : widget.s.deleteAccountConfirmPassword),
           const SizedBox(height: 16),
           TextField(
             controller: _inputCtrl,
             obscureText: !widget.isGoogle,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: widget.isGoogle ? '信箱' : '密碼',
+              labelText: widget.isGoogle ? widget.s.emailLabel : widget.s.passwordLabel,
               errorText: _errorMsg,
             ),
             onSubmitted: (_) => _loading ? null : _delete(),
@@ -551,7 +557,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Text('確認刪除'),
+              : Text(widget.s.confirmDeleteAction),
         ),
       ],
     );

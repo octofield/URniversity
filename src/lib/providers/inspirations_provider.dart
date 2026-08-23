@@ -1,66 +1,24 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/inspiration.dart';
+import 'synced_list_notifier.dart';
 
-class InspirationsNotifier extends StateNotifier<List<Inspiration>> {
-  InspirationsNotifier() : super([]);
+class InspirationsNotifier extends SyncedListNotifier<Inspiration> {
+  InspirationsNotifier(super.ref)
+      : super(
+          table: 'inspirations',
+          localKey: 'guest_inspirations',
+          orderColumn: 'created_at',
+          orderAscending: false,
+        );
 
-  String? _userId;
-  SupabaseClient get _db => Supabase.instance.client;
-  static const _localKey = 'guest_inspirations';
-  bool get _isGuest => _userId == 'guest';
+  @override
+  Inspiration fromJson(Map<String, dynamic> json) => Inspiration.fromJson(json);
 
-  Future<void> load(String userId) async {
-    if (_userId == userId) return;
-    _userId = userId;
-    try {
-      final rows = await _db
-          .from('inspirations')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      state = (rows as List<dynamic>)
-          .map((r) => Inspiration.fromJson(r as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      _userId = null;
-    }
-  }
+  @override
+  Map<String, dynamic> toJson(Inspiration item) => item.toJson();
 
-  Future<void> loadGuest() async {
-    _userId = 'guest';
-    final p = await SharedPreferences.getInstance();
-    final json = p.getString(_localKey);
-    if (json != null) {
-      state = (jsonDecode(json) as List)
-          .map((j) => Inspiration.fromJson(j as Map<String, dynamic>))
-          .toList();
-    } else {
-      state = [];
-    }
-  }
-
-  void _persistLocally() {
-    SharedPreferences.getInstance().then((p) {
-      p.setString(_localKey, jsonEncode(state.map((i) => i.toJson()).toList()));
-    });
-  }
-
-  void clear() {
-    _userId = null;
-    state = [];
-  }
-
-  Future<void> mergeToUser(String userId) async {
-    _userId = userId;
-    for (final item in state) {
-      try {
-        await _db.from('inspirations').upsert({...item.toJson(), 'user_id': userId});
-      } catch (_) {}
-    }
-  }
+  @override
+  String idOf(Inspiration item) => item.id;
 
   void add(String title, {String? content}) {
     final item = Inspiration(
@@ -70,13 +28,7 @@ class InspirationsNotifier extends StateNotifier<List<Inspiration>> {
       createdAt: DateTime.now(),
     );
     state = [item, ...state];
-    if (_isGuest) {
-      _persistLocally();
-    } else if (_userId != null) {
-      _db.from('inspirations')
-          .upsert({...item.toJson(), 'user_id': _userId})
-          .catchError((_) {});
-    }
+    upsert(item);
   }
 
   void update(Inspiration updated) {
@@ -84,13 +36,7 @@ class InspirationsNotifier extends StateNotifier<List<Inspiration>> {
       for (final i in state)
         if (i.id == updated.id) updated else i,
     ];
-    if (_isGuest) {
-      _persistLocally();
-    } else if (_userId != null) {
-      _db.from('inspirations')
-          .upsert({...updated.toJson(), 'user_id': _userId})
-          .catchError((_) {});
-    }
+    upsert(updated);
   }
 
   void toggleCompleted(String id) {
@@ -100,15 +46,11 @@ class InspirationsNotifier extends StateNotifier<List<Inspiration>> {
 
   void remove(String id) {
     state = state.where((i) => i.id != id).toList();
-    if (_isGuest) {
-      _persistLocally();
-    } else if (_userId != null) {
-      _db.from('inspirations').delete().eq('id', id).catchError((_) {});
-    }
+    deleteRow(id);
   }
 }
 
 final inspirationsProvider =
     StateNotifierProvider<InspirationsNotifier, List<Inspiration>>(
-  (ref) => InspirationsNotifier(),
+  (ref) => InspirationsNotifier(ref),
 );

@@ -24,7 +24,6 @@ class StringsEn implements AppStrings {
   @override String get priorityMed => 'Med';
   @override String get priorityHigh => 'High';
   @override String get dueTime => 'Due time';
-  @override String get clearTime => 'Clear';
 
   @override String get linkedTarget => 'Linked Target';
   @override String get selectTarget => 'Select Target';
@@ -50,7 +49,6 @@ class StringsEn implements AppStrings {
   @override String get me => 'Me';
   @override String get usernameLabel => 'Username';
   @override String get accountSettings => 'Account Settings';
-  @override String get editUsername => 'Edit Username';
   @override String get journal => 'Journal';
   @override String get noJournal => 'No journal entries yet';
   @override String get addJournal => 'New Entry';
@@ -94,7 +92,6 @@ class StringsEn implements AppStrings {
   @override String get addSubgoal => 'Add Subgoal';
   @override String get editTask => 'Edit Task';
   @override String get save => 'Save';
-  @override String get addCategory => 'Add Category';
   @override String get categoryName => 'Category Name';
   @override String get linkedFutureGoal => 'Linked Goal';
   @override String get selectFutureGoal => 'Select Goal';
@@ -133,7 +130,6 @@ class StringsEn implements AppStrings {
   @override String get fourSemesters => 'Four-semester';
   @override String get semesterStartMonth => 'Start Month';
 
-  @override String get goalDetail => 'Goal Details';
   @override String get linkedTasks => 'Linked Tasks';
   @override String get linkedTargets => 'Linked Semester Targets';
 
@@ -185,4 +181,68 @@ class StringsEn implements AppStrings {
   @override String get feedbackErrorMinLength => 'Please enter at least 10 characters';
   @override String get feedbackErrorCooldown => 'Please wait 5 minutes before submitting again';
   @override String get feedbackErrorFailed => 'Submission failed. Please try again later.';
+
+  @override String get login => 'Log in';
+  @override String get register => 'Sign up';
+  @override String get createAccount => 'Create account';
+  @override String get registerHeadline => 'Get started with URniversity';
+  @override String get emailLabel => 'Email';
+  @override String get passwordLabel => 'Password';
+  @override String get passwordLabelWithHint => 'Password (at least 6 characters)';
+  @override String get confirmPasswordLabel => 'Confirm password';
+  @override String get orDivider => 'or';
+  @override String get signInWithGoogle => 'Sign in with Google';
+  @override String get noAccountYet => 'Don\'t have an account?';
+  @override String get haveAccountAlready => 'Already have an account?';
+  @override String get backToGuestMode => 'Back to guest mode';
+  @override String get tryAsGuest => 'Continue as a guest';
+  @override String get passwordMismatch => 'The passwords do not match';
+  @override String get passwordTooShort => 'Password must be at least 6 characters';
+  @override String get checkVerificationEmail => 'Check your inbox for the verification email, then log in';
+
+  @override String get setupProfileTitle => 'Set up your profile';
+  @override String get setupProfileSubtitle => 'You can change this later in account settings';
+  @override String get pickAvatar => 'Choose an avatar';
+  @override String get avatar => 'Avatar';
+  @override String get done => 'Done';
+  @override String get confirm => 'OK';
+  @override String get guest => 'Guest';
+  @override String get loginMethod => 'Sign-in method';
+  @override String gradeLabel(int grade) => '$grade';
+  @override String pickerSearchHint(String field) => 'Search $field';
+  @override String pickerCustomInput(String field) => 'Enter $field';
+  @override String get pickerOther => 'Other (type it in)';
+
+  @override String get loginOrCreateAccount => 'Log in / Create account';
+  @override String get mergeGuestDataQuestion => 'What should happen to your current guest data after you log in?';
+  @override String get discardGuestData => 'Discard it';
+  @override String get mergeGuestData => 'Merge into account';
+
+  @override String get exitGuestConfirm => 'Leaving guest mode erases all guest data. This cannot be undone. Continue?';
+  @override String get exitAction => 'Exit';
+  @override String get logoutConfirm => 'Log out of your account?';
+  @override String deleteAccountConfirmEmail(String email) =>
+      'This cannot be undone. All of your data will be permanently deleted.\nType your email "$email" to confirm.';
+  @override String get deleteAccountConfirmPassword =>
+      'This cannot be undone. All of your data will be permanently deleted.\nEnter your password to confirm.';
+  @override String get emailMismatch => 'The email does not match';
+  @override String get confirmDeleteAction => 'Delete permanently';
+
+  @override String get emptyTrashConfirm => 'Every item will be permanently deleted. This cannot be undone.';
+  @override String deletedOn(String date) => 'Deleted $date';
+  @override String get permanentDelete => 'Delete permanently';
+
+  @override String get deleteConfirm => 'Delete?';
+  @override String createdAtValue(String value) => 'Created: $value';
+  @override String percentSuffix(int percent) => ' ($percent%)';
+  @override String dateWithWeekday(String date, String weekday) => '$date ($weekday)';
+  @override String dateLongDate(int month, int day) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[month - 1]} $day';
+  }
+
+  @override String get syncFailed => 'Sync failed — that change may not have reached the cloud';
 }

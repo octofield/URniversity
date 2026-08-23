@@ -5,10 +5,11 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../providers/settings_provider.dart';
 import '../providers/date_provider.dart';
-import 'today_screen.dart' show TodayScreen, showAddTaskSheet, showAddInspirationSheet;
+import '../providers/synced_list_notifier.dart';
+import 'today_screen.dart' show TodayScreen, showTaskSheet, showAddInspirationSheet;
 
 import 'semester_screen.dart';
-import 'semester_goal_detail_screen.dart' show showAddSemesterGoalSheet;
+import 'semester_goal_detail_screen.dart' show showSemesterGoalSheet;
 import 'future_screen.dart';
 import 'me_screen.dart';
 import 'journal_edit_screen.dart';
@@ -34,6 +35,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // When dev mode changes the effective date, sync the task-date calendar
     ref.listen<DateTime>(effectiveNowProvider, (_, next) {
       ref.read(dateProvider.notifier).goToToday(next);
+    });
+
+    // Surface writes that never reached Supabase. Without this the screen shows
+    // the change as saved while the row was silently dropped
+    ref.listen<Object?>(syncErrorProvider, (_, error) {
+      if (error == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.syncFailed)),
+      );
+      ref.read(syncErrorProvider.notifier).state = null;
     });
 
     // Shared destination data for both NavigationBar and NavigationRail
@@ -100,17 +111,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       0 => _VividFab(
           color: AppColors.categoryCompetition,
           tooltip: s.addTask,
-          onPressed: () => showAddTaskSheet(context, ref),
+          onPressed: () => showTaskSheet(context, ref),
           child: const Icon(Icons.add, color: Colors.white, size: 30)),
       1 => _VividFab(
           color: AppColors.categoryIntern,
           tooltip: s.addTarget,
-          onPressed: () => showAddSemesterGoalSheet(context, ref),
+          onPressed: () => showSemesterGoalSheet(context, ref),
           child: const Icon(Icons.add, color: Colors.white, size: 30)),
       2 => _VividFab(
           color: AppColors.categoryCert,
           tooltip: s.addGoal,
-          onPressed: () => showAddFutureGoalSheet(context, ref),
+          onPressed: () => showFutureGoalSheet(context, ref),
           child: const Icon(Icons.add, color: Colors.white, size: 30)),
       3 => _VividFab(
           color: AppColors.categoryPerformance,

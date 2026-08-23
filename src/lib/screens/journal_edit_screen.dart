@@ -5,8 +5,6 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/journal.dart';
-import '../providers/auth_provider.dart';
-import '../providers/guest_provider.dart';
 import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
@@ -76,15 +74,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
         '${_date.year}/${_date.month.toString().padLeft(2, '0')}/${_date.day.toString().padLeft(2, '0')}';
 
     final profile = ref.watch(profileProvider);
-    final user = ref.watch(currentUserProvider);
-    final isGuest = ref.watch(guestModeProvider);
-    final googleName = isGuest ? null : user?.userMetadata?['full_name'] as String?;
-    final avatarUrl = isGuest ? null : user?.userMetadata?['avatar_url'] as String?;
-    final username = profile?.username;
-    final displayName = username?.isNotEmpty == true
-        ? username!
-        : (isGuest ? '訪客' : (googleName ?? user?.email ?? ''));
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+    final identity = ref.watch(displayIdentityProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -126,8 +116,8 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                   children: [
                     AppAvatars.build(
                       avatarIndex: profile?.avatarIndex,
-                      avatarUrl: avatarUrl,
-                      initial: initial,
+                      avatarUrl: identity.avatarUrl,
+                      initial: identity.initial,
                       radius: 20,
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -138,7 +128,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                           Row(
                             children: [
                               Text(
-                                displayName,
+                                identity.name,
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodyMedium

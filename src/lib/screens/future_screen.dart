@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
+import '../core/ui_symbols.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -14,6 +15,7 @@ import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/category_manager.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
@@ -22,27 +24,6 @@ import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
-
-Future<bool> _confirmDeleteGoal(BuildContext context, AppStrings s) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          content: Text('${s.delete}？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-              child: Text(s.delete),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
 
 class _FutGroup {
   final FutureGoal parent;
@@ -514,7 +495,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             icon: Icons.flag_outlined,
             message: s.noGoals,
             actionLabel: s.addGoal,
-            onAction: () => showAddFutureGoalSheet(context, ref),
+            onAction: () => showFutureGoalSheet(context, ref),
           )
         : ListView.builder(
             padding: const EdgeInsets.fromLTRB(
@@ -824,7 +805,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
                               [
                                 if (goal.startSemester != null)
                                   formatSemester(goal.startSemester!, semSettings, s),
-                                if (goal.startSemester != null && goal.endSemester != null) '→',
+                                if (goal.startSemester != null && goal.endSemester != null) kArrow,
                                 if (goal.endSemester != null)
                                   formatSemester(goal.endSemester!, semSettings, s),
                               ].join(' '),
@@ -871,7 +852,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      onPressed: () => showEditFutureGoalSheet(context, ref, goal),
+                      onPressed: () => showFutureGoalSheet(context, ref, existing: goal),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 18),
@@ -880,7 +861,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
                       onPressed: () async {
                         // Confirm before deleting, matching the goal cards —
                         // this was deleting immediately with no prompt
-                        if (await _confirmDeleteGoal(context, s)) {
+                        if (await confirmDelete(context, s)) {
                           ref.read(trashProvider.notifier).addFutureGoal(goal);
                           notifier.remove(goal.id);
                         }
@@ -915,7 +896,7 @@ Widget _semesterDropdown({
     initialValue: value,
     decoration: InputDecoration(labelText: label, isDense: true),
     items: [
-      const DropdownMenuItem(value: null, child: Text('—')),
+      const DropdownMenuItem(value: null, child: Text(kEmptyValue)),
       for (final sem in valid)
         DropdownMenuItem(value: sem, child: Text(formatSemester(sem, settings, s))),
     ],
@@ -947,27 +928,29 @@ Widget _categoryChipsMulti(
   );
 }
 
-void showAddFutureGoalSheet(
+// One sheet for both modes: [existing] null means add, non-null means edit
+void showFutureGoalSheet(
   BuildContext context,
   WidgetRef ref, {
+  FutureGoal? existing,
   String? defaultSemester,
   String? parentId,
 }) {
-  final titleCtrl = TextEditingController();
-  final notesCtrl = TextEditingController();
+  final isEdit = existing != null;
+  final titleCtrl = TextEditingController(text: existing?.title ?? '');
+  final notesCtrl = TextEditingController(text: existing?.notes ?? '');
   final s = ref.read(stringsProvider);
   final settings = ref.read(semesterSettingsProvider);
   final cats = ref.read(categoriesProvider);
   final semesters = generateSemesters(settings);
 
-  var selectedCategories = <String>[];
-  String? startSemester = defaultSemester ?? currentSemester(settings);
-  String? endSemester;
+  var selectedCategories = isEdit ? List<String>.from(existing.categories) : <String>[];
+  String? startSemester =
+      isEdit ? existing.startSemester : (defaultSemester ?? currentSemester(settings));
+  String? endSemester = existing?.endSemester;
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+  showAppSheet(
+    context,
     builder: (sheetCtx) => StatefulBuilder(
       builder: (sheetCtx, setState) => SheetBody(
         child: Column(
@@ -975,7 +958,9 @@ void showAddFutureGoalSheet(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              parentId != null ? s.addSubgoal : s.addGoal,
+              isEdit
+                  ? s.editGoal
+                  : (parentId != null ? s.addSubgoal : s.addGoal),
               style: Theme.of(sheetCtx).textTheme.titleLarge,
             ),
             const SizedBox(height: AppSpacing.md),
@@ -1054,21 +1039,34 @@ void showAddFutureGoalSheet(
               child: FilledButton(
                 onPressed: () {
                   if (titleCtrl.text.trim().isEmpty) return;
-                  ref
-                      .read(futureGoalsProvider.notifier)
+                  final notifier = ref.read(futureGoalsProvider.notifier);
+                  final categories = selectedCategories.isEmpty
+                      ? [FutureCategories.other]
+                      : selectedCategories;
+                  if (isEdit) {
+                    notifier.updateGoal(
+                      existing.id,
+                      title: titleCtrl.text.trim(),
+                      categories: categories,
+                      startSemester: startSemester,
+                      endSemester: endSemester,
+                      notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                    );
+                    Navigator.pop(sheetCtx);
+                    return;
+                  }
+                  notifier
                       .addGoal(
                         parentId: parentId,
                         title: titleCtrl.text.trim(),
-                        categories: selectedCategories.isEmpty
-                            ? [FutureCategories.other]
-                            : selectedCategories,
+                        categories: categories,
                         startSemester: startSemester,
                         endSemester: endSemester,
                         notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
                       );
                   Navigator.pop(sheetCtx);
                 },
-                child: Text(s.add),
+                child: Text(isEdit ? s.save : s.add),
               ),
             ),
           ],
@@ -1078,125 +1076,3 @@ void showAddFutureGoalSheet(
   );
 }
 
-void showEditFutureGoalSheet(BuildContext context, WidgetRef ref, FutureGoal goal) {
-  final titleCtrl = TextEditingController(text: goal.title);
-  final notesCtrl = TextEditingController(text: goal.notes ?? '');
-  final s = ref.read(stringsProvider);
-  final settings = ref.read(semesterSettingsProvider);
-  final cats = ref.read(categoriesProvider);
-  final semesters = generateSemesters(settings);
-
-  var selectedCategories = List<String>.from(goal.categories);
-  String? startSemester = goal.startSemester;
-  String? endSemester = goal.endSemester;
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetCtx) => StatefulBuilder(
-      builder: (sheetCtx, setState) => SheetBody(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(s.editGoal, style: Theme.of(sheetCtx).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: titleCtrl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: s.titleField),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: notesCtrl,
-              maxLines: 2,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: s.goalNotes, isDense: true),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              s.category,
-              style: Theme.of(
-                sheetCtx,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            _categoryChipsMulti(
-              sheetCtx,
-              s,
-              [for (final c in cats) c.id],
-              selectedCategories,
-              (cat) => setState(() {
-                if (selectedCategories.contains(cat)) {
-                  selectedCategories.remove(cat);
-                } else {
-                  selectedCategories.add(cat);
-                }
-              }),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: _semesterDropdown(
-                    value: startSemester,
-                    semesters: semesters,
-                    label: s.startSemester,
-                    minSemester: null,
-                    settings: settings,
-                    s: s,
-                    onChanged: (v) => setState(() {
-                      startSemester = v;
-                      if (endSemester != null &&
-                          startSemester != null &&
-                          compareSemesters(endSemester!, startSemester!) < 0) {
-                        endSemester = null;
-                      }
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _semesterDropdown(
-                    value: endSemester,
-                    semesters: semesters,
-                    label: s.endSemester,
-                    minSemester: startSemester,
-                    settings: settings,
-                    s: s,
-                    onChanged: (v) => setState(() => endSemester = v),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  if (titleCtrl.text.trim().isEmpty) return;
-                  ref
-                      .read(futureGoalsProvider.notifier)
-                      .updateGoal(
-                        goal.id,
-                        title: titleCtrl.text.trim(),
-                        categories: selectedCategories.isEmpty
-                            ? [FutureCategories.other]
-                            : selectedCategories,
-                        startSemester: startSemester,
-                        endSemester: endSemester,
-                        notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                      );
-                  Navigator.pop(sheetCtx);
-                },
-                child: Text(s.save),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}

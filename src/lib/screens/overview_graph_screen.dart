@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
+import '../core/ui_symbols.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/future_goal.dart';
@@ -679,7 +680,7 @@ class _NodeCard extends ConsumerWidget {
               formatSemester(node.future!.startSemester!, semSettings, s),
             if (node.future!.startSemester != null &&
                 node.future!.endSemester != null)
-              '→',
+              kArrow,
             if (node.future!.endSemester != null)
               formatSemester(node.future!.endSemester!, semSettings, s),
           ].join(' ')

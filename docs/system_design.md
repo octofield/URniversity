@@ -127,12 +127,13 @@ flowchart TD
 刪除父任務會連帶刪除其子任務，且**父任務與所有子任務都會各自寫入回收桶快照**
 （`remove()` 回傳被刪除的清單供呼叫端逐一快照）。
 
-⚠️ **編輯任務時是手動重建整個 `Task(...)`**（不是 `copyWith`），因此**新增欄位到 model 時
-必須記得在該處補上**，否則會靜默重設為預設值——`parentTaskId` / `sortOrder` / `completedDates`
-都必須明確帶過去。
+新增與編輯共用同一個 `showTaskSheet(context, ref, {Task? existing, String? parentTaskId})`
+（`existing == null` 即新增）。編輯走 `copyWith`，不手動重建 `Task(...)`——model 的每個欄位
+都有預設值，手動重建會讓漏帶的欄位靜默重設。目標與願景同樣各自收斂成
+`showSemesterGoalSheet` / `showFutureGoalSheet`。
 
-⚠️ **表單狀態必須宣告在 `showModalBottomSheet` 的 `builder:` 之外**（`showAddTaskSheet` /
-`_showEditTaskSheet`）。Flutter 只要 MediaQuery 變動就會重跑該 `builder`（SDK
+⚠️ **表單狀態必須宣告在 `showAppSheet` 的 `builder:` 之外**。Flutter 只要 MediaQuery
+變動就會重跑該 `builder`（SDK
 `bottom_sheet.dart` 的 `buildPage` 透過 `MediaQuery.removePadding` 建立依賴），而表單標題欄
 `autofocus: true` 會讓「開啟選擇器對話框 → 鍵盤收起 → `viewInsets` 改變」必然觸發重跑。若把
 `priority` / `dueTime` / `recurrence` / `linkedTargetId` / `linkedGoalId` 宣告在閉包內，選擇器

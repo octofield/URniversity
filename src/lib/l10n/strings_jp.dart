@@ -24,7 +24,6 @@ class StringsJp implements AppStrings {
   @override String get priorityMed => '中';
   @override String get priorityHigh => '高';
   @override String get dueTime => '期限';
-  @override String get clearTime => 'クリア';
 
   @override String get linkedTarget => '連結ターゲット';
   @override String get selectTarget => 'ターゲットを選択';
@@ -50,7 +49,6 @@ class StringsJp implements AppStrings {
   @override String get me => 'マイ';
   @override String get usernameLabel => 'ユーザー名';
   @override String get accountSettings => 'アカウント設定';
-  @override String get editUsername => 'ユーザー名を編集';
   @override String get journal => '日記';
   @override String get noJournal => '日記がありません';
   @override String get addJournal => '日記を追加';
@@ -94,7 +92,6 @@ class StringsJp implements AppStrings {
   @override String get addSubgoal => 'サブ目標を追加';
   @override String get editTask => 'タスクを編集';
   @override String get save => '保存';
-  @override String get addCategory => 'カテゴリを追加';
   @override String get categoryName => 'カテゴリ名';
   @override String get linkedFutureGoal => '連結ゴール';
   @override String get selectFutureGoal => 'ゴールを選択';
@@ -133,7 +130,6 @@ class StringsJp implements AppStrings {
   @override String get fourSemesters => '四学期制';
   @override String get semesterStartMonth => '開始月';
 
-  @override String get goalDetail => '願望の詳細';
   @override String get linkedTasks => '関連タスク';
   @override String get linkedTargets => '関連する学期目標';
 
@@ -185,4 +181,62 @@ class StringsJp implements AppStrings {
   @override String get feedbackErrorMinLength => '10文字以上入力してください';
   @override String get feedbackErrorCooldown => '5分後に再度送信してください';
   @override String get feedbackErrorFailed => '送信に失敗しました。後でもう一度お試しください。';
+
+  @override String get login => 'ログイン';
+  @override String get register => '新規登録';
+  @override String get createAccount => 'アカウント作成';
+  @override String get registerHeadline => 'URniversity をはじめる';
+  @override String get emailLabel => 'メールアドレス';
+  @override String get passwordLabel => 'パスワード';
+  @override String get passwordLabelWithHint => 'パスワード（6文字以上）';
+  @override String get confirmPasswordLabel => 'パスワード（確認）';
+  @override String get orDivider => 'または';
+  @override String get signInWithGoogle => 'Google でログイン';
+  @override String get noAccountYet => 'アカウントをお持ちでない方';
+  @override String get haveAccountAlready => 'すでにアカウントをお持ちの方';
+  @override String get backToGuestMode => 'ゲストモードに戻る';
+  @override String get tryAsGuest => 'ゲストとして試す';
+  @override String get passwordMismatch => 'パスワードが一致しません';
+  @override String get passwordTooShort => 'パスワードは6文字以上必要です';
+  @override String get checkVerificationEmail => '確認メールをご確認ください。完了後にログインできます';
+
+  @override String get setupProfileTitle => 'プロフィール設定';
+  @override String get setupProfileSubtitle => '後でアカウント設定から変更できます';
+  @override String get pickAvatar => 'アバターを選択';
+  @override String get avatar => 'アバター';
+  @override String get done => '完了';
+  @override String get confirm => '確定';
+  @override String get guest => 'ゲスト';
+  @override String get loginMethod => 'ログイン方法';
+  @override String gradeLabel(int grade) => '$grade';
+  @override String pickerSearchHint(String field) => '$fieldを検索';
+  @override String pickerCustomInput(String field) => '$fieldを入力';
+  @override String get pickerOther => 'その他（自分で入力）';
+
+  @override String get loginOrCreateAccount => 'ログイン / アカウント作成';
+  @override String get mergeGuestDataQuestion => 'ログイン後、現在のゲストデータをどうしますか？';
+  @override String get discardGuestData => '破棄する';
+  @override String get mergeGuestData => 'アカウントに統合';
+
+  @override String get exitGuestConfirm => 'ゲストモードを終了するとゲストデータはすべて削除され、元に戻せません。続行しますか？';
+  @override String get exitAction => '終了';
+  @override String get logoutConfirm => 'ログアウトしますか？';
+  @override String deleteAccountConfirmEmail(String email) =>
+      'この操作は取り消せません。すべてのデータが完全に削除されます。\n確認のためメールアドレス「$email」を入力してください。';
+  @override String get deleteAccountConfirmPassword =>
+      'この操作は取り消せません。すべてのデータが完全に削除されます。\n確認のためパスワードを入力してください。';
+  @override String get emailMismatch => 'メールアドレスが一致しません';
+  @override String get confirmDeleteAction => '削除を確認';
+
+  @override String get emptyTrashConfirm => 'すべての項目が完全に削除され、元に戻せません。';
+  @override String deletedOn(String date) => '$date 削除';
+  @override String get permanentDelete => '完全に削除';
+
+  @override String get deleteConfirm => '削除しますか？';
+  @override String createdAtValue(String value) => '作成日時：$value';
+  @override String percentSuffix(int percent) => '（$percent%）';
+  @override String dateWithWeekday(String date, String weekday) => '$date（$weekday）';
+  @override String dateLongDate(int month, int day) => '$month月$day日';
+
+  @override String get syncFailed => '同期に失敗しました。変更が保存されていない可能性があります';
 }

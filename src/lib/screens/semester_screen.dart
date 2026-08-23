@@ -11,9 +11,9 @@ import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/trash_provider.dart';
-import '../l10n/app_strings.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
@@ -297,7 +297,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
             icon: Icons.school_outlined,
             message: s.noTargets,
             actionLabel: s.addTarget,
-            onAction: () => showAddSemesterGoalSheet(context, ref),
+            onAction: () => showSemesterGoalSheet(context, ref),
           )
         : ListView.builder(
             padding: const EdgeInsets.fromLTRB(
@@ -842,14 +842,14 @@ class _SemGoalCardTile extends ConsumerWidget {
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           onPressed: () =>
-                              showEditSemesterGoalSheet(context, ref, goal),
+                              showSemesterGoalSheet(context, ref, existing: goal),
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, size: 18),
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           onPressed: () async {
-                            if (await _confirmDelete(context, s)) {
+                            if (await confirmDelete(context, s)) {
                               ref
                                   .read(trashProvider.notifier)
                                   .addSemesterGoal(goal);
@@ -872,23 +872,3 @@ class _SemGoalCardTile extends ConsumerWidget {
   }
 }
 
-Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
-  return await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      content: Text('${s.delete}？'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-          child: Text(s.delete),
-        ),
-      ],
-    ),
-  ) ??
-      false;
-}

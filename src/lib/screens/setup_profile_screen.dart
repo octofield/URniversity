@@ -4,6 +4,7 @@ import '../core/avatars.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../providers/profile_provider.dart';
+import '../providers/settings_provider.dart';
 
 class SetupProfileScreen extends ConsumerStatefulWidget {
   const SetupProfileScreen({super.key});
@@ -34,6 +35,7 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     final username = _usernameCtrl.text;
     final canSave = username.trim().isNotEmpty && !_loading;
 
@@ -49,14 +51,14 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '設定個人資料',
+                s.setupProfileTitle,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                '之後可在帳號設定中修改',
+                s.setupProfileSubtitle,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.textTertiary,
                 ),
@@ -75,7 +77,7 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
               const SizedBox(height: 24),
 
               Text(
-                '選擇頭像',
+                s.pickAvatar,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -106,9 +108,9 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
                 autofocus: true,
                 textCapitalization: TextCapitalization.words,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: '使用者名稱',
-                  prefixIcon: Icon(Icons.person_outline),
+                decoration: InputDecoration(
+                  labelText: s.usernameLabel,
+                  prefixIcon: const Icon(Icons.person_outline),
                 ),
               ),
               const SizedBox(height: 32),
@@ -126,7 +128,7 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('完成'),
+                      : Text(s.done),
                 ),
               ),
             ],

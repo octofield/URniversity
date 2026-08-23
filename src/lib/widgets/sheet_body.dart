@@ -3,6 +3,21 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 
+// Opens a modal sheet with the transparent backdrop and free height sizing that
+// every sheet here needs. Wrap the content in [SheetBody] unless the sheet
+// manages its own height
+Future<T?> showAppSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: builder,
+  );
+}
+
 // Shared body for every modal bottom sheet.
 //
 // Two things it fixes that every hand-rolled sheet got wrong:
