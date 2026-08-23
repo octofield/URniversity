@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/semester_goal.dart';
+import 'synced_list_notifier.dart';
 import 'settings_provider.dart';
 
 String currentSemester(SemesterSettings settings) {
@@ -53,73 +51,22 @@ final selectedSemesterProvider = StateProvider<String>(
   (ref) => ref.read(currentSemesterProvider),
 );
 
-class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
-  SemesterGoalsNotifier() : super([]);
+class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
+  SemesterGoalsNotifier(super.ref)
+      : super(
+          table: 'semester_goals',
+          localKey: 'guest_sem_goals',
+          orderColumn: 'sort_order',
+        );
 
-  String? _userId;
-  SupabaseClient get _db => Supabase.instance.client;
-  static const _localKey = 'guest_sem_goals';
-  bool get _isGuest => _userId == 'guest';
+  @override
+  SemesterGoal fromJson(Map<String, dynamic> json) => SemesterGoal.fromJson(json);
 
-  Future<void> loadGuest() async {
-    _userId = 'guest';
-    final p = await SharedPreferences.getInstance();
-    final json = p.getString(_localKey);
-    if (json != null) {
-      state = (jsonDecode(json) as List)
-          .map((j) => SemesterGoal.fromJson(j as Map<String, dynamic>))
-          .toList();
-    } else {
-      state = [];
-    }
-  }
+  @override
+  Map<String, dynamic> toJson(SemesterGoal item) => item.toJson();
 
-  void _persistLocally() {
-    SharedPreferences.getInstance().then((p) {
-      p.setString(_localKey, jsonEncode(state.map((g) => g.toJson()).toList()));
-    });
-  }
-
-  Future<void> load(String userId) async {
-    if (_userId == userId) return;
-    _userId = userId;
-    try {
-      final rows = await _db.from('semester_goals').select().eq('user_id', userId).order('sort_order');
-      state = (rows as List<dynamic>)
-          .map((r) => SemesterGoal.fromJson(r as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      _userId = null;
-    }
-  }
-
-  void clear() {
-    _userId = null;
-    state = [];
-  }
-
-  Future<void> mergeToUser(String userId) async {
-    _userId = userId;
-    for (final goal in state) {
-      try {
-        await _db.from('semester_goals').upsert({...goal.toJson(), 'user_id': userId});
-      } catch (_) {}
-    }
-  }
-
-  void _upsert(SemesterGoal goal) {
-    if (_isGuest) { _persistLocally(); return; }
-    if (_userId == null) return;
-    _db.from('semester_goals')
-        .upsert({...goal.toJson(), 'user_id': _userId})
-        .catchError((_) {});
-  }
-
-  void _delete(String id) {
-    if (_isGuest) { _persistLocally(); return; }
-    if (_userId == null) return;
-    _db.from('semester_goals').delete().eq('id', id).catchError((_) {});
-  }
+  @override
+  String idOf(SemesterGoal item) => item.id;
 
   void addGoal(
     String title,
@@ -143,7 +90,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
       sortOrder: maxOrder + 1000,
     );
     state = [...state, goal];
-    _upsert(goal);
+    upsert(goal);
   }
 
   void updateGoal(
@@ -191,7 +138,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
           g,
     ];
     for (final g in state.where((g) => g.id == goalId || subtree.contains(g.id))) {
-      _upsert(g);
+      upsert(g);
     }
   }
 
@@ -201,7 +148,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
         if (g.id == goalId) g.copyWith(isDone: !g.isDone) else g,
     ];
     final updated = state.where((g) => g.id == goalId).firstOrNull;
-    if (updated != null) _upsert(updated);
+    if (updated != null) upsert(updated);
   }
 
   List<SemesterGoal> getWithDescendants(String goalId) {
@@ -222,7 +169,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
     final toRemove = getWithDescendants(goalId).map((g) => g.id).toSet();
     state = state.where((g) => !toRemove.contains(g.id)).toList();
     for (final id in toRemove) {
-      _delete(id);
+      deleteRow(id);
     }
   }
 
@@ -247,7 +194,7 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
         else g,
     ];
     final updated = state.where((g) => g.id == draggedId).firstOrNull;
-    if (updated != null) _upsert(updated);
+    if (updated != null) upsert(updated);
   }
 
   void linkFutureGoal(String goalId, String? futureGoalId) {
@@ -256,21 +203,12 @@ class SemesterGoalsNotifier extends StateNotifier<List<SemesterGoal>> {
         if (g.id == goalId) g.copyWith(futureGoalId: futureGoalId) else g,
     ];
     final updated = state.where((g) => g.id == goalId).firstOrNull;
-    if (updated != null) _upsert(updated);
+    if (updated != null) upsert(updated);
   }
 
-  void restore(SemesterGoal goal) {
-    if (!state.any((g) => g.id == goal.id)) {
-      final parentExists =
-          goal.parentId == null || state.any((g) => g.id == goal.parentId);
-      final restored = parentExists ? goal : goal.copyWith(parentId: null);
-      state = [...state, restored];
-      _upsert(restored);
-    }
-  }
 }
 
 final semesterGoalsProvider =
     StateNotifierProvider<SemesterGoalsNotifier, List<SemesterGoal>>(
-  (ref) => SemesterGoalsNotifier(),
+  (ref) => SemesterGoalsNotifier(ref),
 );

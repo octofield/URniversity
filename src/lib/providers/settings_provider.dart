@@ -41,24 +41,19 @@ final stringsProvider = Provider<AppStrings>(
 
 enum DateDisplayFormat { mmddWeekday, mmdd, yyyymmdd, longDate }
 
-String formatDate(DateTime date, DateDisplayFormat format) {
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+String formatDate(DateTime date, DateDisplayFormat format, AppStrings s) {
   final mm = date.month.toString().padLeft(2, '0');
   final dd = date.day.toString().padLeft(2, '0');
 
   switch (format) {
     case DateDisplayFormat.mmddWeekday:
-      return '$mm/$dd（${weekdays[date.weekday - 1]}）';
+      return s.dateWithWeekday('$mm/$dd', s.weekdayShort(date.weekday));
     case DateDisplayFormat.mmdd:
       return '$mm/$dd';
     case DateDisplayFormat.yyyymmdd:
       return '${date.year}/$mm/$dd';
     case DateDisplayFormat.longDate:
-      return '${months[date.month - 1]} ${date.day}';
+      return s.dateLongDate(date.month, date.day);
   }
 }
 

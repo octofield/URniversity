@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../l10n/app_strings.dart';
 import '../models/trash_item.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
@@ -47,12 +48,12 @@ class TrashScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmEmptyTrash(BuildContext context, WidgetRef ref, dynamic s) {
+  void _confirmEmptyTrash(BuildContext context, WidgetRef ref, AppStrings s) {
     showDialog(
       context: context,
       builder: (dlgCtx) => AlertDialog(
         title: Text(s.emptyTrash),
-        content: const Text('所有項目將被永久刪除，無法復原。'),
+        content: Text(s.emptyTrashConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dlgCtx),
@@ -93,7 +94,7 @@ class _TrashTile extends ConsumerWidget {
       child: ListTile(
         leading: Icon(icon, color: AppColors.textSecondary),
         title: Text(item.title),
-        subtitle: Text('$mm/$dd 刪除',
+        subtitle: Text(s.deletedOn('$mm/$dd'),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: AppColors.textTertiary,
             )),
@@ -118,7 +119,7 @@ class _TrashTile extends ConsumerWidget {
             ),
             IconButton(
               icon: const Icon(Icons.delete_forever, color: AppColors.error),
-              tooltip: '永久刪除',
+              tooltip: s.permanentDelete,
               onPressed: () =>
                   ref.read(trashProvider.notifier).permanentDelete(item.id),
             ),

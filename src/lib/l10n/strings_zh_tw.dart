@@ -24,7 +24,6 @@ class StringsZhTw implements AppStrings {
   @override String get priorityMed => '中';
   @override String get priorityHigh => '高';
   @override String get dueTime => '截止時間';
-  @override String get clearTime => '清除';
 
   @override String get linkedTarget => '連結目標';
   @override String get selectTarget => '選擇目標';
@@ -50,7 +49,6 @@ class StringsZhTw implements AppStrings {
   @override String get me => '我的';
   @override String get usernameLabel => '使用者名稱';
   @override String get accountSettings => '帳號設定';
-  @override String get editUsername => '編輯使用者名稱';
   @override String get journal => '日記';
   @override String get noJournal => '尚無日記';
   @override String get addJournal => '新增日記';
@@ -94,7 +92,6 @@ class StringsZhTw implements AppStrings {
   @override String get addSubgoal => '新增子願景';
   @override String get editTask => '編輯任務';
   @override String get save => '儲存';
-  @override String get addCategory => '新增分類';
   @override String get categoryName => '分類名稱';
   @override String get linkedFutureGoal => '連結的願景';
   @override String get selectFutureGoal => '選擇願景';
@@ -133,7 +130,6 @@ class StringsZhTw implements AppStrings {
   @override String get fourSemesters => '四學期制';
   @override String get semesterStartMonth => '開始月份';
 
-  @override String get goalDetail => '願景詳情';
   @override String get linkedTasks => '連結的任務';
   @override String get linkedTargets => '連結的學期目標';
 
@@ -185,4 +181,66 @@ class StringsZhTw implements AppStrings {
   @override String get feedbackErrorMinLength => '請至少輸入 10 個字元';
   @override String get feedbackErrorCooldown => '請等待 5 分鐘後再回報';
   @override String get feedbackErrorFailed => '送出失敗，請稍後再試';
+
+  @override String get login => '登入';
+  @override String get register => '註冊';
+  @override String get createAccount => '建立帳號';
+  @override String get registerHeadline => '開始使用 URniversity';
+  @override String get emailLabel => '電子郵件';
+  @override String get passwordLabel => '密碼';
+  @override String get passwordLabelWithHint => '密碼（至少 6 字元）';
+  @override String get confirmPasswordLabel => '確認密碼';
+  @override String get orDivider => '或';
+  @override String get signInWithGoogle => '使用 Google 登入';
+  @override String get noAccountYet => '還沒有帳號？';
+  @override String get haveAccountAlready => '已有帳號？';
+  @override String get backToGuestMode => '返回訪客模式';
+  @override String get tryAsGuest => '以訪客身份體驗';
+  @override String get passwordMismatch => '兩次密碼不一致';
+  @override String get passwordTooShort => '密碼至少 6 個字元';
+  @override String get checkVerificationEmail => '請到信箱確認驗證信，完成後即可登入';
+
+  @override String get setupProfileTitle => '設定個人資料';
+  @override String get setupProfileSubtitle => '之後可在帳號設定中修改';
+  @override String get pickAvatar => '選擇頭像';
+  @override String get avatar => '頭像';
+  @override String get done => '完成';
+  @override String get confirm => '確定';
+  @override String get guest => '訪客';
+  @override String get loginMethod => '登入方式';
+  @override String gradeLabel(int grade) {
+    const labels = ['一', '二', '三', '四', '五', '六', '七'];
+    final i = grade - 1;
+    return i >= 0 && i < labels.length ? labels[i] : '$grade';
+  }
+  @override String pickerSearchHint(String field) => '搜尋$field';
+  @override String pickerCustomInput(String field) => '輸入$field';
+  @override String get pickerOther => '其他（自行輸入）';
+
+  @override String get loginOrCreateAccount => '登入 / 建立帳號';
+  @override String get mergeGuestDataQuestion => '登入後，目前的訪客資料要如何處理？';
+  @override String get discardGuestData => '捨棄資料';
+  @override String get mergeGuestData => '整合進帳號';
+
+  @override String get exitGuestConfirm => '退出後所有訪客資料將會清除，無法復原。確定繼續？';
+  @override String get exitAction => '退出';
+  @override String get logoutConfirm => '確定要登出嗎？';
+  @override String deleteAccountConfirmEmail(String email) =>
+      '此操作無法還原，所有資料將永久刪除。\n請輸入你的信箱「$email」以確認。';
+  @override String get deleteAccountConfirmPassword =>
+      '此操作無法還原，所有資料將永久刪除。\n請輸入密碼以確認。';
+  @override String get emailMismatch => '信箱不相符';
+  @override String get confirmDeleteAction => '確認刪除';
+
+  @override String get emptyTrashConfirm => '所有項目將被永久刪除，無法復原。';
+  @override String deletedOn(String date) => '$date 刪除';
+  @override String get permanentDelete => '永久刪除';
+
+  @override String get deleteConfirm => '刪除？';
+  @override String createdAtValue(String value) => '建立時間：$value';
+  @override String percentSuffix(int percent) => '（$percent%）';
+  @override String dateWithWeekday(String date, String weekday) => '$date（$weekday）';
+  @override String dateLongDate(int month, int day) => '$month月$day日';
+
+  @override String get syncFailed => '同步失敗，剛才的變更可能沒有存到雲端';
 }

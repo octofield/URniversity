@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../providers/settings_provider.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -25,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    final s = ref.read(stringsProvider);
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
     final confirm = _confirmCtrl.text;
@@ -32,13 +35,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (email.isEmpty || password.isEmpty) return;
     if (password != confirm) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('兩次密碼不一致')),
+        SnackBar(content: Text(s.passwordMismatch)),
       );
       return;
     }
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('密碼至少 6 個字元')),
+        SnackBar(content: Text(s.passwordTooShort)),
       );
       return;
     }
@@ -52,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (mounted) {
         if (response.session == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('請到信箱確認驗證信，完成後即可登入')),
+            SnackBar(content: Text(s.checkVerificationEmail)),
           );
         }
         Navigator.pop(context);
@@ -70,8 +73,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('建立帳號')),
+      appBar: AppBar(title: Text(s.createAccount)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
@@ -82,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '開始使用 URniversity',
+                s.registerHeadline,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -91,9 +95,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: '電子郵件',
-                  prefixIcon: Icon(Icons.email_outlined),
+                decoration: InputDecoration(
+                  labelText: s.emailLabel,
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -101,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  labelText: '密碼（至少 6 字元）',
+                  labelText: s.passwordLabelWithHint,
                   prefixIcon: const Icon(Icons.lock_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(_showPassword
@@ -116,9 +120,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextField(
                 controller: _confirmCtrl,
                 obscureText: !_showPassword,
-                decoration: const InputDecoration(
-                  labelText: '確認密碼',
-                  prefixIcon: Icon(Icons.lock_outlined),
+                decoration: InputDecoration(
+                  labelText: s.confirmPasswordLabel,
+                  prefixIcon: const Icon(Icons.lock_outlined),
                 ),
                 onSubmitted: (_) => _register(),
               ),
@@ -133,17 +137,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('註冊'),
+                      : Text(s.register),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('已有帳號？'),
+                  Text(s.haveAccountAlready),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('登入'),
+                    child: Text(s.login),
                   ),
                 ],
               ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/ui_symbols.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
@@ -174,9 +175,9 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                     selected == null
                         ? s.historyTapHint
                         : selected.total == 0
-                            ? '${selected.label} · ${s.historyNoData}'
-                            : '${selected.label} · ${s.goalProgress(selected.done, selected.total)}'
-                              '（${(selected.rate! * 100).round()}%）',
+                            ? '${selected.label}$kDotSeparator${s.historyNoData}'
+                            : '${selected.label}$kDotSeparator${s.goalProgress(selected.done, selected.total)}'
+                              '${s.percentSuffix((selected.rate! * 100).round())}',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: selected == null
                           ? AppColors.textTertiary

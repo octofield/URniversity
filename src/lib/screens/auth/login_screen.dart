@@ -6,16 +6,17 @@ import '../../core/theme/app_breakpoints.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/guest_provider.dart';
+import '../../providers/settings_provider.dart';
 import 'register_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
@@ -72,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     final isDesktop =
         MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
@@ -88,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          '登入',
+          s.login,
           style: Theme.of(
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -97,9 +99,9 @@ class _LoginScreenState extends State<LoginScreen> {
         TextField(
           controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: '電子郵件',
-            prefixIcon: Icon(Icons.email_outlined),
+          decoration: InputDecoration(
+            labelText: s.emailLabel,
+            prefixIcon: const Icon(Icons.email_outlined),
           ),
           onSubmitted: (_) => _login(),
         ),
@@ -108,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: _passwordCtrl,
           obscureText: !_showPassword,
           decoration: InputDecoration(
-            labelText: '密碼',
+            labelText: s.passwordLabel,
             prefixIcon: const Icon(Icons.lock_outlined),
             suffixIcon: IconButton(
               icon: Icon(
@@ -132,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('登入'),
+                : Text(s.login),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -141,7 +143,8 @@ class _LoginScreenState extends State<LoginScreen> {
             const Expanded(child: Divider()),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text('或', style: TextStyle(color: Colors.grey)),
+              child: Text(s.orDivider,
+                  style: const TextStyle(color: Colors.grey)),
             ),
             const Expanded(child: Divider()),
           ],
@@ -151,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
           width: double.infinity,
           child: OutlinedButton.icon(
             icon: const Icon(Icons.g_mobiledata, size: 22),
-            label: const Text('使用 Google 登入'),
+            label: Text(s.signInWithGoogle),
             onPressed: _loading ? null : _googleLogin,
           ),
         ),
@@ -159,13 +162,13 @@ class _LoginScreenState extends State<LoginScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('還沒有帳號？'),
+            Text(s.noAccountYet),
             TextButton(
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const RegisterScreen()),
               ),
-              child: const Text('註冊'),
+              child: Text(s.register),
             ),
           ],
         ),
@@ -181,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textTertiary,
                 ),
-                child: const Text('返回訪客模式'),
+                child: Text(s.backToGuestMode),
               );
             }
             return TextButton(
@@ -195,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.textTertiary,
               ),
-              child: const Text('以訪客身份體驗'),
+              child: Text(s.tryAsGuest),
             );
           },
         ),

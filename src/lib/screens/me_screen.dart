@@ -5,6 +5,8 @@ import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/ui_symbols.dart';
+import '../l10n/app_strings.dart';
 import '../models/inspiration.dart';
 import '../models/journal.dart';
 import '../providers/auth_provider.dart';
@@ -14,6 +16,8 @@ import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/universities_provider.dart';
+import '../widgets/confirm_dialog.dart';
+import '../widgets/sheet_body.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'inspirations_screen.dart';
@@ -147,12 +151,6 @@ class MeScreen extends ConsumerWidget {
   }
 }
 
-String _gradeLabel(int grade) {
-  const labels = ['一', '二', '三', '四', '五', '六', '七'];
-  final i = grade - 1;
-  return i >= 0 && i < labels.length ? labels[i] : '$grade';
-}
-
 // ─── Profile Card ─────────────────────────────────────────────────────────────
 
 class _ProfileCard extends ConsumerWidget {
@@ -167,13 +165,7 @@ class _ProfileCard extends ConsumerWidget {
     final semSettings = ref.watch(semesterSettingsProvider);
 
     final isGuest = ref.watch(guestModeProvider);
-    final googleName = isGuest ? null : user?.userMetadata?['full_name'] as String?;
-    final avatarUrl = isGuest ? null : user?.userMetadata?['avatar_url'] as String?;
-    final username = profile?.username;
-    final displayName = username?.isNotEmpty == true
-        ? username!
-        : (isGuest ? '訪客' : (googleName ?? user?.email ?? ''));
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+    final identity = ref.watch(displayIdentityProvider);
 
     int? displayGrade;
     if (profile?.grade != null && profile?.gradeSetYear != null) {
@@ -196,8 +188,8 @@ class _ProfileCard extends ConsumerWidget {
               children: [
                 AppAvatars.build(
                   avatarIndex: profile?.avatarIndex,
-                  avatarUrl: avatarUrl,
-                  initial: initial,
+                  avatarUrl: identity.avatarUrl,
+                  initial: identity.initial,
                   radius: 32,
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -206,10 +198,10 @@ class _ProfileCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        displayName,
+                        identity.name,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: (username?.isNotEmpty == true || (!isGuest && googleName != null))
+                          color: identity.hasRealName
                               ? AppColors.textPrimary
                               : AppColors.textTertiary,
                         ),
@@ -218,13 +210,13 @@ class _ProfileCard extends ConsumerWidget {
                         Text(user!.email!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
                       const SizedBox(height: 4),
                       // School / Department / Grade info rows
-                      _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : '—'),
-                      _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : '—'),
-                      _InfoRow(label: s.grade, value: displayGrade != null ? _gradeLabel(displayGrade) : '—'),
+                      _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : kEmptyValue),
+                      _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : kEmptyValue),
+                      _InfoRow(label: s.grade, value: displayGrade != null ? s.gradeLabel(displayGrade) : kEmptyValue),
                       if (!isGuest)
                         _InfoRow(
-                          label: '登入方式',
-                          value: (user?.identities?.any((i) => i.provider == 'google') ?? false) ? 'Google' : '電子郵件',
+                          label: s.loginMethod,
+                          value: (user?.identities?.any((i) => i.provider == 'google') ?? false) ? 'Google' : s.emailLabel,
                         ),
                     ],
                   ),
@@ -244,7 +236,7 @@ class _ProfileCard extends ConsumerWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.login, size: 18),
-                  label: const Text('登入 / 建立帳號'),
+                  label: Text(s.loginOrCreateAccount),
                   onPressed: () => _showMergeChoiceDialog(context, ref),
                 ),
               ),
@@ -328,13 +320,13 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   Future<void> _pickSchool() async {
     final unis = widget.ref.read(universitiesProvider).universities;
-    final result = await _openSearchPicker(context, '選擇學校', unis, _school);
+    final result = await _openSearchPicker(context, widget.s, widget.s.school, unis, _school);
     if (result != null) setState(() { _school = result; _dept = ''; });
   }
 
   Future<void> _pickDept() async {
     final depts = widget.ref.read(universitiesProvider).departmentsFor(_school);
-    final result = await _openSearchPicker(context, '選擇系所', depts, _dept);
+    final result = await _openSearchPicker(context, widget.s, widget.s.department, depts, _dept);
     if (result != null) setState(() => _dept = result);
   }
 
@@ -361,12 +353,12 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               decoration: InputDecoration(labelText: s.grade),
               items: [
                 for (int i = 1; i <= 7; i++)
-                  DropdownMenuItem<int>(value: i, child: Text(_gradeLabel(i))),
+                  DropdownMenuItem<int>(value: i, child: Text(s.gradeLabel(i))),
               ],
               onChanged: (v) => setState(() => _selectedGrade = v ?? 1),
             ),
             const SizedBox(height: 16),
-            Text('頭像', style: Theme.of(context).textTheme.labelMedium),
+            Text(s.avatar, style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -537,7 +529,7 @@ class _InspirationTile extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 18),
             onPressed: () async {
-              if (await _confirmDelete(context, s)) {
+              if (await confirmDelete(context, s)) {
                 ref.read(inspirationsProvider.notifier).remove(item.id);
               }
             },
@@ -554,78 +546,50 @@ void _showEditInspirationSheet(
   final contentCtrl = TextEditingController(text: item.content ?? '');
   final s = ref.read(stringsProvider);
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetCtx) => Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.pageHorizontal,
-        right: AppSpacing.pageHorizontal,
-        top: AppSpacing.lg,
-        bottom: MediaQuery.of(sheetCtx).viewInsets.bottom +
-                  MediaQuery.of(sheetCtx).viewPadding.bottom +
-                  AppSpacing.lg,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
-              ),
+  showAppSheet(
+    context,
+    builder: (sheetCtx) => SheetBody(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.inspirations,
+              style: Theme.of(sheetCtx).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: titleCtrl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(labelText: s.titleField),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: contentCtrl,
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(labelText: s.inspirationDetails),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                final title = titleCtrl.text.trim();
+                if (title.isEmpty) return;
+                ref.read(inspirationsProvider.notifier).update(
+                  item.copyWith(
+                    title: title,
+                    content: contentCtrl.text.trim().isEmpty
+                        ? null
+                        : contentCtrl.text.trim(),
+                  ),
+                );
+                Navigator.pop(sheetCtx);
+              },
+              child: Text(s.save),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(s.inspirations,
-                style: Theme.of(sheetCtx).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: titleCtrl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: s.titleField),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: contentCtrl,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: s.inspirationDetails),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  final title = titleCtrl.text.trim();
-                  if (title.isEmpty) return;
-                  ref.read(inspirationsProvider.notifier).update(
-                    item.copyWith(
-                      title: title,
-                      content: contentCtrl.text.trim().isEmpty
-                          ? null
-                          : contentCtrl.text.trim(),
-                    ),
-                  );
-                  Navigator.pop(sheetCtx);
-                },
-                child: Text(s.save),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
@@ -733,16 +697,8 @@ class _JournalTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final user = ref.watch(currentUserProvider);
     final profile = ref.watch(profileProvider);
-    final isGuest = ref.watch(guestModeProvider);
-    final googleName = isGuest ? null : user?.userMetadata?['full_name'] as String?;
-    final avatarUrl = isGuest ? null : user?.userMetadata?['avatar_url'] as String?;
-    final username = profile?.username;
-    final displayName = username?.isNotEmpty == true
-        ? username!
-        : (isGuest ? '訪客' : (googleName ?? user?.email ?? ''));
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+    final identity = ref.watch(displayIdentityProvider);
     final d = journal.date;
     final dateStr =
         '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
@@ -761,8 +717,8 @@ class _JournalTile extends ConsumerWidget {
               children: [
                 AppAvatars.build(
                   avatarIndex: profile?.avatarIndex,
-                  avatarUrl: avatarUrl,
-                  initial: initial,
+                  avatarUrl: identity.avatarUrl,
+                  initial: identity.initial,
                   radius: 14,
                 ),
                 const SizedBox(width: 8),
@@ -796,7 +752,7 @@ class _JournalTile extends ConsumerWidget {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   onPressed: () async {
-                    if (await _confirmDelete(context, s)) {
+                    if (await confirmDelete(context, s)) {
                       ref.read(journalProvider.notifier).remove(journal.id);
                     }
                   },
@@ -841,16 +797,8 @@ class JournalDetailScreen extends ConsumerWidget {
       if (j.id == journal.id) { live = j; break; }
     }
 
-    final user = ref.watch(currentUserProvider);
     final profile = ref.watch(profileProvider);
-    final isGuest = ref.watch(guestModeProvider);
-    final googleName = isGuest ? null : user?.userMetadata?['full_name'] as String?;
-    final avatarUrl = isGuest ? null : user?.userMetadata?['avatar_url'] as String?;
-    final username = profile?.username;
-    final displayName = username?.isNotEmpty == true
-        ? username!
-        : (isGuest ? '訪客' : (googleName ?? user?.email ?? ''));
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+    final identity = ref.watch(displayIdentityProvider);
 
     // Compute day number
     DateTime? earliest;
@@ -891,8 +839,8 @@ class JournalDetailScreen extends ConsumerWidget {
               children: [
                 AppAvatars.build(
                   avatarIndex: profile?.avatarIndex,
-                  avatarUrl: avatarUrl,
-                  initial: initial,
+                  avatarUrl: identity.avatarUrl,
+                  initial: identity.initial,
                   radius: 24,
                 ),
                 const SizedBox(width: 12),
@@ -901,7 +849,7 @@ class JournalDetailScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        displayName,
+                        identity.name,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -955,7 +903,7 @@ class JournalDetailScreen extends ConsumerWidget {
                       ),
                     )
                   : Text(
-                      '—',
+                      kEmptyValue,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -971,11 +919,12 @@ class JournalDetailScreen extends ConsumerWidget {
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 void _showMergeChoiceDialog(BuildContext context, WidgetRef ref) {
+  final s = ref.read(stringsProvider);
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('登入 / 建立帳號'),
-      content: const Text('登入後，目前的訪客資料要如何處理？'),
+      title: Text(s.loginOrCreateAccount),
+      content: Text(s.mergeGuestDataQuestion),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
@@ -987,7 +936,7 @@ void _showMergeChoiceDialog(BuildContext context, WidgetRef ref) {
             ref.read(shouldMergeGuestDataProvider.notifier).state = false;
             ref.read(pendingGuestLoginProvider.notifier).state = true;
           },
-          child: const Text('捨棄資料'),
+          child: Text(s.discardGuestData),
         ),
         FilledButton(
           onPressed: () {
@@ -995,7 +944,7 @@ void _showMergeChoiceDialog(BuildContext context, WidgetRef ref) {
             ref.read(shouldMergeGuestDataProvider.notifier).state = true;
             ref.read(pendingGuestLoginProvider.notifier).state = true;
           },
-          child: const Text('整合進帳號'),
+          child: Text(s.mergeGuestData),
         ),
       ],
     ),
@@ -1021,7 +970,7 @@ class _PickerTile extends StatelessWidget {
           suffixIcon: const Icon(Icons.arrow_drop_down),
         ),
         child: Text(
-          value.isEmpty ? '—' : value,
+          value.isEmpty ? kEmptyValue : value,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: value.isEmpty ? AppColors.textTertiary : AppColors.textPrimary,
           ),
@@ -1033,15 +982,14 @@ class _PickerTile extends StatelessWidget {
 
 Future<String?> _openSearchPicker(
   BuildContext context,
-  String title,
+  AppStrings s,
+  String field,
   List<String> options,
   String current,
 ) async {
   String query = '';
-  final result = await showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+  final result = await showAppSheet<String>(
+    context,
     builder: (ctx) {
       return StatefulBuilder(
         builder: (ctx, setSt) {
@@ -1069,7 +1017,7 @@ Future<String?> _openSearchPicker(
                   child: TextField(
                     autofocus: true,
                     decoration: InputDecoration(
-                      hintText: '搜尋 $title',
+                      hintText: s.pickerSearchHint(field),
                       prefixIcon: const Icon(Icons.search),
                     ),
                     onChanged: (v) => setSt(() => query = v),
@@ -1087,10 +1035,10 @@ Future<String?> _openSearchPicker(
                       const Divider(),
                       ListTile(
                         leading: const Icon(Icons.edit_outlined),
-                        title: const Text('其他（自行輸入）'),
+                        title: Text(s.pickerOther),
                         onTap: () async {
                           Navigator.pop(ctx);
-                          final custom = await _showCustomInputDialog(context, title, current);
+                          final custom = await _showCustomInputDialog(context, s, field, current);
                           if (custom != null && context.mounted) {
                             Navigator.pop(context, custom);
                           }
@@ -1109,17 +1057,22 @@ Future<String?> _openSearchPicker(
   return result;
 }
 
-Future<String?> _showCustomInputDialog(BuildContext context, String title, String initial) async {
+Future<String?> _showCustomInputDialog(
+  BuildContext context,
+  AppStrings s,
+  String field,
+  String initial,
+) async {
   final ctrl = TextEditingController(text: initial);
   final result = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text('輸入$title'),
+      title: Text(s.pickerCustomInput(field)),
       content: TextField(
         controller: ctrl,
         autofocus: true,
         textCapitalization: TextCapitalization.words,
-        decoration: InputDecoration(labelText: title),
+        decoration: InputDecoration(labelText: field),
       ),
       actions: [
         TextButton(
@@ -1128,35 +1081,12 @@ Future<String?> _showCustomInputDialog(BuildContext context, String title, Strin
         ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-          child: const Text('確定'),
+          child: Text(s.confirm),
         ),
       ],
     ),
   );
   ctrl.dispose();
   return result?.isEmpty == true ? null : result;
-}
-
-Future<bool> _confirmDelete(BuildContext context, dynamic s) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          content: Text('${s.delete}？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child:
-                  Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.error),
-              child: Text(s.delete),
-            ),
-          ],
-        ),
-      ) ??
-      false;
 }
 

@@ -6,6 +6,7 @@ import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/ui_symbols.dart';
 import '../l10n/app_strings.dart';
 import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
@@ -21,6 +22,7 @@ import '../providers/categories_provider.dart';
 import '../providers/profile_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/sheet_body.dart';
@@ -127,7 +129,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${formatDate(todayDate, dateFormat)} · '
+                      '${formatDate(todayDate, dateFormat, s)}$kDotSeparator'
                       '${s.todayStatus(todayTasks.length, todayDone)}',
                       style: Theme.of(
                         context,
@@ -205,7 +207,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       const Icon(Icons.filter_list, size: 14, color: AppColors.primary),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        '${s.filters} · ${targetFilter.length + goalFilter.length}',
+                        '${s.filters}$kDotSeparator${targetFilter.length + goalFilter.length}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -237,7 +239,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   onPressed: () => ref.read(dateProvider.notifier).prev(),
                 ),
                 Text(
-                  formatDate(selectedDate, dateFormat),
+                  formatDate(selectedDate, dateFormat, s),
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 IconButton(
@@ -556,7 +558,7 @@ class _WeekTaskTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isCompleted = task.isCompletedOn(date);
     return InkWell(
-      onTap: () => _showEditTaskSheet(context, ref, task),
+      onTap: () => showTaskSheet(context, ref, existing: task),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
@@ -646,7 +648,7 @@ class _SummaryCard extends ConsumerWidget {
                           ),
                           Center(
                             child: Text(
-                              total == 0 ? '—' : '${(value * 100).round()}%',
+                              total == 0 ? kEmptyValue : '${(value * 100).round()}%',
                               style: Theme.of(
                                 context,
                               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -852,7 +854,7 @@ class _TasksSection extends ConsumerWidget {
                       icon: Icons.task_alt,
                       message: s.noTasks,
                       actionLabel: s.addTask,
-                      onAction: () => showAddTaskSheet(context, ref),
+                      onAction: () => showTaskSheet(context, ref),
                       compact: true,
                     ),
                   )
@@ -1477,7 +1479,7 @@ class _TaskTile extends ConsumerWidget {
                   ),
                 if (linkedTarget != null)
                   Text(
-                    '→ ${linkedTarget.title}',
+                    '$kArrow ${linkedTarget.title}',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
@@ -1520,7 +1522,7 @@ class _TaskTile extends ConsumerWidget {
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             onPressed: () async {
-              if (await _confirmDelete(context, s)) {
+              if (await confirmDelete(context, s)) {
                 // Snapshot every removed task (parent + subtasks) so all of
                 // them can be restored from the trash
                 final removed = ref.read(tasksProvider.notifier).remove(task.id);
@@ -1533,7 +1535,7 @@ class _TaskTile extends ConsumerWidget {
           ),
         ],
       ),
-      onTap: () => _showEditTaskSheet(context, ref, task),
+      onTap: () => showTaskSheet(context, ref, existing: task),
     );
 
     // ListTile paints its ink splash on the nearest Material ancestor. The card
@@ -1574,27 +1576,6 @@ Widget _linkColorBar(Color? top, Color? bottom) {
       ],
     ),
   );
-}
-
-Future<bool> _confirmDelete(BuildContext context, AppStrings s) async {
-  return await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          content: Text('${s.delete}？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-              child: Text(s.delete),
-            ),
-          ],
-        ),
-      ) ??
-      false;
 }
 
 // ─── Date+time picker (clock style) ──────────────────────────────────────────
@@ -1961,27 +1942,33 @@ Widget _linkRow({
 // ─── Add task sheet ───────────────────────────────────────────────────────────
 
 // Public so HomeScreen FAB can call it
-void showAddTaskSheet(BuildContext context, WidgetRef ref, {String? parentTaskId}) {
-  // The task doesn't exist yet, so the weekly/monthly fallback preview is
-  // relative to now — which is what its createdAt will be on submit
-  final labelCreatedAt = DateTime.now();
-  final titleController = TextEditingController();
-  final contentController = TextEditingController();
+// One sheet for both modes: [existing] null means add, non-null means edit.
+// Keeping them apart meant every field change had to be made twice
+void showTaskSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  Task? existing,
+  String? parentTaskId,
+}) {
+  final isEdit = existing != null;
+  // When adding, the task does not exist yet, so the weekly/monthly fallback
+  // preview is relative to now — which is what its createdAt will be on submit
+  final labelCreatedAt = existing?.createdAt ?? DateTime.now();
+  final titleController = TextEditingController(text: existing?.title ?? '');
+  final contentController = TextEditingController(text: existing?.content ?? '');
   final s = ref.read(stringsProvider);
   final semSettings = ref.read(semesterSettingsProvider);
   // Sheet state must outlive the modal route builder: Flutter re-invokes that
   // builder whenever MediaQuery changes (e.g. the keyboard hides when a picker
   // dialog opens), which would otherwise reset every field to its default
-  var priority = 1;
-  DateTime? dueTime;
-  RecurrenceRule? recurrence;
-  String? linkedTargetId;
-  String? linkedGoalId;
+  var priority = existing?.priority ?? 1;
+  DateTime? dueTime = existing?.dueTime;
+  RecurrenceRule? recurrence = existing?.recurrence;
+  String? linkedTargetId = existing?.linkedTargetId;
+  String? linkedGoalId = existing?.linkedGoalId;
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+  showAppSheet(
+    context,
     builder: (sheetCtx) {
       return StatefulBuilder(
         builder: (sheetCtx, setState) {
@@ -1999,185 +1986,37 @@ void showAddTaskSheet(BuildContext context, WidgetRef ref, {String? parentTaskId
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s.addTask, style: Theme.of(sheetCtx).textTheme.titleLarge),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: s.titleField),
-                  onSubmitted: (_) => _submitTask(
-                    sheetCtx,
-                    ref,
-                    titleController,
-                    contentController,
-                    priority,
-                    dueTime,
-                    recurrence,
-                    linkedTargetId,
-                    linkedGoalId,
-                    parentTaskId: parentTaskId,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: contentController,
-                  maxLines: 1,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: s.taskNotes, isDense: true),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _linkRow(
-                  icon: Icons.calendar_today_outlined,
-                  label: dueTime != null ? _formatDueTime(dueTime!) : s.dueTime,
-                  active: dueTime != null,
-                  onTap: () async {
-                    final result = await _showDateTimePicker(sheetCtx, dueTime ?? DateTime.now());
-                    if (result != null) setState(() => dueTime = result);
-                  },
-                  onClear: () => setState(() => dueTime = null),
-                ),
-                const SizedBox(height: 2),
-                _linkRow(
-                  icon: Icons.repeat,
-                  label: (recurrence == null || recurrence!.isNone)
-                      ? s.repeatNone
-                      : _recurrenceShort(recurrence!, s, labelCreatedAt),
-                  active: recurrence != null && !recurrence!.isNone,
-                  onTap: () async {
-                    final result = await _showRecurrencePicker(sheetCtx, s, recurrence);
-                    if (result != null) setState(() => recurrence = result);
-                  },
-                  onClear: () =>
-                      setState(() => recurrence = const RecurrenceRule(type: RecurrenceType.none)),
-                ),
-                const SizedBox(height: 2),
-                _linkRow(
-                  icon: Icons.flag_outlined,
-                  label: linkedTarget != null
-                      ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
-                      : s.linkedTarget,
-                  active: linkedTarget != null,
-                  onTap: () => _showTargetSelector(
-                    sheetCtx,
-                    ref,
-                    s,
-                    linkedTargetId,
-                    (id) => setState(() => linkedTargetId = id),
-                  ),
-                  onClear: () => setState(() => linkedTargetId = null),
-                ),
-                const SizedBox(height: 2),
-                _linkRow(
-                  icon: Icons.stars_outlined,
-                  label: linkedGoal != null ? linkedGoal.title : s.linkedGoal,
-                  active: linkedGoal != null,
-                  onTap: () => _showGoalSelectorForTask(
-                    sheetCtx,
-                    ref,
-                    s,
-                    linkedGoalId,
-                    (id) => setState(() => linkedGoalId = id),
-                  ),
-                  onClear: () => setState(() => linkedGoalId = null),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    Text(s.priority, style: Theme.of(sheetCtx).textTheme.bodyMedium),
-                    const SizedBox(width: 12),
-                    SegmentedButton<int>(
-                      segments: [
-                        ButtonSegment(value: 1, label: Text(s.priorityLow)),
-                        ButtonSegment(value: 2, label: Text(s.priorityMed)),
-                        ButtonSegment(value: 3, label: Text(s.priorityHigh)),
-                      ],
-                      selected: {priority},
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onSelectionChanged: (v) => setState(() => priority = v.first),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => _submitTask(
+                Text(isEdit ? s.editTask : s.addTask,
+                    style: Theme.of(sheetCtx).textTheme.titleLarge),
+                if (isEdit) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    s.createdAtValue(_formatCreatedAt(existing.createdAt)),
+                    style: Theme.of(
                       sheetCtx,
-                      ref,
-                      titleController,
-                      contentController,
-                      priority,
-                      dueTime,
-                      recurrence,
-                      linkedTargetId,
-                      linkedGoalId,
-                    ),
-                    child: Text(s.add),
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
-void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
-  final labelCreatedAt = task.createdAt;
-  final titleController = TextEditingController(text: task.title);
-  final contentController = TextEditingController(text: task.content ?? '');
-  final s = ref.read(stringsProvider);
-  final semSettings = ref.read(semesterSettingsProvider);
-  // Sheet state must outlive the modal route builder: Flutter re-invokes that
-  // builder whenever MediaQuery changes (e.g. the keyboard hides when a picker
-  // dialog opens), which would otherwise reset every field to its default
-  var priority = task.priority;
-  DateTime? dueTime = task.dueTime;
-  RecurrenceRule? recurrence = task.recurrence;
-  String? linkedTargetId = task.linkedTargetId;
-  String? linkedGoalId = task.linkedGoalId;
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetCtx) {
-      return StatefulBuilder(
-        builder: (sheetCtx, setState) {
-          final targets = ref.read(semesterGoalsProvider);
-          final goals = ref.read(futureGoalsProvider);
-          final linkedTarget = linkedTargetId != null
-              ? targets.where((g) => g.id == linkedTargetId).firstOrNull
-              : null;
-          final linkedGoal = linkedGoalId != null
-              ? goals.where((g) => g.id == linkedGoalId).firstOrNull
-              : null;
-
-          return SheetBody(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s.editTask, style: Theme.of(sheetCtx).textTheme.titleLarge),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${s.createdAtLabel}：${_formatCreatedAt(task.createdAt)}',
-                  style: Theme.of(
-                    sheetCtx,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
-                ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: titleController,
                   autofocus: true,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: InputDecoration(labelText: s.titleField),
+                  onSubmitted: isEdit
+                      ? null
+                      : (_) => _submitTask(
+                            sheetCtx,
+                            ref,
+                            titleController,
+                            contentController,
+                            priority,
+                            dueTime,
+                            recurrence,
+                            linkedTargetId,
+                            linkedGoalId,
+                            parentTaskId: parentTaskId,
+                          ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -2215,7 +2054,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                 _linkRow(
                   icon: Icons.flag_outlined,
                   label: linkedTarget != null
-                      ? '${linkedTarget.title} · ${formatSemester(linkedTarget.semester, semSettings, s)}'
+                      ? '${linkedTarget.title}$kDotSeparator${formatSemester(linkedTarget.semester, semSettings, s)}'
                       : s.linkedTarget,
                   active: linkedTarget != null,
                   onTap: () => _showTargetSelector(
@@ -2262,7 +2101,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                   ],
                 ),
                 // Subtasks are one level deep, so only top-level tasks offer this
-                if (task.parentTaskId == null) ...[
+                if (isEdit && existing.parentTaskId == null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -2271,7 +2110,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                       label: Text(s.addSubtask),
                       onPressed: () {
                         Navigator.pop(sheetCtx);
-                        showAddTaskSheet(context, ref, parentTaskId: task.id);
+                        showTaskSheet(context, ref, parentTaskId: existing.id);
                       },
                     ),
                   ),
@@ -2281,6 +2120,21 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () {
+                      if (!isEdit) {
+                        _submitTask(
+                          sheetCtx,
+                          ref,
+                          titleController,
+                          contentController,
+                          priority,
+                          dueTime,
+                          recurrence,
+                          linkedTargetId,
+                          linkedGoalId,
+                          parentTaskId: parentTaskId,
+                        );
+                        return;
+                      }
                       final title = titleController.text.trim();
                       if (title.isEmpty) return;
                       // copyWith, not a hand-built Task: every field has a
@@ -2289,7 +2143,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                       ref
                           .read(tasksProvider.notifier)
                           .update(
-                            task.copyWith(
+                            existing.copyWith(
                               title: title,
                               content: contentController.text.trim().isEmpty
                                   ? null
@@ -2303,7 +2157,7 @@ void _showEditTaskSheet(BuildContext context, WidgetRef ref, Task task) {
                           );
                       Navigator.pop(sheetCtx);
                     },
-                    child: Text(s.save),
+                    child: Text(isEdit ? s.save : s.add),
                   ),
                 ),
               ],
@@ -2349,39 +2203,13 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
   final contentController = TextEditingController();
   final s = ref.read(stringsProvider);
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (sheetCtx) => Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      padding: EdgeInsets.only(
-        left: AppSpacing.pageHorizontal,
-        right: AppSpacing.pageHorizontal,
-        top: AppSpacing.lg,
-        bottom:
-            MediaQuery.of(sheetCtx).viewInsets.bottom +
-            MediaQuery.of(sheetCtx).viewPadding.bottom +
-            AppSpacing.lg,
-      ),
+  showAppSheet(
+    context,
+    builder: (sheetCtx) => SheetBody(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
           Text(s.addInspiration, style: Theme.of(sheetCtx).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
           TextField(

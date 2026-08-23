@@ -1,12 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/trash_item.dart';
+import 'synced_list_notifier.dart';
 import '../models/task.dart';
 import '../models/semester_goal.dart';
 import '../models/future_goal.dart';
 
 class TrashNotifier extends StateNotifier<List<TrashItem>> {
-  TrashNotifier() : super([]);
+  TrashNotifier(this.ref) : super([]);
+
+  final Ref ref;
 
   String? _userId;
   SupabaseClient get _db => Supabase.instance.client;
@@ -33,12 +36,12 @@ class TrashNotifier extends StateNotifier<List<TrashItem>> {
     if (_userId == null) return;
     _db.from('trash_items')
         .insert({...item.toRow(), 'user_id': _userId})
-        .catchError((_) {});
+        .catchError((Object e) => reportSyncError(ref, e));
   }
 
   void _deleteRow(String trashId) {
     if (_userId == null) return;
-    _db.from('trash_items').delete().eq('id', trashId).catchError((_) {});
+    _db.from('trash_items').delete().eq('id', trashId).catchError((Object e) => reportSyncError(ref, e));
   }
 
   void addTask(Task task) {
@@ -75,5 +78,5 @@ class TrashNotifier extends StateNotifier<List<TrashItem>> {
 }
 
 final trashProvider = StateNotifierProvider<TrashNotifier, List<TrashItem>>(
-  (ref) => TrashNotifier(),
+  (ref) => TrashNotifier(ref),
 );

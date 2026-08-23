@@ -20,7 +20,6 @@ abstract class AppStrings {
   String get priorityMed;
   String get priorityHigh;
   String get dueTime;
-  String get clearTime;
 
   // Task linking & recurrence
   String get linkedTarget;
@@ -51,7 +50,6 @@ abstract class AppStrings {
   String get me;
   String get usernameLabel;
   String get accountSettings;
-  String get editUsername;
   String get journal;
   String get noJournal;
   String get addJournal;
@@ -97,7 +95,6 @@ abstract class AppStrings {
   String get addSubgoal;
   String get editTask;
   String get save;
-  String get addCategory;
   String get categoryName;
   String get linkedFutureGoal;
   String get selectFutureGoal;
@@ -148,7 +145,6 @@ abstract class AppStrings {
   String get semesterStartMonth;
 
   // Goal detail screen
-  String get goalDetail;
   String get linkedTasks;
   String get linkedTargets;
 
@@ -209,4 +205,68 @@ abstract class AppStrings {
   String get feedbackErrorMinLength;
   String get feedbackErrorCooldown;
   String get feedbackErrorFailed;
+
+  // Auth screens
+  String get login;
+  String get register;
+  String get createAccount;
+  String get registerHeadline;
+  String get emailLabel;
+  String get passwordLabel;
+  String get passwordLabelWithHint;
+  String get confirmPasswordLabel;
+  String get orDivider;
+  String get signInWithGoogle;
+  String get noAccountYet;
+  String get haveAccountAlready;
+  String get backToGuestMode;
+  String get tryAsGuest;
+  String get passwordMismatch;
+  String get passwordTooShort;
+  String get checkVerificationEmail;
+
+  // Profile setup & editing
+  String get setupProfileTitle;
+  String get setupProfileSubtitle;
+  String get pickAvatar;
+  String get avatar;
+  String get done;
+  String get confirm;
+  String get guest;
+  String get loginMethod;
+  String gradeLabel(int grade);
+  String pickerSearchHint(String field);
+  String pickerCustomInput(String field);
+  String get pickerOther;
+
+  // Guest data merge
+  String get loginOrCreateAccount;
+  String get mergeGuestDataQuestion;
+  String get discardGuestData;
+  String get mergeGuestData;
+
+  // Account action confirmations
+  String get exitGuestConfirm;
+  String get exitAction;
+  String get logoutConfirm;
+  String deleteAccountConfirmEmail(String email);
+  String get deleteAccountConfirmPassword;
+  String get emailMismatch;
+  String get confirmDeleteAction;
+
+  // Trash
+  String get emptyTrashConfirm;
+  String deletedOn(String date);
+  String get permanentDelete;
+
+  // Shared phrasing — the punctuation itself differs per locale, so these
+  // cannot be assembled from their parts at the call site
+  String get deleteConfirm;
+  String createdAtValue(String value);
+  String percentSuffix(int percent);
+  String dateWithWeekday(String date, String weekday);
+  String dateLongDate(int month, int day);
+
+  // Shown when a write did not reach Supabase
+  String get syncFailed;
 }
