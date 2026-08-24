@@ -371,12 +371,12 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
                     // Main block: goal group list
                     Expanded(flex: 2, child: goalsList),
                     // Secondary block: semester progress overview
-                    Expanded(
+                    const Expanded(
                       flex: 1,
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(
+                        padding: EdgeInsets.fromLTRB(
                             0, 0, AppSpacing.pageHorizontal, AppSpacing.xl),
-                        child: const _SemesterOverviewCard(),
+                        child: _SemesterOverviewCard(),
                       ),
                     ),
                   ],
@@ -850,10 +850,12 @@ class _SemGoalCardTile extends ConsumerWidget {
                           padding: EdgeInsets.zero,
                           onPressed: () async {
                             if (await confirmDelete(context, s)) {
-                              ref
-                                  .read(trashProvider.notifier)
-                                  .addSemesterGoal(goal);
-                              notifier.remove(goal.id);
+                              // Snapshot the whole subtree, not just the root
+                              final removed = notifier.remove(goal.id);
+                              final trash = ref.read(trashProvider.notifier);
+                              for (final g in removed) {
+                                trash.addSemesterGoal(g);
+                              }
                             }
                           },
                         ),

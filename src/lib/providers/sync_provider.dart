@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_provider.dart';
@@ -95,15 +96,17 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   // which triggers _clearAll via the guestModeProvider listener.
   await ref.read(guestModeProvider.notifier).disable();
   // Reload from Supabase (state was just cleared by _clearAll).
-  ref.read(tasksProvider.notifier).load(uid);
-  ref.read(futureGoalsProvider.notifier).load(uid);
-  ref.read(semesterGoalsProvider.notifier).load(uid);
-  ref.read(trashProvider.notifier).load(uid);
-  ref.read(categoriesProvider.notifier).load(uid);
-  ref.read(inspirationsProvider.notifier).load(uid);
-  ref.read(journalProvider.notifier).load(uid);
-  ref.read(profileProvider.notifier).load(uid);
-  _loadSettings(ref, uid);
+  // Fired in parallel on purpose: each list loads independently and the UI
+  // fills in as they arrive, so awaiting them in sequence would only be slower
+  unawaited(ref.read(tasksProvider.notifier).load(uid));
+  unawaited(ref.read(futureGoalsProvider.notifier).load(uid));
+  unawaited(ref.read(semesterGoalsProvider.notifier).load(uid));
+  unawaited(ref.read(trashProvider.notifier).load(uid));
+  unawaited(ref.read(categoriesProvider.notifier).load(uid));
+  unawaited(ref.read(inspirationsProvider.notifier).load(uid));
+  unawaited(ref.read(journalProvider.notifier).load(uid));
+  unawaited(ref.read(profileProvider.notifier).load(uid));
+  unawaited(_loadSettings(ref, uid));
 }
 
 void _loadGuest(Ref ref) {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/theme/app_breakpoints.dart';
 import '../core/ui_symbols.dart';
+import '../l10n/app_strings.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -15,6 +15,7 @@ import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/responsive_body.dart';
 import 'future_screen.dart';
 import 'semester_goal_detail_screen.dart';
 
@@ -51,8 +52,6 @@ class FutureGoalDetailScreen extends ConsumerWidget {
     final catC = resolveCatColor(cats, primaryCat);
 
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
-    final isDesktop =
-        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
     final content = ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -295,14 +294,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: isDesktop
-          ? Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: content,
-              ),
-            )
-          : content,
+      body: ResponsiveBody(child: content),
     );
   }
 }
@@ -387,14 +379,13 @@ class _GoalTreeTile extends ConsumerWidget {
                 ),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 8),
+                      const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         goal.title,
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           decoration: goal.isDone
                               ? TextDecoration.lineThrough
                               : null,
@@ -440,8 +431,13 @@ class _GoalTreeTile extends ConsumerWidget {
               padding: EdgeInsets.zero,
               onPressed: () async {
                 if (await confirmDelete(context, s)) {
-                  ref.read(trashProvider.notifier).addFutureGoal(goal);
-                  ref.read(futureGoalsProvider.notifier).remove(goal.id);
+                  // Snapshot the whole subtree, not just the root
+                  final removed =
+                      ref.read(futureGoalsProvider.notifier).remove(goal.id);
+                  final trash = ref.read(trashProvider.notifier);
+                  for (final g in removed) {
+                    trash.addFutureGoal(g);
+                  }
                 }
               },
             ),
@@ -479,7 +475,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _CategoryBadge extends ConsumerWidget {
   final String cat;
-  final dynamic s;
+  final AppStrings s;
   const _CategoryBadge({required this.cat, required this.s});
 
   @override
@@ -496,9 +492,9 @@ class _CategoryBadge extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(resolveCatIcon(cats, cat), size: 12, color: color),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Text(catLabel(cat, s),
-              style: TextStyle(fontSize: 12, color: color)),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color)),
         ],
       ),
     );
@@ -609,8 +605,8 @@ void _showTargetSelectorForGoal(
                               : null,
                         )),
                     subtitle: Text(formatSemester(target.semester, semSettings, s),
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary)),
                     enabled: target.futureGoalId != goalId,
                     onTap: target.futureGoalId == goalId
                         ? null

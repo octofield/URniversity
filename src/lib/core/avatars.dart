@@ -32,7 +32,7 @@ class AppAvatars {
       return CircleAvatar(
         radius: radius,
         backgroundColor: p.color,
-        child: Icon(p.icon, color: Colors.white, size: radius * 0.85),
+        child: Icon(p.icon, color: AppColors.textOnPrimary, size: radius * 0.85),
       );
     }
     if (avatarUrl != null) {
@@ -49,7 +49,7 @@ class AppAvatars {
         style: TextStyle(
           fontSize: radius * 0.7,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: AppColors.textOnPrimary,
         ),
       ),
     );

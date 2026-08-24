@@ -107,6 +107,43 @@ formats, core algorithms, operation steps, and program flowcharts.**
   testing, and record actual results after. Do not run ad-hoc tests without a corresponding test
   plan file.
 
+## 9. Established Patterns
+
+**Before writing a helper, check whether one already exists.** A 2026-08 refactor collapsed
+dozens of near-duplicates into these; re-implementing them undoes that work.
+
+| Need | Use | Where |
+|---|---|---|
+| Delete confirmation dialog | `confirmDelete(context, s)` | `widgets/confirm_dialog.dart` |
+| Open a bottom sheet | `showAppSheet()` wrapping a `SheetBody` | `widgets/sheet_body.dart` |
+| Cap a single-column screen on desktop | `ResponsiveBody` | `widgets/responsive_body.dart` |
+| Drag-reorder drop zones and ordering | `dropZoneFor()`, `orderBetween()` | `widgets/drag_reorder.dart` |
+| A new list-shaped provider | extend `SyncedListNotifier<T>` | `providers/synced_list_notifier.dart` |
+| Current account's display name / avatar | `displayIdentityProvider` | `providers/profile_provider.dart` |
+| `—` `→` ` · ` placeholders | `kEmptyValue`, `kArrow`, `kDotSeparator` | `core/ui_symbols.dart` |
+
+### Hard rules
+
+1. **Never run `dart format`.** It reformats whole files and buries the real change.
+   Hand-edit indentation, and only on lines you already touched.
+2. **Never write `catchError((_) {})` or `catch (_) {}` around a write.** Route failures through
+   `reportSyncError(ref, e)` so the UI can surface them. A parse fallback is the one exception,
+   and it needs a comment saying so.
+3. **Declare sheet state outside the `showAppSheet` `builder:`.** Flutter re-runs that builder on
+   any MediaQuery change (the keyboard alone does it), so state declared inside is silently reset
+   — the symptom is "tapping does nothing, I have to press it several times".
+4. **l10n changes touch four files.** `l10n/app_strings.dart` plus the three implementations.
+   Verify with `grep -c "@override" src/lib/l10n/strings_*.dart` — all three must match.
+   Full-width punctuation (`？` `：` `（）`) belongs inside the localized string, never
+   concatenated at the call site.
+5. **No bare `fontSize:`.** Use a `Theme.of(context).textTheme.*` role. If no role matches the
+   size, keep it inline and add one English comment saying why.
+6. **Check subclass overrides before touching `SyncedListNotifier`.** e.g. `JournalNotifier`
+   overrides `mergeToUser` to filter out `auto_`-prefixed auto-filled entries; the generic base
+   does not.
+7. **Only top-level semester goals carry `future_goal_id`.** Enforced in
+   `linkFutureGoal()` and cleared by `reparent()`; see `system_design.md` UC4.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

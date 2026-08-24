@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/theme/app_breakpoints.dart';
 import '../core/ui_symbols.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
@@ -17,6 +16,7 @@ import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/responsive_body.dart';
 import '../widgets/sheet_body.dart';
 import 'future_goal_detail_screen.dart';
 
@@ -50,7 +50,6 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
     final total = children.length;
 
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
-    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
     final content = ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -95,7 +94,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                       color: goal.isDone ? AppColors.textTertiary : null,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.xs),
                   if (goal.categories.length > 1)
                     Wrap(
                       spacing: 4,
@@ -118,7 +117,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                       ).textTheme.bodyMedium?.copyWith(color: AppColors.primary),
                     ),
                   if (goal.notes != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       goal.notes!,
                       style: Theme.of(
@@ -127,9 +126,9 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                     ),
                   ],
                   if (total > 0) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(s.goalProgress(done, total), style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.full),
                       child: LinearProgressIndicator(
@@ -217,54 +216,58 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
           onTap: () => _showTaskSelectorForTarget(context, ref, goalId),
         ),
 
-        const Divider(),
+        // A milestone takes its context from its parent, so only top-level
+        // goals show the vision link (matches showSemesterGoalSheet)
+        if (goal.parentId == null) ...[
+          const Divider(),
 
-        // Linked future goal
-        _SectionHeader(label: s.linkedFutureGoal),
-        if (linkedGoal == null) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              kEmptyValue,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
-            ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.add_link, color: AppColors.primary),
-            title: Text(s.addLinkedGoal, style: const TextStyle(color: AppColors.primary)),
-            onTap: () => _showGoalSelectorForTarget(context, ref, goalId),
-          ),
-        ] else
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              Icons.stars,
-              color: resolveCatColor(
-                cats,
-                linkedGoal.categories.isNotEmpty
-                    ? linkedGoal.categories.first
-                    : FutureCategories.other,
+          // Linked future goal
+          _SectionHeader(label: s.linkedFutureGoal),
+          if (linkedGoal == null) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                kEmptyValue,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
               ),
             ),
-            title: Text(linkedGoal.title),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.link_off, size: 18),
-                  color: AppColors.textTertiary,
-                  onPressed: () =>
-                      ref.read(semesterGoalsProvider.notifier).linkFutureGoal(goalId, null),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.add_link, color: AppColors.primary),
+              title: Text(s.addLinkedGoal, style: const TextStyle(color: AppColors.primary)),
+              onTap: () => _showGoalSelectorForTarget(context, ref, goalId),
+            ),
+          ] else
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                Icons.stars,
+                color: resolveCatColor(
+                  cats,
+                  linkedGoal.categories.isNotEmpty
+                      ? linkedGoal.categories.first
+                      : FutureCategories.other,
                 ),
-                const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textTertiary),
-              ],
+              ),
+              title: Text(linkedGoal.title),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.link_off, size: 18),
+                    color: AppColors.textTertiary,
+                    onPressed: () =>
+                        ref.read(semesterGoalsProvider.notifier).linkFutureGoal(goalId, null),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textTertiary),
+                ],
+              ),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => FutureGoalDetailScreen(goalId: linkedGoal.id)),
+              ),
             ),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => FutureGoalDetailScreen(goalId: linkedGoal.id)),
-            ),
-          ),
+        ],
       ],
     );
 
@@ -279,14 +282,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: isDesktop
-          ? Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: content,
-              ),
-            )
-          : content,
+      body: ResponsiveBody(child: content),
     );
   }
 }
@@ -370,8 +366,7 @@ class _SemMilestoneTile extends ConsumerWidget {
                       children: [
                         Text(
                           milestone.title,
-                          style: TextStyle(
-                            fontSize: 14,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
                             decoration: milestone.isDone ? TextDecoration.lineThrough : null,
                             color: milestone.isDone ? AppColors.textTertiary : null,
@@ -421,8 +416,14 @@ class _SemMilestoneTile extends ConsumerWidget {
                         padding: EdgeInsets.zero,
                         onPressed: () async {
                           if (await confirmDelete(context, s)) {
-                            ref.read(trashProvider.notifier).addSemesterGoal(milestone);
-                            ref.read(semesterGoalsProvider.notifier).remove(milestone.id);
+                            // Snapshot the whole subtree, not just the root
+                            final removed = ref
+                                .read(semesterGoalsProvider.notifier)
+                                .remove(milestone.id);
+                            final trash = ref.read(trashProvider.notifier);
+                            for (final g in removed) {
+                              trash.addSemesterGoal(g);
+                            }
                           }
                         },
                       ),
@@ -442,7 +443,7 @@ class _SemMilestoneTile extends ConsumerWidget {
 
 class _CategoryBadge extends ConsumerWidget {
   final String cat;
-  final dynamic s;
+  final AppStrings s;
   const _CategoryBadge({required this.cat, required this.s});
 
   @override
@@ -460,7 +461,8 @@ class _CategoryBadge extends ConsumerWidget {
         children: [
           Icon(resolveCatIcon(cats, cat), size: 11, color: color),
           const SizedBox(width: 3),
-          Text(catLabel(cat, s), style: TextStyle(fontSize: 11, color: color)),
+          Text(catLabel(cat, s),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
         ],
       ),
     );
@@ -657,7 +659,8 @@ Widget _goalLinkTile(
               children: [
                 Text(
                   s.linkedFutureGoal,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -738,10 +741,9 @@ void _showFutureGoalSelectorForSheet(
 
 // One sheet for both modes: [existing] null means add, non-null means edit.
 //
-// The two modes deliberately still differ in two places, exactly as they did
-// when this was two functions: only edit offers the semester picker, and only
-// edit shows the future-goal link on milestones. TODO: decide whether that
-// difference is intentional and make both modes agree
+// The semester picker is edit-only on purpose: adding always lands in the
+// semester currently being viewed. The vision link follows the same rule in
+// both modes — top-level goals only.
 void showSemesterGoalSheet(
   BuildContext context,
   WidgetRef ref, {
@@ -749,6 +751,7 @@ void showSemesterGoalSheet(
   String? parentId,
 }) {
   final isEdit = existing != null;
+  final isTopLevel = isEdit ? existing.parentId == null : parentId == null;
   final titleCtrl = TextEditingController(text: existing?.title ?? '');
   final notesCtrl = TextEditingController(text: existing?.notes ?? '');
   final s = ref.read(stringsProvider);
@@ -780,7 +783,7 @@ void showSemesterGoalSheet(
               title: titleCtrl.text.trim(),
               semester: selectedSemester,
               categories: cats,
-              futureGoalId: selectedFutureGoalId,
+              futureGoalId: isTopLevel ? selectedFutureGoalId : null,
               notes: notes,
             );
           } else {
@@ -815,7 +818,7 @@ void showSemesterGoalSheet(
                 decoration: InputDecoration(labelText: s.titleField),
                 onSubmitted: (_) => submit(),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: notesCtrl,
                 maxLines: 2,
@@ -845,7 +848,7 @@ void showSemesterGoalSheet(
               ),
               // Milestones inherit their parent's semester, so only top-level
               // goals get the picker
-              if (isEdit && existing.parentId == null) ...[
+              if (isEdit && isTopLevel) ...[
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   initialValue: selectedSemester,
@@ -857,7 +860,8 @@ void showSemesterGoalSheet(
                   onChanged: (v) => setState(() => selectedSemester = v ?? selectedSemester),
                 ),
               ],
-              if (isEdit || parentId == null) ...[
+              // Only top-level goals carry a vision link, in both modes
+              if (isTopLevel) ...[
                 const SizedBox(height: AppSpacing.md),
                 _goalLinkTile(
                   sheetCtx,

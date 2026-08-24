@@ -27,9 +27,25 @@ class TrashNotifier extends StateNotifier<List<TrashItem>> {
     }
   }
 
+  // Sign-out only: drops local state and forgets the user. Do NOT use this for
+  // the Empty Trash button — it leaves the cloud rows in place and nulls
+  // _userId, which silently disables every later write in the session
   void clear() {
     _userId = null;
     state = [];
+  }
+
+  // Empty Trash: deletes the user rows for real and keeps _userId, so snapshots
+  // taken later in the same session still reach Supabase
+  Future<void> emptyAll() async {
+    if (state.isEmpty) return;
+    state = [];
+    if (_userId == null) return;
+    try {
+      await _db.from('trash_items').delete().eq('user_id', _userId!);
+    } catch (e) {
+      reportSyncError(ref, e);
+    }
   }
 
   void _insertRow(TrashItem item) {

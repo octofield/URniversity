@@ -259,26 +259,36 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
 **目標**：把三套排版寫法收成一套，並只抽真正重複的數值。
 
 1. **59 處 inline `TextStyle(`（含 23 處裸 `fontSize:`）改用 `Theme.of(context).textTheme.*`**。
-   對照表（依現有 107 處的使用頻率推得，**不要自創新級距**）：
+   對照表——**只用尺寸完全相符的角色**（Material 3 預設值，不是我先前憑印象寫的區間）：
 
-   | 現有 `fontSize` | 改用 |
-   |---|---|
-   | 11–12 | `bodySmall` |
-   | 13–15 | `bodyMedium` |
-   | 16 | `titleMedium` |
-   | 20 | `titleLarge` |
-   | 24+ | `headlineSmall` |
+   | 現有 `fontSize` | 改用 | 實際尺寸 | 權重 |
+   |---|---|---|---|
+   | 11 | `labelSmall` | 11 | ⚠️ w500（原本繼承 w400）|
+   | 12 | `bodySmall` | 12 | w400 ✓ |
+   | 14 | `bodyMedium` | 14 | w400 ✓ |
+   | 16 | `bodyLarge` | 16 | w400 ✓ |
+   | 10、10.5、15 | **無對應角色** | — | 保留 inline + 註解 |
 
    需要改粗細／顏色時用 `.copyWith(...)`，不要退回 inline `TextStyle`。
 
-   ⚠️ 逐處目視比對字級是否真的等價。**不等價就保留 inline，並加一行英文註解說明為什麼**。
+   ⚠️ **這不是無損替換。** `TextStyle(fontSize: 12)` 會併入 `DefaultTextStyle`（Material 設為
+   `bodyMedium`），得到字距 0.25；`textTheme.bodySmall` 的字距是 0.4。每 20 字約寬 3px。
+   11px 那批還會從 w400 變 w500。動手前先確認可以接受。
+
+   ⚠️ `TextStyle(color: ...)`、`TextStyle(fontWeight: ...)` 這種**只覆蓋單一屬性**的寫法
+   **不要動**——它們會併入 `DefaultTextStyle`，本來就是 Flutter 的正常用法，不是另一套系統。
 
 2. **裸數值只抽重複 ≥ 3 次且有語意的**。先跑統計、列出候選清單，確認後再動手。
    一次性的 `SizedBox(height: 2)`、`Icon(size: 15)` **一律保持原樣**。
 
-3. 裸 `Colors.white`(12) / `Colors.grey`(2) 改用 `AppColors.textOnPrimary` /
-   `AppColors.textTertiary`。
+3. 裸 `Colors.white`(12) → `AppColors.textOnPrimary`（兩者都是 `#FFFFFFFF`，純改名）；
+   `Colors.grey`(2) → `AppColors.textTertiary`（⚠️ `#9E9E9E` → `#B09A84`，**真的換顏色**）。
    `Colors.transparent`(21) **保持不動**——那是語意正確的用法，不該進 `AppColors`。
+   漸層遮罩與 `Color.lerp` 裡的 `Colors.white` 也保持不動：那是字面上的白，不是「主色上的文字」。
+
+4. 裸間距數值：**已經有對應 `AppSpacing` 常數的直接換**（`8`→`sm`、`4`→`xs`、`16`→`md`，
+   零視覺風險）。`12`（12 處）與 `2`（12 處）**沒有**對應常數——`AppSpacing` 的級距
+   4/8/16 跳過了 12。不要為了消滅它們自創新常數，那是設計決定不是重構決定。
 
 **驗收**
 - `flutter test` 40/40

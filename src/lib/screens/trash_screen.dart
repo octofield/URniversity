@@ -9,6 +9,7 @@ import '../providers/tasks_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/trash_provider.dart';
+import '../widgets/responsive_body.dart';
 
 class TrashScreen extends ConsumerWidget {
   const TrashScreen({super.key});
@@ -30,21 +31,23 @@ class TrashScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: items.isEmpty
-          ? Center(
-              child: Text(s.noTrash,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textTertiary,
-                  )),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pageHorizontal,
-                vertical: AppSpacing.md,
+      body: ResponsiveBody(
+        child: items.isEmpty
+            ? Center(
+                child: Text(s.noTrash,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppColors.textTertiary,
+                    )),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageHorizontal,
+                  vertical: AppSpacing.md,
+                ),
+                itemCount: items.length,
+                itemBuilder: (ctx, i) => _TrashTile(item: items[i]),
               ),
-              itemCount: items.length,
-              itemBuilder: (ctx, i) => _TrashTile(item: items[i]),
-            ),
+      ),
     );
   }
 
@@ -61,7 +64,7 @@ class TrashScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () {
-              ref.read(trashProvider.notifier).clear();
+              ref.read(trashProvider.notifier).emptyAll();
               Navigator.pop(dlgCtx);
             },
             child: Text(s.emptyTrash,

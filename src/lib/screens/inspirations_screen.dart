@@ -8,6 +8,7 @@ import '../providers/inspirations_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/sheet_body.dart';
+import '../widgets/responsive_body.dart';
 
 class InspirationsScreen extends ConsumerWidget {
   const InspirationsScreen({super.key});
@@ -21,40 +22,42 @@ class InspirationsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(s.allInspirations)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.pageHorizontal, AppSpacing.md,
-          AppSpacing.pageHorizontal, AppSpacing.xl,
-        ),
-        children: [
-          if (active.isNotEmpty) ...[
-            Text(s.pending, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: AppSpacing.sm),
-            ...active.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _InspirationCard(item: item),
-            )),
-            const SizedBox(height: AppSpacing.lg),
-          ],
-          if (done.isNotEmpty) ...[
-            Text(s.completed, style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.textTertiary,
-            )),
-            const SizedBox(height: AppSpacing.sm),
-            ...done.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _InspirationCard(item: item),
-            )),
-          ],
-          if (all.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 48),
-                child: Text(s.noInspirations, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+      body: ResponsiveBody(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal, AppSpacing.md,
+            AppSpacing.pageHorizontal, AppSpacing.xl,
+          ),
+          children: [
+            if (active.isNotEmpty) ...[
+              Text(s.pending, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: AppSpacing.sm),
+              ...active.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _InspirationCard(item: item),
+              )),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            if (done.isNotEmpty) ...[
+              Text(s.completed, style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.textTertiary,
+              )),
+              const SizedBox(height: AppSpacing.sm),
+              ...done.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _InspirationCard(item: item),
+              )),
+            ],
+            if (all.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 48),
+                  child: Text(s.noInspirations, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

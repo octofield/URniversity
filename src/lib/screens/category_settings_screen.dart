@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/categories_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/category_manager.dart';
+import '../widgets/responsive_body.dart';
 
 class CategorySettingsScreen extends ConsumerWidget {
   const CategorySettingsScreen({super.key});
@@ -14,24 +15,26 @@ class CategorySettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(s.categorySettings)),
-      body: Column(
-        children: [
-          Expanded(
-            child: ReorderableListView.builder(
-              itemCount: cats.length,
-              onReorder: (o, n) =>
-                  ref.read(categoriesProvider.notifier).reorder(o, n),
-              itemBuilder: (tileCtx, i) => categoryManageTile(
-                context: tileCtx,
-                ref: ref,
-                entry: cats[i],
-                s: s,
+      body: ResponsiveBody(
+        child: Column(
+          children: [
+            Expanded(
+              child: ReorderableListView.builder(
+                itemCount: cats.length,
+                onReorderItem: (o, n) =>
+                    ref.read(categoriesProvider.notifier).reorder(o, n),
+                itemBuilder: (tileCtx, i) => categoryManageTile(
+                  context: tileCtx,
+                  ref: ref,
+                  entry: cats[i],
+                  s: s,
+                ),
               ),
             ),
-          ),
-          const Divider(height: 1),
-          const CategoryAddRow(),
-        ],
+            const Divider(height: 1),
+            const CategoryAddRow(),
+          ],
+        ),
       ),
     );
   }
