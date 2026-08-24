@@ -84,6 +84,8 @@ class Task {
 
   factory Task.fromJson(Map<String, dynamic> j) {
     List<String> completedDates = const [];
+    // Tolerated on purpose: a malformed stored value costs the completion
+    // history, not the task. This is a parse fallback, not a swallowed write
     try {
       final raw = j['completed_dates'];
       if (raw is String && raw.isNotEmpty) {

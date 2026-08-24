@@ -9,6 +9,7 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import 'journal_edit_screen.dart';
+import '../widgets/responsive_body.dart';
 import 'me_screen.dart' show JournalDetailScreen;
 
 
@@ -39,23 +40,25 @@ class JournalsScreen extends ConsumerWidget {
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
         child: const Icon(Icons.edit_note),
       ),
-      body: journals.isEmpty
-          ? Center(child: Text(s.noJournal, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)))
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, AppSpacing.md, AppSpacing.pageHorizontal, 80),
-              itemCount: journals.length,
-              itemBuilder: (context, i) {
-                final journal = journals[i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _JournalCard(
-                    journal: journal,
-                    dayNumber: dayNumber(journal.date),
-                    showDayCounter: showDay,
-                  ),
-                );
-              },
-            ),
+      body: ResponsiveBody(
+        child: journals.isEmpty
+            ? Center(child: Text(s.noJournal, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary)))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, AppSpacing.md, AppSpacing.pageHorizontal, 80),
+                itemCount: journals.length,
+                itemBuilder: (context, i) {
+                  final journal = journals[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _JournalCard(
+                      journal: journal,
+                      dayNumber: dayNumber(journal.date),
+                      showDayCounter: showDay,
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }
@@ -96,20 +99,24 @@ class _JournalCard extends ConsumerWidget {
                     backgroundColor: AppColors.primary,
                     backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
                     child: avatarUrl == null
-                        ? Text(identity.initial, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textOnPrimary))
+                        ? Text(identity.initial,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.bold, color: AppColors.textOnPrimary))
                         : null,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(dateStr, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
                   if (showDayCounter) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.primaryLight,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
-                      child: Text('Day $dayNumber', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      child: Text('Day $dayNumber',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: AppColors.primary, fontWeight: FontWeight.w600)),
                     ),
                   ],
                   const Spacer(),

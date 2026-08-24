@@ -354,7 +354,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                     height: 300,
                     child: ReorderableListView.builder(
                       itemCount: cats.length,
-                      onReorder: (o, n) => cRef.read(categoriesProvider.notifier).reorder(o, n),
+                      onReorderItem: (o, n) => cRef.read(categoriesProvider.notifier).reorder(o, n),
                       itemBuilder: (tileCtx, i) => categoryManageTile(
                         context: tileCtx,
                         ref: cRef,
@@ -823,12 +823,12 @@ class _FutureGoalCardRow extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           if (total > 0) ...[
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xs),
                             Text(
                               s.goalProgress(done, total),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xs),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(AppRadius.full),
                               child: TweenAnimationBuilder<double>(
@@ -862,8 +862,12 @@ class _FutureGoalCardRow extends ConsumerWidget {
                         // Confirm before deleting, matching the goal cards —
                         // this was deleting immediately with no prompt
                         if (await confirmDelete(context, s)) {
-                          ref.read(trashProvider.notifier).addFutureGoal(goal);
-                          notifier.remove(goal.id);
+                          // Snapshot the whole subtree, not just the root
+                          final removed = notifier.remove(goal.id);
+                          final trash = ref.read(trashProvider.notifier);
+                          for (final g in removed) {
+                            trash.addFutureGoal(g);
+                          }
                         }
                       },
                     ),
@@ -906,7 +910,7 @@ Widget _semesterDropdown({
 
 Widget _categoryChipsMulti(
   BuildContext context,
-  dynamic s,
+  AppStrings s,
   List<String> allCats,
   List<String> selected,
   void Function(String) onToggle,
@@ -970,7 +974,7 @@ void showFutureGoalSheet(
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(labelText: s.titleField),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: notesCtrl,
               maxLines: 2,

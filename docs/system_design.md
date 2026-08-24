@@ -312,11 +312,23 @@ flowchart TD
 邏輯，不另開 Widget class）。彈出視窗（bottom sheet／dialog）另外在 `app_theme.dart` 統一
 限制最大寬度，避免超寬螢幕被拉伸。詳細流程圖見 §5-E。
 
-單欄表單／列表類畫面（`LoginScreen`、`SettingsScreen`、`SemesterGoalDetailScreen`、
-`FutureGoalDetailScreen`）不套用 §5-E 的雙欄＋NavigationRail 模式（這些畫面沒有底部導覽／
-側邊欄），改用較簡單的版本：寬度 < 768 維持原本鋪滿寬度的單欄版面；≥ 768 時用 `Center` +
-`ConstrainedBox` 把同一份內容限制在固定最大寬度並置中（`LoginScreen` 420，其餘 640），
-避免欄位／清單在超寬螢幕被拉伸到不合理的寬度。
+單欄表單／列表類畫面不套用 §5-E 的雙欄＋NavigationRail 模式（這些畫面沒有底部導覽／側邊欄），
+改用較簡單的版本，統一由 `widgets/responsive_body.dart` 的 **`ResponsiveBody`** 實作：
+寬度 < 768 直接回傳原本鋪滿寬度的內容；≥ 768 時用 `Center` + `ConstrainedBox` 把**同一份**
+內容限制在固定最大寬度並置中，避免欄位／清單在超寬螢幕被拉伸到不合理的寬度。
+
+兩個寬度常數定義在該檔內：`ResponsiveBody.formWidth = 420`（登入類表單，行寬窄一點好讀）、
+`ResponsiveBody.contentWidth = 640`（其餘，也是預設值）。
+
+套用 `ResponsiveBody` 的 12 個畫面：
+
+| maxWidth | 畫面 |
+|---|---|
+| 420（`formWidth`） | `LoginScreen`、`RegisterScreen`、`SetupProfileScreen` |
+| 640（`contentWidth`） | `SettingsScreen`、`SemesterGoalDetailScreen`、`FutureGoalDetailScreen`、`CategorySettingsScreen`、`JournalsScreen`、`JournalEditScreen`、`TaskHistoryScreen`、`TrashScreen`、`InspirationsScreen` |
+
+`TodayScreen`、`SemesterScreen`、`FutureScreen`、`MeScreen` 走 §5-E 的雙欄模式，
+用 `isWide ? 1100 : 900`，**不使用** `ResponsiveBody`。
 
 > 兩個詳細頁刻意用 640 而非分頁列表的 `isWide ? 1100 : 900`——後者是為「主內容 + 側欄」雙欄
 > 版面設計的，套用在單欄長文字內容上會產生過長、難以閱讀的行寬。
@@ -428,6 +440,11 @@ flowchart TD
    同層最後。
 3. 卡片標題下方立即出現「⭐ 願景標題」，關聯圖也會畫出該目標與願景之間的虛線箭頭（見 §3-G）。
 
+> **只有頂層目標能連結願景**，子目標（里程碑）從父節點取得脈絡。這條規則在四個地方一致：
+> 新增／編輯表單只對頂層顯示連結列、學期目標詳情頁的「連結的願景」區塊只對頂層顯示、
+> 願景詳情頁的「新增連結目標」選單只列頂層目標，並由
+> `semesterGoalsProvider.linkFutureGoal()` 在 Provider 層擋下對子目標的連結請求。
+
 ### UC4-B　標示目標／願景完成
 1. 在列表卡片或詳細頁頁首，點**左側的分類圖示方塊**。
 2. `toggleDone()` 反轉 `isDone` 並寫回資料層；圖示立即換成打勾、標題出現刪除線。
@@ -443,6 +460,8 @@ flowchart TD
 1. 長按（行動裝置）或直接拖曳（Web）目標卡片。
 2. 拖到另一張卡片上緣→視為「插入該卡片之前」；拖到卡片主體→視為「變成該卡片的子節點」。
 3. 放開時觸發 `reparent()`，若目標父節點是自己的子孫則操作被忽略（無提示，直接不生效）。
+4. ⚠️ 學期目標從頂層被拖成**子目標**時，`reparent()` 會一併清掉它的 `future_goal_id`——
+   只有頂層目標能連結願景（見 UC4），留著會變成 UI 再也改不掉的孤兒連結。
 
 ### UC6　刪除項目與從回收桶還原
 1. 於任務／學期目標／未來願景列表點刪除 → 對非循環刪除即時生效前，先寫入回收桶快照。
@@ -586,6 +605,18 @@ flowchart TD
     Mobile --> Shared["共用同一份 ref.watch() 資料\n與同一批子元件"]
     Desktop1 --> Shared
     Desktop2 --> Shared
+```
+
+單欄畫面（12 個，見 §3-F 表格）走的是另一條較短的路徑，由 `ResponsiveBody` 統一實作：
+
+```mermaid
+flowchart TD
+    Start(["ResponsiveBody.build(context)"]) --> Width["width = MediaQuery.of(context).size.width"]
+    Width --> D{"width < 768?"}
+    D -->|是| Full["直接回傳 child\n(鋪滿寬度)"]
+    D -->|否| Cap["Center + ConstrainedBox\nmaxWidth = formWidth 420\n或 contentWidth 640"]
+    Cap --> Same["child 是同一個 widget 實例\n沒有第二份資料 watch"]
+    Full --> Same
 ```
 
 ### 5-F 關聯圖佈局管線（`_layoutGraph`）

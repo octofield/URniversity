@@ -725,7 +725,7 @@ class _NodeCard extends ConsumerWidget {
                     size: node.isFuture ? 18 : 15,
                     color: node.isDone ? AppColors.textTertiary : catC,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -751,6 +751,8 @@ class _NodeCard extends ConsumerWidget {
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            // Graph node labels are sized to the node box, not
+                            // to the type scale
                             style: const TextStyle(
                               fontSize: 10.5,
                               color: AppColors.textTertiary,
@@ -770,6 +772,7 @@ class _NodeCard extends ConsumerWidget {
                       ),
                       child: Text(
                         '$taskCount',
+                        // Sized to the count badge, not to the type scale
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,

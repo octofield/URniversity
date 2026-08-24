@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/theme/app_breakpoints.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/guest_provider.dart';
 import '../../providers/settings_provider.dart';
 import 'register_screen.dart';
+import '../../widgets/responsive_body.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -74,8 +74,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
-    final isDesktop =
-        MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
     final form = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,7 +142,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(s.orDivider,
-                  style: const TextStyle(color: Colors.grey)),
+                  style: const TextStyle(color: AppColors.textTertiary)),
             ),
             const Expanded(child: Divider()),
           ],
@@ -211,14 +209,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.pageHorizontal,
           ),
-          child: isDesktop
-              ? Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: form,
-                  ),
-                )
-              : form,
+          child: ResponsiveBody(
+            maxWidth: ResponsiveBody.formWidth,
+            child: form,
+          ),
         ),
       ),
     );

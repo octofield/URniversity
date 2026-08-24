@@ -5,6 +5,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/responsive_body.dart';
 
 class SetupProfileScreen extends ConsumerStatefulWidget {
   const SetupProfileScreen({super.key});
@@ -47,91 +48,94 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
             AppSpacing.pageHorizontal, 40,
             AppSpacing.pageHorizontal, AppSpacing.xl,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                s.setupProfileTitle,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+          child: ResponsiveBody(
+            maxWidth: ResponsiveBody.formWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.setupProfileTitle,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                s.setupProfileSubtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textTertiary,
+                const SizedBox(height: 6),
+                Text(
+                  s.setupProfileSubtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 36),
+                const SizedBox(height: 36),
 
-              // Avatar preview
-              Center(
-                child: AppAvatars.build(
-                  avatarIndex: _selectedAvatar,
-                  avatarUrl: null,
-                  initial: username.isNotEmpty ? username[0].toUpperCase() : '?',
-                  radius: 48,
+                // Avatar preview
+                Center(
+                  child: AppAvatars.build(
+                    avatarIndex: _selectedAvatar,
+                    avatarUrl: null,
+                    initial: username.isNotEmpty ? username[0].toUpperCase() : '?',
+                    radius: 48,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              Text(
-                s.pickAvatar,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+                Text(
+                  s.pickAvatar,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              GridView.count(
-                crossAxisCount: 5,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                children: [
-                  for (int i = 0; i < AppAvatars.presets.length; i++)
-                    _AvatarOption(
-                      index: i,
-                      isSelected: _selectedAvatar == i,
-                      onTap: () => setState(() {
-                        _selectedAvatar = _selectedAvatar == i ? null : i;
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 28),
-
-              TextField(
-                controller: _usernameCtrl,
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: s.usernameLabel,
-                  prefixIcon: const Icon(Icons.person_outline),
+                GridView.count(
+                  crossAxisCount: 5,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  children: [
+                    for (int i = 0; i < AppAvatars.presets.length; i++)
+                      _AvatarOption(
+                        index: i,
+                        isSelected: _selectedAvatar == i,
+                        onTap: () => setState(() {
+                          _selectedAvatar = _selectedAvatar == i ? null : i;
+                        }),
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: canSave ? _save : null,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(s.done),
+                TextField(
+                  controller: _usernameCtrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: s.usernameLabel,
+                    prefixIcon: const Icon(Icons.person_outline),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 32),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: canSave ? _save : null,
+                    child: _loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.textOnPrimary,
+                            ),
+                          )
+                        : Text(s.done),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

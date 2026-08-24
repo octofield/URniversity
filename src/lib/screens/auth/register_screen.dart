@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/responsive_body.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -82,76 +83,79 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             horizontal: AppSpacing.pageHorizontal,
             vertical: AppSpacing.lg,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                s.registerHeadline,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              TextField(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: s.emailLabel,
-                  prefixIcon: const Icon(Icons.email_outlined),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: !_showPassword,
-                decoration: InputDecoration(
-                  labelText: s.passwordLabelWithHint,
-                  prefixIcon: const Icon(Icons.lock_outlined),
-                  suffixIcon: IconButton(
-                    icon: Icon(_showPassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined),
-                    onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
+          child: ResponsiveBody(
+            maxWidth: ResponsiveBody.formWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.registerHeadline,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _confirmCtrl,
-                obscureText: !_showPassword,
-                decoration: InputDecoration(
-                  labelText: s.confirmPasswordLabel,
-                  prefixIcon: const Icon(Icons.lock_outlined),
-                ),
-                onSubmitted: (_) => _register(),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _loading ? null : _register,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(s.register),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(s.haveAccountAlready),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(s.login),
+                const SizedBox(height: AppSpacing.xxl),
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: s.emailLabel,
+                    prefixIcon: const Icon(Icons.email_outlined),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _passwordCtrl,
+                  obscureText: !_showPassword,
+                  decoration: InputDecoration(
+                    labelText: s.passwordLabelWithHint,
+                    prefixIcon: const Icon(Icons.lock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(_showPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined),
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _confirmCtrl,
+                  obscureText: !_showPassword,
+                  decoration: InputDecoration(
+                    labelText: s.confirmPasswordLabel,
+                    prefixIcon: const Icon(Icons.lock_outlined),
+                  ),
+                  onSubmitted: (_) => _register(),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _loading ? null : _register,
+                    child: _loading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(s.register),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(s.haveAccountAlready),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(s.login),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

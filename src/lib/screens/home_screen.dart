@@ -95,10 +95,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: const Stack(
                 alignment: Alignment.center,
                 children: [
-                  Icon(Icons.cloud_outlined, size: 30, color: Colors.white),
+                  Icon(Icons.cloud_outlined, size: 30, color: AppColors.textOnPrimary),
                   Padding(
                     padding: EdgeInsets.only(top: 2),
-                    child: Icon(Icons.lightbulb_outline, size: 15, color: Colors.white),
+                    child: Icon(Icons.lightbulb_outline, size: 15, color: AppColors.textOnPrimary),
                   ),
                 ],
               ),
@@ -112,17 +112,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           color: AppColors.categoryCompetition,
           tooltip: s.addTask,
           onPressed: () => showTaskSheet(context, ref),
-          child: const Icon(Icons.add, color: Colors.white, size: 30)),
+          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
       1 => _VividFab(
           color: AppColors.categoryIntern,
           tooltip: s.addTarget,
           onPressed: () => showSemesterGoalSheet(context, ref),
-          child: const Icon(Icons.add, color: Colors.white, size: 30)),
+          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
       2 => _VividFab(
           color: AppColors.categoryCert,
           tooltip: s.addGoal,
           onPressed: () => showFutureGoalSheet(context, ref),
-          child: const Icon(Icons.add, color: Colors.white, size: 30)),
+          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
       3 => _VividFab(
           color: AppColors.categoryPerformance,
           tooltip: s.addJournal,
@@ -130,7 +130,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             context,
             MaterialPageRoute(builder: (_) => const JournalEditScreen()),
           ),
-          child: const Icon(Icons.edit_note, color: Colors.white, size: 30)),
+          child: const Icon(Icons.edit_note, color: AppColors.textOnPrimary, size: 30)),
       _ => null,
     };
 

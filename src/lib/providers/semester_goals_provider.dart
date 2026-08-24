@@ -165,12 +165,18 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
     return result;
   }
 
-  void remove(String goalId) {
-    final toRemove = getWithDescendants(goalId).map((g) => g.id).toSet();
-    state = state.where((g) => !toRemove.contains(g.id)).toList();
-    for (final id in toRemove) {
+  // Returns every goal actually removed (the goal plus its whole subtree) so the
+  // caller can snapshot all of them to the trash. Snapshotting only the root
+  // lost every descendant permanently
+  List<SemesterGoal> remove(String goalId) {
+    final removed = getWithDescendants(goalId);
+    if (removed.isEmpty) return const [];
+    final removedIds = removed.map((g) => g.id).toSet();
+    state = state.where((g) => !removedIds.contains(g.id)).toList();
+    for (final id in removedIds) {
       deleteRow(id);
     }
+    return removed;
   }
 
   bool isAncestor(String potentialAncestorId, String targetId) {
@@ -190,14 +196,26 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
     state = [
       for (final g in state)
         if (g.id == draggedId)
-          g.copyWith(parentId: newParentId, sortOrder: newSortOrder)
+          // Becoming a milestone drops the vision link: only top-level goals
+          // carry one, and leaving it set would make it unreachable from the UI
+          g.copyWith(
+            parentId: newParentId,
+            sortOrder: newSortOrder,
+            futureGoalId: newParentId == null ? g.futureGoalId : null,
+          )
         else g,
     ];
     final updated = state.where((g) => g.id == draggedId).firstOrNull;
     if (updated != null) upsert(updated);
   }
 
+  // Only top-level goals carry a vision link; a milestone takes its context from
+  // its parent. Enforced here so no caller can route around it
   void linkFutureGoal(String goalId, String? futureGoalId) {
+    if (futureGoalId != null) {
+      final goal = state.where((g) => g.id == goalId).firstOrNull;
+      if (goal == null || goal.parentId != null) return;
+    }
     state = [
       for (final g in state)
         if (g.id == goalId) g.copyWith(futureGoalId: futureGoalId) else g,

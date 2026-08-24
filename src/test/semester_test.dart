@@ -9,7 +9,7 @@ void main() {
   const twoSem = SemesterSettings(count: 2, startMonths: [8, 2]);
   const threeSem = SemesterSettings(count: 3, startMonths: [8, 12, 4]);
   const fourSem = SemesterSettings(count: 4, startMonths: [8, 11, 2, 5]);
-  final s = StringsEn();
+  final s = const StringsEn();
 
   group('generateSemesters', () {
     test('interleaves each semester with the break that follows it', () {

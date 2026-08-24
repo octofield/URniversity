@@ -79,9 +79,11 @@ class CategoriesNotifier extends StateNotifier<List<CategoryEntry>> {
     }
   }
 
+  // Indices come from ReorderableListView's onReorderItem, which has already
+  // accounted for the dragged item leaving the list. Adjusting again here would
+  // drop every downward drag one slot short
   void reorder(int oldIndex, int newIndex) {
     final list = [...state];
-    if (newIndex > oldIndex) newIndex--;
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
     state = list;

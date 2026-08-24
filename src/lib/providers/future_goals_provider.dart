@@ -96,12 +96,18 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
     return result;
   }
 
-  void remove(String goalId) {
-    final toRemove = getWithDescendants(goalId).map((g) => g.id).toSet();
-    state = state.where((g) => !toRemove.contains(g.id)).toList();
-    for (final id in toRemove) {
+  // Returns every goal actually removed (the goal plus its whole subtree) so the
+  // caller can snapshot all of them to the trash. Snapshotting only the root
+  // lost every descendant permanently
+  List<FutureGoal> remove(String goalId) {
+    final removed = getWithDescendants(goalId);
+    if (removed.isEmpty) return const [];
+    final removedIds = removed.map((g) => g.id).toSet();
+    state = state.where((g) => !removedIds.contains(g.id)).toList();
+    for (final id in removedIds) {
       deleteRow(id);
     }
+    return removed;
   }
 
   bool isAncestor(String potentialAncestorId, String targetId) {

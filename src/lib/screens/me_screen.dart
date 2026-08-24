@@ -9,6 +9,7 @@ import '../core/ui_symbols.dart';
 import '../l10n/app_strings.dart';
 import '../models/inspiration.dart';
 import '../models/journal.dart';
+import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/guest_provider.dart';
 import '../providers/inspirations_provider.dart';
@@ -208,7 +209,7 @@ class _ProfileCard extends ConsumerWidget {
                       ),
                       if (!isGuest && user?.email != null)
                         Text(user!.email!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       // School / Department / Grade info rows
                       _InfoRow(label: s.school, value: profile?.school?.isNotEmpty == true ? profile!.school! : kEmptyValue),
                       _InfoRow(label: s.department, value: profile?.department?.isNotEmpty == true ? profile!.department! : kEmptyValue),
@@ -271,11 +272,11 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _EditProfileDialog extends StatefulWidget {
-  final dynamic profile;
+  final UserProfile? profile;
   final WidgetRef ref;
-  final dynamic s;
+  final AppStrings s;
   final DateTime effectiveNow;
-  final dynamic semSettings;
+  final SemesterSettings semSettings;
   const _EditProfileDialog({required this.profile, required this.ref, required this.s, required this.effectiveNow, required this.semSettings});
 
   @override
@@ -357,9 +358,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               ],
               onChanged: (v) => setState(() => _selectedGrade = v ?? 1),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             Text(s.avatar, style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -721,7 +722,7 @@ class _JournalTile extends ConsumerWidget {
                   initial: identity.initial,
                   radius: 14,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 Text(
                   dateStr,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -729,7 +730,7 @@ class _JournalTile extends ConsumerWidget {
                   ),
                 ),
                 if (showDayCounter) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
@@ -738,8 +739,7 @@ class _JournalTile extends ConsumerWidget {
                     ),
                     child: Text(
                       'Day $dayNumber',
-                      style: const TextStyle(
-                        fontSize: 11,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
@@ -864,7 +864,7 @@ class JournalDetailScreen extends ConsumerWidget {
                             ),
                           ),
                           if (showDay) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
@@ -874,8 +874,7 @@ class JournalDetailScreen extends ConsumerWidget {
                               ),
                               child: Text(
                                 'Day $dayNum',
-                                style: const TextStyle(
-                                  fontSize: 11,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -898,7 +897,6 @@ class JournalDetailScreen extends ConsumerWidget {
                       live.content!,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         height: 1.8,
-                        fontSize: 16,
                         color: AppColors.textPrimary,
                       ),
                     )
@@ -998,9 +996,9 @@ Future<String?> _openSearchPicker(
               .toList();
           return Container(
             height: MediaQuery.of(ctx).size.height * 0.75,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
             ),
             child: Column(
               children: [

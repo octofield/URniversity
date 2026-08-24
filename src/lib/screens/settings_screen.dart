@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
 import '../l10n/app_strings.dart';
 import '../providers/guest_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/responsive_body.dart';
 import 'category_settings_screen.dart';
 import 'trash_screen.dart';
 
@@ -46,7 +47,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final showDayCounter = ref.watch(showDayCounterProvider);
     final dev = ref.watch(devModeProvider);
     final isGuest = ref.watch(guestModeProvider);
-    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
 
     final list = ListView(
         children: [
@@ -126,10 +126,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Text(
                 s.developerMode,
-                style: const TextStyle(
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -186,14 +185,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(s.settings)),
-      body: isDesktop
-          ? Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: list,
-              ),
-            )
-          : list,
+      body: ResponsiveBody(child: list),
     );
   }
 }
@@ -266,7 +258,7 @@ void _confirmLogout(BuildContext context, AppStrings s) {
   );
 }
 
-String _semesterSettingsLabel(SemesterSettings settings, dynamic s) {
+String _semesterSettingsLabel(SemesterSettings settings, AppStrings s) {
   final countLabel = switch (settings.count) {
     2 => s.twoSemesters,
     3 => s.threeSemesters,
@@ -276,7 +268,7 @@ String _semesterSettingsLabel(SemesterSettings settings, dynamic s) {
   return '$countLabel  ·  $months';
 }
 
-String _taskViewLabel(int view, dynamic s) {
+String _taskViewLabel(int view, AppStrings s) {
   switch (view) {
     case 1:  return s.dailyTasks;
     case 2:  return s.weeklyTasks;
@@ -285,7 +277,7 @@ String _taskViewLabel(int view, dynamic s) {
 }
 
 void _showDefaultTaskViewDialog(BuildContext context, WidgetRef ref,
-    dynamic s, int current) {
+    AppStrings s, int current) {
   showDialog(
     context: context,
     builder: (ctx) => SimpleDialog(
@@ -309,7 +301,7 @@ void _showDefaultTaskViewDialog(BuildContext context, WidgetRef ref,
 }
 
 void _showLanguageDialog(BuildContext context, WidgetRef ref,
-    dynamic s, AppLanguage current) {
+    AppStrings s, AppLanguage current) {
   showDialog(
     context: context,
     builder: (ctx) => SimpleDialog(
@@ -333,7 +325,7 @@ void _showLanguageDialog(BuildContext context, WidgetRef ref,
 }
 
 void _showDateFormatDialog(BuildContext context, WidgetRef ref,
-    dynamic s, DateDisplayFormat current) {
+    AppStrings s, DateDisplayFormat current) {
   final exampleDate = DateTime.now();
   showDialog(
     context: context,
@@ -359,7 +351,7 @@ void _showDateFormatDialog(BuildContext context, WidgetRef ref,
 }
 
 void _showSemesterSettingsDialog(BuildContext context, WidgetRef ref,
-    dynamic s, SemesterSettings current) {
+    AppStrings s, SemesterSettings current) {
   showDialog(
     context: context,
     builder: (ctx) => _SemesterSettingsDialog(s: s, current: current, ref: ref),
@@ -367,7 +359,7 @@ void _showSemesterSettingsDialog(BuildContext context, WidgetRef ref,
 }
 
 class _SemesterSettingsDialog extends StatefulWidget {
-  final dynamic s;
+  final AppStrings s;
   final SemesterSettings current;
   final WidgetRef ref;
 
@@ -421,7 +413,7 @@ class _SemesterSettingsDialogState extends State<_SemesterSettingsDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(s.semesterCount, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           SegmentedButton<int>(
             segments: [
               ButtonSegment(value: 2, label: Text(s.twoSemesters)),
@@ -431,7 +423,7 @@ class _SemesterSettingsDialogState extends State<_SemesterSettingsDialog> {
             selected: {_count},
             onSelectionChanged: (sel) => _setCount(sel.first),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           for (int i = 0; i < _count; i++)
             Row(
               children: [
@@ -530,7 +522,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
           Text(widget.isGoogle
               ? widget.s.deleteAccountConfirmEmail(widget.email)
               : widget.s.deleteAccountConfirmPassword),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             controller: _inputCtrl,
             obscureText: !widget.isGoogle,
@@ -555,7 +547,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               ? const SizedBox(
                   height: 16,
                   width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textOnPrimary),
                 )
               : Text(widget.s.confirmDeleteAction),
         ),
@@ -565,7 +557,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
 }
 
 class _FeedbackDialog extends StatefulWidget {
-  final dynamic s;
+  final AppStrings s;
   const _FeedbackDialog({required this.s});
 
   @override
@@ -631,12 +623,12 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(s.feedbackTitle, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               s.feedbackAnonymousNote,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             SegmentedButton<String>(
               segments: [
                 ButtonSegment(value: 'bug', label: Text(s.feedbackBug), icon: const Icon(Icons.bug_report_outlined)),
@@ -645,7 +637,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
               selected: {_type},
               onSelectionChanged: (v) => setState(() => _type = v.first),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _ctrl,
               maxLines: 8,
@@ -659,7 +651,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
                 border: const OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -667,14 +659,14 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
                   onPressed: () => Navigator.pop(context),
                   child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 FilledButton(
                   onPressed: (length < _minLength || _loading) ? null : _submit,
                   child: _loading
                       ? const SizedBox(
                           height: 16,
                           width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textOnPrimary),
                         )
                       : Text(s.feedbackSubmit),
                 ),

@@ -7,6 +7,7 @@ import '../core/ui_symbols.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../widgets/responsive_body.dart';
 
 // One point on the history chart. rate is null when no task applied that
 // day/week/month — distinct from 0%, where tasks existed but none were done.
@@ -126,70 +127,72 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SegmentedButton<int>(
-              segments: [
-                ButtonSegment(value: 0, label: Text(s.historyDaily)),
-                ButtonSegment(value: 1, label: Text(s.historyWeekly)),
-                ButtonSegment(value: 2, label: Text(s.historyMonthly)),
-              ],
-              selected: {_range},
-              onSelectionChanged: (v) => setState(() {
-                _range = v.first;
-                _selected = null;
-              }),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (avgPercent != null)
-              Text(s.historyAverage(avgPercent),
-                  style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.cardPadding),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true, // Most recent period visible by default
-                    child: _HistoryChart(
-                      periods: periods,
-                      selected: _selected,
-                      onSelect: (i) => setState(() => _selected = i),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  const Divider(height: 1),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    selected == null
-                        ? s.historyTapHint
-                        : selected.total == 0
-                            ? '${selected.label}$kDotSeparator${s.historyNoData}'
-                            : '${selected.label}$kDotSeparator${s.goalProgress(selected.done, selected.total)}'
-                              '${s.percentSuffix((selected.rate! * 100).round())}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: selected == null
-                          ? AppColors.textTertiary
-                          : AppColors.textPrimary,
-                      fontWeight:
-                          selected == null ? null : FontWeight.w600,
-                    ),
-                  ),
+      body: ResponsiveBody(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SegmentedButton<int>(
+                segments: [
+                  ButtonSegment(value: 0, label: Text(s.historyDaily)),
+                  ButtonSegment(value: 1, label: Text(s.historyWeekly)),
+                  ButtonSegment(value: 2, label: Text(s.historyMonthly)),
                 ],
+                selected: {_range},
+                onSelectionChanged: (v) => setState(() {
+                  _range = v.first;
+                  _selected = null;
+                }),
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              if (avgPercent != null)
+                Text(s.historyAverage(avgPercent),
+                    style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.cardPadding),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true, // Most recent period visible by default
+                      child: _HistoryChart(
+                        periods: periods,
+                        selected: _selected,
+                        onSelect: (i) => setState(() => _selected = i),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Divider(height: 1),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      selected == null
+                          ? s.historyTapHint
+                          : selected.total == 0
+                              ? '${selected.label}$kDotSeparator${s.historyNoData}'
+                              : '${selected.label}$kDotSeparator${s.goalProgress(selected.done, selected.total)}'
+                                '${s.percentSuffix((selected.rate! * 100).round())}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: selected == null
+                            ? AppColors.textTertiary
+                            : AppColors.textPrimary,
+                        fontWeight:
+                            selected == null ? null : FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
