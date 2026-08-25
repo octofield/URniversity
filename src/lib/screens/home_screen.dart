@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
@@ -41,8 +42,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // the change as saved while the row was silently dropped
     ref.listen<Object?>(syncErrorProvider, (_, error) {
       if (error == null) return;
+      // Debug builds show which column or policy rejected the write; a release
+      // user can do nothing with a PostgREST code, so they get the plain message
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(s.syncFailed)),
+        SnackBar(
+          content: Text(
+            kDebugMode
+                ? '${s.syncFailed} — ${describeSyncError(error)}'
+                : s.syncFailed,
+          ),
+          duration: const Duration(seconds: kDebugMode ? 10 : 4),
+        ),
       );
       ref.read(syncErrorProvider.notifier).state = null;
     });

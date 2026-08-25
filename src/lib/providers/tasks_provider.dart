@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
 import 'synced_list_notifier.dart';
+import 'future_goals_provider.dart';
+import 'semester_goals_provider.dart';
 import 'date_provider.dart';
 import 'settings_provider.dart';
 
@@ -20,6 +22,27 @@ class TasksNotifier extends SyncedListNotifier<Task> {
 
   @override
   String idOf(Task item) => item.id;
+
+  // tasks has no parent_task_id foreign key, so an orphaned subtask only needs
+  // re-attaching for consistency (see system_design.md UC6). The link columns do
+  // have real foreign keys with ON DELETE SET NULL, but that only fires while
+  // the task row exists — a task sitting in the trash keeps the id of a goal
+  // deleted after it, and restoring it would insert a dangling reference
+  @override
+  Task sanitizeForRestore(Task item) {
+    final parentGone =
+        item.parentTaskId != null && !state.any((x) => x.id == item.parentTaskId);
+    final targetGone = item.linkedTargetId != null &&
+        !ref.read(semesterGoalsProvider).any((g) => g.id == item.linkedTargetId);
+    final goalGone = item.linkedGoalId != null &&
+        !ref.read(futureGoalsProvider).any((g) => g.id == item.linkedGoalId);
+    if (!parentGone && !targetGone && !goalGone) return item;
+    return item.copyWith(
+      parentTaskId: parentGone ? null : item.parentTaskId,
+      linkedTargetId: targetGone ? null : item.linkedTargetId,
+      linkedGoalId: goalGone ? null : item.linkedGoalId,
+    );
+  }
 
   void add(
     String title, {

@@ -1,6 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
+import 'dart:math';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' show ClientException;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // The last write that failed to reach Supabase. The UI watches this to surface
@@ -9,9 +14,63 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 final syncErrorProvider = StateProvider<Object?>((ref) => null);
 
 // Records a failed write for the UI to pick up. Free function so the providers
-// that do not extend [SyncedListNotifier] can report the same way
+// that do not extend [SyncedListNotifier] can report the same way.
+//
+// Also logs at the source rather than in the UI: a failure during sign-in
+// happens before HomeScreen is mounted, so nothing would ever display it
 void reportSyncError(Ref ref, Object error) {
+  debugPrint('[sync] ${describeSyncError(error)}');
   ref.read(syncErrorProvider.notifier).state = error;
+}
+
+// PostgrestException.toString() drops details and hint, which are usually the
+// only parts that say which column or policy rejected the write
+String describeSyncError(Object error) {
+  if (error is! PostgrestException) return error.toString();
+  final parts = <String>[
+    if (error.code != null) 'code=${error.code}',
+    error.message,
+    if (error.details != null) 'details=${error.details}',
+    if (error.hint != null) 'hint=${error.hint}',
+  ];
+  return parts.join(' | ');
+}
+
+// Errors worth trying again. Everything else is a schema or policy problem that
+// will fail identically on the next attempt, so retrying only delays the report.
+//
+// PGRST303 is the one that prompted this: a PostgREST bug rejects tokens used
+// within a few hundred ms of being issued, so the same write succeeds a moment
+// later. PGRST301 covers a token that expired mid-flight
+bool isTransientSyncError(Object error) {
+  if (error is PostgrestException) {
+    return const {'PGRST301', 'PGRST303'}.contains(error.code);
+  }
+  return error is SocketException ||
+      error is TimeoutException ||
+      error is ClientException;
+}
+
+// Runs a write, retrying transient failures with growing, jittered delays.
+// Fixed delays were reported as not enough for the PostgREST clock bug, so the
+// gap widens and carries jitter to avoid every pending write retrying in step.
+Future<void> runWithRetry(
+  Future<void> Function() write, {
+  int maxAttempts = 3,
+}) async {
+  final jitter = Random();
+  for (var attempt = 1; ; attempt++) {
+    try {
+      await write();
+      return;
+    } catch (e) {
+      if (attempt >= maxAttempts || !isTransientSyncError(e)) rethrow;
+      final backoff = 200 * attempt + jitter.nextInt(200);
+      debugPrint('[sync] attempt $attempt failed, retrying in ${backoff}ms '
+          '- ${describeSyncError(e)}');
+      await Future<void>.delayed(Duration(milliseconds: backoff));
+    }
+  }
 }
 
 // Shared guest/Supabase plumbing for the list-shaped providers.
@@ -53,14 +112,18 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     if (_userId == userId) return;
     _userId = userId;
     try {
-      final rows = await db
-          .from(table)
-          .select()
-          .eq('user_id', userId)
-          .order(orderColumn, ascending: orderAscending);
-      state = (rows as List<dynamic>)
-          .map((r) => fromJson(r as Map<String, dynamic>))
-          .toList();
+      // Retried harder than a single write: a failed load nulls _userId below,
+      // which silently disables every write for the rest of the session
+      await runWithRetry(() async {
+        final rows = await db
+            .from(table)
+            .select()
+            .eq('user_id', userId)
+            .order(orderColumn, ascending: orderAscending);
+        state = (rows as List<dynamic>)
+            .map((r) => fromJson(r as Map<String, dynamic>))
+            .toList();
+      }, maxAttempts: 4);
       await afterLoad();
     } catch (e) {
       // Leaving _userId null lets a later load() retry instead of no-oping
@@ -109,10 +172,11 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       return;
     }
     if (_userId == null) return;
-    db
-        .from(table)
-        .upsert({...toJson(item), 'user_id': _userId})
-        .catchError((Object e) => reportSyncError(e));
+    final row = {...toJson(item), 'user_id': _userId};
+    unawaited(
+      runWithRetry(() => db.from(table).upsert(row))
+          .catchError((Object e) => reportSyncError(e)),
+    );
   }
 
   void deleteRow(String id) {
@@ -121,15 +185,21 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       return;
     }
     if (_userId == null) return;
-    db
-        .from(table)
-        .delete()
-        .eq('id', id)
-        .catchError((Object e) => reportSyncError(e));
+    unawaited(
+      runWithRetry(() => db.from(table).delete().eq('id', id))
+          .catchError((Object e) => reportSyncError(e)),
+    );
   }
 
+  // A trashed row keeps whatever ids it held when it was deleted, and those
+  // rows can be deleted in the meantime. Restoring it then inserts a dangling
+  // reference and a real foreign key rejects the whole write. Subclasses drop
+  // the references that no longer resolve
+  T sanitizeForRestore(T item) => item;
+
   void restore(T item) {
-    state = [...state, item];
-    upsert(item);
+    final clean = sanitizeForRestore(item);
+    state = [...state, clean];
+    upsert(clean);
   }
 }
