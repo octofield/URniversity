@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/semester_goal.dart';
 import 'synced_list_notifier.dart';
+import 'future_goals_provider.dart';
 import 'settings_provider.dart';
 
 String currentSemester(SemesterSettings settings) {
@@ -67,6 +68,22 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
 
   @override
   String idOf(SemesterGoal item) => item.id;
+
+  // Both references are real foreign keys, and a trashed goal keeps the ids it
+  // held when it was deleted. Restoring it after its parent or its vision was
+  // deleted would insert a dangling reference (see system_design.md UC6)
+  @override
+  SemesterGoal sanitizeForRestore(SemesterGoal item) {
+    final parentGone =
+        item.parentId != null && !state.any((x) => x.id == item.parentId);
+    final visionGone = item.futureGoalId != null &&
+        !ref.read(futureGoalsProvider).any((g) => g.id == item.futureGoalId);
+    if (!parentGone && !visionGone) return item;
+    return item.copyWith(
+      parentId: parentGone ? null : item.parentId,
+      futureGoalId: visionGone ? null : item.futureGoalId,
+    );
+  }
 
   void addGoal(
     String title,

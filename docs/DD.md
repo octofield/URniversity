@@ -38,8 +38,8 @@
 | `recurrence_interval` | int | ✗ | `null` | 僅 `recurrence_type = everyNDays` 時有意義，代表間隔天數 |
 | `recurrence_weekdays` | int[] | ✗ | `null` | 僅 `recurrence_type = weekly` 時有意義；ISO 星期（週一=1 … 週日=7），可複選。`null`／空陣列代表沿用舊行為「與建立日同一個星期幾」 |
 | `recurrence_month_days` | int[] | ✗ | `null` | 僅 `recurrence_type = monthly` 時有意義；日期 1–31，外加 **`32` 代表「該月最後一天」**（超出合法日數範圍的哨兵值，排序時自然落在最後）。`null`／空陣列代表沿用舊行為「與建立日同一個號數」 |
-| `linked_target_id` | text（邏輯 FK → `semester_goals.id`） | ✗ | `null` | 連結的學期目標 |
-| `linked_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景 |
+| `linked_target_id` | text（**真實外鍵** → `semester_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | 連結的學期目標。目標被刪除時資料庫會自動清成 `null`——但只對**當下還存在**的任務列生效，回收桶裡的快照仍留著舊 id（見 §UC6 的還原處理） |
+| `linked_goal_id` | text（**真實外鍵** → `future_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | 連結的未來願景，同上 |
 | `parent_task_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 父任務；`null` 代表頂層任務。**限制一層**：有 `parent_task_id` 的任務不能再有自己的子任務 |
 | `sort_order` | int | ✓ | `0` | 同一層（同 `parent_task_id`）手動拖曳排序用；新增時取同層最大值 `+1000` |
 | `completed_dates` | text（JSON 字串，`List<String>`） | ✗ | `null` | 僅循環任務使用；陣列內為 `"yyyy-MM-dd"` 字串，記錄哪些日期已完成 |
@@ -85,7 +85,7 @@
 | `title` | text | ✓ | — | 目標標題 |
 | `semester` | text | ✓ | — | 學期字串，格式 `"{民國年}-{學期序}"`，例如 `"114-1"`；產生規則見 `semester_goals_provider.dart` 的 `currentSemester()` |
 | `category` | text（**JSON 字串**，內容是 `List<String>`） | ✓ | `'["other"]'` | ⚠️ **欄位名為單數，實際存的是分類「陣列」的 JSON 字串**（用 `jsonEncode`/`jsonDecode` 手動轉換），與 D3 `future_goals.categories` 的存法不同，修改時請特別留意，勿混用 |
-| `future_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景（跨層關聯，也是關聯圖頁面畫虛線箭頭的資料來源）。⚠️ **僅頂層目標（`parent_id IS NULL`）可有值**；`linkFutureGoal()` 會擋下對子目標的連結，`reparent()` 把目標拖成子目標時會清成 `null` |
+| `future_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景（跨層關聯，也是關聯圖頁面畫虛線箭頭的資料來源）。⚠️ 這是**真實的外鍵** `semester_goals_future_goal_id_fkey → future_goals(id) ON DELETE SET NULL`（不是邏輯關聯），指向不存在的願景會被資料庫拒絕。另外 **僅頂層目標（`parent_id IS NULL`）可有值**；`linkFutureGoal()` 會擋下對子目標的連結，`reparent()` 把目標拖成子目標時會清成 `null` |
 | `notes` | text | ✗ | `null` | 備註 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |
 | `sort_order` | int | ✓ | `0` | 同層（同 `parent_id` 且同 `semester`）手動排序用；新增時取同層最大值 `+1000` |
@@ -195,16 +195,28 @@
 | `styles` | jsonb | ✗ | `null` | `{ id: { color: int(ARGB), icon: int(codePoint) } }`，每個分類（含內建）目前自訂的顯示顏色與圖示；沒有出現在這個 map 裡的 id 使用 `defaultCatColor()`/`defaultCatIcon()` 的內建預設值 |
 
 **特別說明：**
-- `ordered_list`／`styles` 兩欄位已於雲端 Supabase 執行過一次性 migration 補齊：
+- 這張表經過兩次 migration 才變成現在的形狀。第一次補上 `ordered_list`／`styles`：
   ```sql
   ALTER TABLE user_categories ADD COLUMN IF NOT EXISTS ordered_list text[] NOT NULL DEFAULT '{}';
   ALTER TABLE user_categories ADD COLUMN IF NOT EXISTS styles jsonb;
   ```
-  在這之前，顏色/圖示自訂功能寫入會靜默失敗（`_persist()` 內的 `.catchError((_) {})`），畫面上的
-  變更只存在當次 session 記憶體中，重新整理就會消失——這個狀況已排除。
-- ⚠️ 這張表目前還留有 `name`（text）、`order_index`（integer）兩個欄位，是比較舊、「一個分類一列」
-  設計遺留下來的，現行程式碼（`CategoriesNotifier`）完全不讀寫這兩欄，屬於未清理的死欄位，維護時
-  請勿誤以為它們是目前分類系統的一部分。
+  ⚠️ **這次 migration 並沒有真的修好寫入**——當時本文件寫著「這個狀況已排除」，但那是
+  未經驗證的宣稱：`_persist()` 的 `.catchError((_) {})` 讓失敗完全看不見，沒有任何辦法確認。
+  2026-08-24 把靜默 catch 改成會顯示的錯誤之後才發現，**這張表當時是 0 列，從來沒有成功
+  寫入過一次**。真正的原因是「一個分類一列」舊設計留下的兩個欄位：
+  - `name` 是 `NOT NULL` 且無預設值 → INSERT 必然違反約束
+  - 主鍵是複合鍵 `(user_id, name)`，`user_id` 單獨沒有唯一索引 →
+    程式碼的 `onConflict: 'user_id'` 在 Postgres 端無效（42P10）
+
+  第二次 migration 清掉這兩個死欄位並改用單欄主鍵，形狀才與程式碼一致：
+  ```sql
+  ALTER TABLE user_categories DROP CONSTRAINT user_categories_pkey;
+  ALTER TABLE user_categories DROP COLUMN name;
+  ALTER TABLE user_categories DROP COLUMN order_index;
+  ALTER TABLE user_categories ADD CONSTRAINT user_categories_pkey PRIMARY KEY (user_id);
+  ```
+- **教訓**：靜默 catch 讓一個壞了不知道多久的寫入路徑，在文件裡被記載成「已修好」。
+  現在寫入失敗一律經由 `reportSyncError()` 顯示（見 D0）。
 - 圖示只會是 `src/lib/utils/category_helpers.dart` 裡 `categoryIconPresets`（固定常數清單）中的
   其中一個，而不是任意 `IconData`——因為這些 codepoint 也會被寫在挑選圖示的網格 UI 裡當成
   literal `Icons.xxx`，Flutter 的圖示 tree-shaking 才不會把使用者選到的字型砍掉。

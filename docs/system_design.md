@@ -361,6 +361,23 @@ flowchart TD
 
 由 `sync_provider.dart` 統籌，完整流程與時序見 [DFD.md](./DFD.md) Diagram 1-A，本文件不重複。
 
+**寫入失敗的處理**（`synced_list_notifier.dart`）：本 App 的寫入是「本地樂觀更新 +
+雲端 fire-and-forget」，一旦推送失敗就不會再回頭補，本地與雲端會永久分歧。因此
+`load()`／`upsert()`／`deleteRow()` 三個出口統一走 `runWithRetry()`：
+
+| 錯誤 | 判定 | 理由 |
+|---|---|---|
+| `PGRST303`（JWT issued at future）、`PGRST301`（JWT expired） | 重試 | PostgREST 上游 bug 會拒絕剛簽發的 token，隔數百毫秒即可成功 |
+| `SocketException`／`TimeoutException`／`ClientException` | 重試 | 連線問題，下一次可能就通了 |
+| `23502` NOT NULL、`23503` 外鍵、`42P10` onConflict、`42703` 缺欄位、`42501` RLS | **一次放棄** | schema／policy 問題，重試只會延後錯誤回報 |
+
+退避從 200ms 起遞增並加上 jitter（固定延遲被上游回報為不夠用）。寫入預設 3 次、
+`load()` 4 次——`load()` 失敗會把 `_userId` 設回 null，導致該 session 後續所有寫入
+靜默跳過，代價比單次寫入失敗高得多。
+
+用盡重試才呼叫 `reportSyncError()`，經 `syncErrorProvider` 由 `HomeScreen` 顯示
+SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`。
+
 ### 3-J 分類顏色／圖示解析與任務連結色條
 
 - `resolveCatColor(cats, id)` / `resolveCatIcon(cats, id)`（`category_helpers.dart`）：在使用者
@@ -466,7 +483,21 @@ flowchart TD
 ### UC6　刪除項目與從回收桶還原
 1. 於任務／學期目標／未來願景列表點刪除 → 對非循環刪除即時生效前，先寫入回收桶快照。
 2. 設定頁 →「回收桶」→ 看到已刪除項目列表（含刪除時間）。
-3. 點「還原」→ 呼叫對應 Provider 的 `restore()`；若父節點已不存在則自動掛回頂層。
+3. 點「還原」→ 呼叫對應 Provider 的 `restore()`；若父節點已不存在則自動掛回頂層
+   （`SyncedListNotifier.reattachIfOrphaned()`，由三個樹狀 Provider 覆寫）。
+   ⚠️ 這一步是**必要的**而非保險。回收桶裡的快照保留著它被刪除當下的所有 id，而那些
+   被指向的列可能之後才被刪掉——`ON DELETE SET NULL` 只會改寫**當下還存在**的列，
+   碰不到回收桶。還原時就會插入失效的參照，被真實外鍵擋下（23503），項目雖然出現在
+   畫面上卻永遠同步不上去。`sanitizeForRestore()` 會清掉三類失效參照：
+
+   | 欄位 | 外鍵 |
+   |---|---|
+   | `semester_goals.parent_id`／`future_goals.parent_id` | `*_parent_id_fkey ... ON DELETE CASCADE` |
+   | `semester_goals.future_goal_id` | `... ON DELETE SET NULL` |
+   | `tasks.linked_target_id`／`tasks.linked_goal_id` | `... ON DELETE SET NULL` |
+
+   （`tasks.parent_task_id` **沒有**外鍵，那裡的重新掛回純粹是為了行為一致。
+   本文件先前就寫著「自動掛回頂層」，但程式碼一直沒實作，2026-08-25 才補上。）
 4. 也可「清空回收桶」→ 全部永久刪除，無法復原。
 
 ### UC7　篩選今日任務

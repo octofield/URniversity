@@ -38,6 +38,8 @@ dependencies:
   google_fonts: ^6.2.1
   supabase_flutter: ^2.9.0
   shared_preferences: ^2.3.3
+  # Direct: SyncedListNotifier classifies ClientException as a retryable failure
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
