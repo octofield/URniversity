@@ -15,11 +15,17 @@
 
 ## 現況說明
 
-本專案目前**沒有自動化 CI 流程**，但**已有可執行的單元測試**（`src/test/`，40 個案例，
+本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，135 個案例，
 `flutter test` 全綠）。`flutter create` 產生的預設計數器範例 `widget_test.dart` 已刪除。
 
-單元測試只涵蓋不依賴 Supabase／SharedPreferences 的純函式；其餘部分仍以「依測試計畫手動執行
-+ 記錄結果」為主。
+自動測試分兩層：**單元測試**涵蓋不依賴 Supabase／SharedPreferences 的純函式（§2.1）；
+**Widget 測試**在訪客模式下驅動真實畫面（§2.6）。訪客模式的寫入走
+`persistLocally()` 就返回，不會連上 Supabase，所以整個畫面樹可以在沒有網路、
+沒有 stub 的情況下跑起來。
+
+其餘部分仍以「依測試計畫手動執行 + 記錄結果」為主。**雲端持久化、信件送達、
+視覺外觀（字距／權重／顏色）、實機平台行為（deep link、旋轉、launcher widget）
+這四類無法自動化**，會長期留在手動清單裡。
 
 **實機測試環境**：手動測試（尤其是觸控拖曳與 Android 專屬行為）需要把 app 跑到實體手機上。
 環境建置方式、可遠端 hot reload 的作法，以及已知的連線陷阱，見
@@ -56,15 +62,21 @@
 
 ### 2.1 單元測試（Unit Testing）
 
-工具：`flutter test`，測試檔置於 `src/test/`。**已建立 40 個案例，全部通過。**
+工具：`flutter test`，測試檔置於 `src/test/`。
 
 | 測試檔 | 覆蓋範圍 |
 |---|---|
 | `test/recurrence_test.dart` | 五種循環規則（不循環／每日／每週／每月／每 N 天），含星期複選、每月日期複選、`kLastDayOfMonth` 的閏年與月長邊界、`interval = 0` 的防護，以及 `taskCompletionStatsOn()` 的統計 |
 | `test/semester_test.dart` | `generateSemesters()`／`compareSemesters()`／`currentSemester()`／`formatSemester()`／`breakName()`，含 2／3／4 學期制與假期 token 排序 |
 | `test/task_model_test.dart` | `Task` 的 JSON 往返、`copyWith` 的 sentinel 行為（含可清空 `content`）、`isCompletedOn()` 的循環／非循環分流 |
+| `test/category_reorder_test.dart` | 分類拖曳排序的 `orderBetween()` 與寫回順序 |
+| `test/sync_retry_test.dart` | `isTransientSyncError()` 的分類、`runWithRetry()` 的重試次數與退避 |
+| `test/restore_sanitize_test.dart` | `sanitizeForRestore()` 清掉指向已刪除列的懸空外鍵 |
+| `test/merge_order_test.dart` | `mergeOrder()` 的拓撲排序：父先於子、懸空 parent 視為根、循環不會無窮迴圈 |
+| `test/trash_snapshot_test.dart` | `remove()` 回傳整棵子樹（目標／願景／任務），還原後父子關係完整 |
 
-選擇標準：**只測不依賴 Supabase／SharedPreferences 的純函式**。
+選擇標準：**只測不依賴 Supabase／SharedPreferences 的純函式**，或在沒有設定
+`user_id` 的狀態下操作 Provider（此時 `upsert()`／`deleteRow()` 會直接返回）。
 `_taskAppliesTo()` 等私有函式透過公開的 `taskCompletionStatsOn()` 間接覆蓋。
 
 尚未涵蓋、之後可補：`isAncestor()`／`reparent()` 的循環參照防護、`computedGrade()`、
@@ -103,7 +115,7 @@
 
 | 項目 | 邊界值 | 預期行為 |
 |---|---|---|
-| 響應式斷點 | 767／768／1199／1200px | 767→手機；768、1199→桌面（收合）；1200→桌面（展開） |
+| 響應式斷點 | 767／768／1199／1200px | 767→手機；768、1199→桌面（收合）；1200→桌面（展開）。767／768 已由 `test/widget/responsive_test.dart` 自動涵蓋 |
 | 循環「每 N 天」間隔 | 0／1 | 0 被夾為 1（不得崩潰）；1 等同每日 |
 | 每月循環日期 | 31 號遇到 2 月 | 該月不出現；「最後一天」則落在 28／29 號 |
 | 年級推進 `computedGrade` | 推進後 < 1 或 > 7 | `clamp(1, 7)` |
@@ -111,6 +123,37 @@
 | 意見回饋長度 | 9／10／1000／1001 字 | 9 字禁止送出；1001 字截斷為 1000 |
 | 意見回饋冷卻 | 第 299／300 秒 | 299 秒內拒絕；滿 300 秒可送出 |
 | 目標／願景樹深度 | 深度 1／5 層 | 遞迴刪除與 `isAncestor` 在深層仍正確 |
+
+### 2.6 Widget 測試（Widget Testing）
+
+工具：`flutter test`，測試檔置於 `src/test/widget/`，共用基礎建設在
+`src/test/helpers/pump_app.dart`。
+
+| 測試檔 | 覆蓋範圍 | 退役的手動案例 |
+|---|---|---|
+| `test/widget/responsive_test.dart` | 13 個單欄畫面在 767／768px 的斷點切換與限寬值（420／640），四個分頁不得使用 `ResponsiveBody` | `2026-08-23-style-and-responsive.md` 23–38 |
+| `test/widget/password_reset_test.dart` | 忘記密碼入口與預填、新密碼的不一致／長度驗證、`_AuthGate` 的 recovery 優先序、關閉後離開 recovery、三語在地化 | `2026-09-05-phase0-reliability.md` 7、8、10、14、15、17 |
+| `test/widget/goal_link_visibility_test.dart` | 「只有頂層目標能連結願景」在新增／編輯表單、詳情頁、願景選單四處一致 | `2026-08-23-known-issues.md` 20–25、28 |
+| `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
+| `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
+
+**可行的前提**：訪客模式下 `SyncedListNotifier.upsert()` 走完 `persistLocally()`
+就返回，不碰 Supabase。Supabase 本身仍需初始化（多個 Provider 會讀
+`Supabase.instance.client`），但以 `EmptyLocalStorage` + `detectSessionInUri: false`
+初始化後不碰儲存也不連線。
+
+**三個踩過的坑**：
+
+1. **四個分頁沒有自己的 `Scaffold`**，還會呼叫 `Scaffold.of(context)`。要透過
+   `pumpApp()`／`HomeScreen` 間接 pump，不能單獨 pump 分頁。
+2. **`IndexedStack` 的非選中分頁是 offstage**，`find` 預設會跳過。要斷言全部四個
+   分頁，必須加 `skipOffstage: false`，否則測試會安靜地只檢查到一個分頁。
+3. **`pumpApp()` 之後才能種資料**。`App` 會 watch `syncProvider`，訪客模式下它呼叫
+   `loadGuest()` 把每個 Provider 的 state 從 SharedPreferences 重新載入，
+   pump 之前種的資料會被洗掉。
+
+**不做的事**：不用 golden test 測視覺。沒有可信的基準圖時，測試紅了也分不出是真的
+跑版還是基準過期，維護成本高於價值。字距／權重／顏色留在手動清單。
 
 ---
 
