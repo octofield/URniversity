@@ -243,4 +243,12 @@ class StringsZhTw implements AppStrings {
   @override String dateLongDate(int month, int day) => '$month月$day日';
 
   @override String get syncFailed => '同步失敗，剛才的變更可能沒有存到雲端';
+
+  @override String get forgotPassword => '忘記密碼？';
+  @override String get resetPasswordHint => '輸入註冊時使用的電子郵件，我們會寄一封重設連結給你。';
+  @override String get sendResetLink => '寄出重設連結';
+  @override String get resetEmailSent => '重設連結已寄出，請到信箱查看';
+  @override String get setNewPassword => '設定新密碼';
+  @override String get newPasswordLabel => '新密碼（至少 6 字元）';
+  @override String get passwordUpdated => '密碼已更新';
 }

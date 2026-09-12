@@ -19,6 +19,9 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
   @override
   String idOf(FutureGoal item) => item.id;
 
+  @override
+  String? parentIdOf(FutureGoal item) => item.parentId;
+
   // Restoring a child while its parent is still deleted would leave parentId
   // pointing at a row the foreign key can no longer resolve, so it goes back to
   // the top level instead (see system_design.md UC6)
@@ -41,7 +44,7 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
         .where((g) => g.parentId == parentId)
         .fold(0, (prev, g) => g.sortOrder > prev ? g.sortOrder : prev);
     final goal = FutureGoal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: newRowId(),
       parentId: parentId,
       title: title,
       categories: categories,

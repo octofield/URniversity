@@ -409,12 +409,29 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
    序載入 8 種資料（見 DFD.md Diagram 1-A）。
 5. 若為 Email 帳號且尚未設定暱稱 → 導向 `SetupProfileScreen`，輸入暱稱與頭像後才進首頁。
 
-**驗證信的寄送機制（不走 Supabase 內建寄信）：**
-專案在 Supabase Dashboard 啟用了 Auth「Send Email」Hook，指向自建的 Edge Function
-`supabase/functions/send-auth-email/index.ts`。每當 Auth 需要寄信（`signup` 驗證、`recovery`
-密碼重設、`email_change`、`invite`、`magiclink`），Supabase 不自己寄，而是把
-`{ user, email_data }` 以 Standard Webhooks 簽章 POST 給這支 function，由它組出
-`{SUPABASE_URL}/auth/v1/verify?token=...&type=...&redirect_to=...` 連結後呼叫 Resend API 寄出。
+**驗證信的寄送機制：**
+⚠️ 原本走 Auth「Send Email」Hook（`supabase/functions/send-auth-email/index.ts`）呼叫 Resend，
+**但那條路解不開 Supabase 每小時 2 封的寄信上限**——hook 不會繞過它，超過額度時 Supabase 會
+靜默跳過 hook 並照樣回 200。改用 **Resend 的 custom SMTP**，上限才變成可調。
+完整設定步驟見 [auth-email-setup.md](./auth-email-setup.md)，信件範本存在
+`supabase/email-templates/`（Dashboard 的範本欄位不進版控，改動要以 repo 的檔案為準）。
+
+### UC2-B　忘記密碼與重設
+
+1. `LoginScreen` 點「忘記密碼？」→ 跳出對話框，預填登入欄已輸入的 Email。
+2. 送出 → `auth.resetPasswordForEmail(email, redirectTo:)`。
+   `redirectTo` 與 Google 登入共用同一組：Web 用 `Uri.base.origin`，
+   Android 用 `com.octofield.urniversity://login-callback`（`AndroidManifest.xml` 已註冊）。
+3. 使用者點信中的連結回到 App。⚠️ **Supabase 會直接發給一組真正的 session**，
+   所以 `_AuthGate` 若不特別處理就會把人直接丟進首頁、永遠沒機會改密碼。
+4. `App.build()` 以 `ref.listen(authStateProvider)` 攔截 `AuthChangeEvent.passwordRecovery`，
+   把 `passwordRecoveryProvider` 設為 true。
+5. `_AuthGate` **在檢查訪客模式之前**先看這個旗標 → 導向 `ResetPasswordScreen`
+   （順序很重要：訪客瀏覽時點開重設連結也要能進到設定密碼的畫面）。
+6. 輸入新密碼（前端檢查兩次相同、長度 ≥ 6）→ `auth.updateUser()` → 旗標設回 false，
+   `_AuthGate` 這時看到的就是一般的已登入 session，進入首頁。
+7. 若中途放棄（按右上角關閉）→ `signOut()` 後才清旗標——**不能只清旗標**，
+   否則那條連結會在裝置上留下一個已登入的帳號。
 
 維護時的已知陷阱（都實際踩過）：
 - 部署務必帶 `--no-verify-jwt`：Auth Hook 呼叫不帶使用者 JWT，靠簽章驗證身分，預設的 JWT 閘道
@@ -517,11 +534,38 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 3. 點擊或滑鼠移到長條上 → 下方顯示該期間「N / M 完成（P%）」；無資料的期間點擊顯示「無資料」。
 
 ### UC10　訪客資料合併進帳號
-1. 訪客模式下點「登入 / 建立帳號」→ 彈出選擇：「捨棄資料」或「整合進帳號」。
-2. 選擇後導向 `LoginScreen` 完成登入。
-3. `sync_provider._handleGuestLogin()`：若選擇整合，依序把六種本機資料 `mergeToUser()` 寫入
-   雲端（**不含**回收桶與自訂分類，訪客模式本來就沒有這兩者）。
-4. 清除本機 `guest_*` key 並關閉訪客模式，重新以登入身分載入全部資料。
+
+1. 訪客模式累積資料 → 在「我的」頁點「登入 / 建立帳號」。
+2. 選「整合進帳號」或「捨棄資料」→ 設定 `shouldMergeGuestDataProvider`。
+3. 登入成功後 `sync_provider` 的 `_handleGuestLogin()` 執行合併。
+
+⚠️ **合併順序由外鍵決定，不能任意調換**（2026-09-05 修正，先前順序是反的）：
+
+```
+future_goals  →  semester_goals  →  tasks  →  inspirations / journals / profile
+```
+
+理由是這些都是**真實外鍵**，不是邏輯關聯：
+
+| 參照 | 被參照 |
+|---|---|
+| `tasks.linked_target_id` | `semester_goals.id` |
+| `tasks.linked_goal_id` | `future_goals.id` |
+| `semester_goals.future_goal_id` | `future_goals.id` |
+
+被參照的表沒先寫進去，參照它的那一列會被 23503 擋下**並且永久遺失**——
+合併是逐列 upsert，失敗的那一列不會重試。
+
+4. 同一張表內也要**父先於子**（`parent_id` 同樣是真實外鍵）。
+   `SyncedListNotifier.mergeOrder()` 做拓撲排序：根節點先、逐層往下；
+   父節點不在集合裡的（懸空 id）視為根節點照樣送出，交給資料庫判斷。
+5. 合併完成 → `guestModeProvider.disable()` 清掉 `SharedPreferences` 並切換為已登入。
+
+> **列 id 的產生**：`newRowId()`（`synced_list_notifier.dart`）＝ 毫秒時間戳 + 隨機後綴。
+> 先前只用毫秒時間戳，**同一毫秒內建立的多列會共用同一個 id**，而 id 是主鍵，
+> 第二筆 upsert 會直接覆蓋第一筆。手動點擊碰不到，但任何「一次建立多列」的功能
+> （例如模板套用）都會踩到。
+
 
 ### UC11　自訂分類的顏色與圖示
 1. 設定頁點「分類設定」（或願景頁點「更多分類」）→ 開啟分類管理列表。

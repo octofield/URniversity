@@ -73,6 +73,14 @@ Future<void> runWithRetry(
   }
 }
 
+// Row ids are generated on the client. A bare millisecond timestamp collides
+// for anything created in a loop — and `id` is the primary key, so the second
+// upsert silently overwrites the first. The random suffix keeps ids roughly
+// time-ordered while making a collision negligible
+final _idRandom = Random();
+String newRowId() =>
+    '${DateTime.now().millisecondsSinceEpoch}_${_idRandom.nextInt(1 << 32)}';
+
 // Shared guest/Supabase plumbing for the list-shaped providers.
 //
 // Every list provider needs the same five things: load from Supabase, load from
@@ -155,9 +163,40 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     state = [];
   }
 
+  // Self-referencing parent id, for the tree-shaped tables. Used to order the
+  // merge; null means this table has no parent column
+  String? parentIdOf(T item) => null;
+
+  // Rows are merged one at a time and parent_id is a real foreign key, so a
+  // child sent before its parent is rejected and that row is lost. Roots first,
+  // then each level below them. Anything whose parent is not in the set (a
+  // dangling id) is treated as a root so it still gets merged
+  List<T> mergeOrder() {
+    final ids = {for (final item in state) idOf(item)};
+    final pending = [...state];
+    final ordered = <T>[];
+    final placed = <String>{};
+
+    while (pending.isNotEmpty) {
+      final ready = pending.where((item) {
+        final parent = parentIdOf(item);
+        return parent == null || !ids.contains(parent) || placed.contains(parent);
+      }).toList();
+      // A parent cycle would loop forever; ship the rest in their current order
+      // and let the database reject whatever it cannot resolve
+      if (ready.isEmpty) return [...ordered, ...pending];
+      for (final item in ready) {
+        ordered.add(item);
+        placed.add(idOf(item));
+      }
+      pending.removeWhere((item) => placed.contains(idOf(item)));
+    }
+    return ordered;
+  }
+
   Future<void> mergeToUser(String userId) async {
     _userId = userId;
-    for (final item in state) {
+    for (final item in mergeOrder()) {
       try {
         await db.from(table).upsert({...toJson(item), 'user_id': userId});
       } catch (e) {

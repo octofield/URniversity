@@ -6,10 +6,12 @@ import 'core/config.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/guest_provider.dart';
+import 'providers/password_recovery_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/sync_provider.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/setup_profile_screen.dart';
 
@@ -30,6 +32,14 @@ class App extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(syncProvider);
     final lang = ref.watch(languageProvider);
+
+    // A reset link signs the user in with a recovery session. Catch the event
+    // here so _AuthGate can send them to set a password instead of the home page
+    ref.listen<AsyncValue<AuthState>>(authStateProvider, (_, next) {
+      if (next.value?.event == AuthChangeEvent.passwordRecovery) {
+        ref.read(passwordRecoveryProvider.notifier).state = true;
+      }
+    });
 
     return MaterialApp(
       title: 'URniversity',
@@ -56,6 +66,10 @@ class _AuthGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Checked before guest mode: opening a reset link while browsing as a guest
+    // must still land on the password screen
+    if (ref.watch(passwordRecoveryProvider)) return const ResetPasswordScreen();
+
     final isGuest = ref.watch(guestModeProvider);
     if (isGuest) {
       return ref.watch(pendingGuestLoginProvider) ? const LoginScreen() : const HomeScreen();

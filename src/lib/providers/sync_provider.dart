@@ -85,12 +85,18 @@ final syncProvider = Provider<void>((ref) {
 
 Future<void> _handleGuestLogin(Ref ref, String uid) async {
   if (ref.read(shouldMergeGuestDataProvider)) {
+    // Order matters: these are real foreign keys, not logical ones.
+    //   tasks.linked_target_id  -> semester_goals.id
+    //   tasks.linked_goal_id    -> future_goals.id
+    //   semester_goals.future_goal_id -> future_goals.id
+    // A referencing row sent first is rejected and silently lost, so every
+    // table a row points at has to be merged before it
+    await ref.read(futureGoalsProvider.notifier).mergeToUser(uid);
+    await ref.read(semesterGoalsProvider.notifier).mergeToUser(uid);
     await ref.read(tasksProvider.notifier).mergeToUser(uid);
     await ref.read(inspirationsProvider.notifier).mergeToUser(uid);
     await ref.read(journalProvider.notifier).mergeToUser(uid);
     await ref.read(profileProvider.notifier).mergeToUser(uid);
-    await ref.read(semesterGoalsProvider.notifier).mergeToUser(uid);
-    await ref.read(futureGoalsProvider.notifier).mergeToUser(uid);
   }
   // disable() clears SharedPreferences and sets isGuest = false,
   // which triggers _clearAll via the guestModeProvider listener.

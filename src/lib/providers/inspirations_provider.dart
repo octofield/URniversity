@@ -22,7 +22,7 @@ class InspirationsNotifier extends SyncedListNotifier<Inspiration> {
 
   void add(String title, {String? content}) {
     final item = Inspiration(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: newRowId(),
       title: title,
       content: content,
       createdAt: DateTime.now(),

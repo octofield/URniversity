@@ -65,7 +65,7 @@ class JournalNotifier extends SyncedListNotifier<Journal> {
 
   void add(DateTime date, {String? content}) {
     final journal = Journal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: newRowId(),
       date: date,
       content: content,
       createdAt: DateTime.now(),
