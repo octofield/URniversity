@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config.dart';
 import 'core/theme/app_theme.dart';
+import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/guest_provider.dart';
 import 'providers/password_recovery_provider.dart';
@@ -25,13 +26,20 @@ Future<void> main() async {
   runApp(const ProviderScope(child: App()));
 }
 
+// Lets the auth-link listener below show a message from outside any Scaffold,
+// so it reaches the user whether _AuthGate landed them on the login screen or,
+// as a guest, on the home screen
+final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
 class App extends ConsumerWidget {
   const App({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(syncProvider);
+    ref.watch(authLinkWatcherProvider);
     final lang = ref.watch(languageProvider);
+    final s = ref.watch(stringsProvider);
 
     // A reset link signs the user in with a recovery session. Catch the event
     // here so _AuthGate can send them to set a password instead of the home page
@@ -39,9 +47,36 @@ class App extends ConsumerWidget {
       if (next.value?.event == AuthChangeEvent.passwordRecovery) {
         ref.read(passwordRecoveryProvider.notifier).state = true;
       }
+      // supabase_flutter subscribes to this stream with an empty onError, so a
+      // failed code exchange dies there unless it is picked up here
+      final failure = next.error == null
+          ? null
+          : authLinkFailureFromError(next.error!);
+      if (failure != null) {
+        ref.read(authLinkErrorProvider.notifier).state = failure;
+      }
+    });
+
+    // A dead reset link used to leave the user on an ordinary login screen with
+    // nothing said, and on Android with no address bar to even read the error
+    ref.listen<AuthLinkFailure?>(authLinkErrorProvider, (_, failure) {
+      if (failure == null) return;
+      final message = switch (failure) {
+        AuthLinkFailure.expired => s.resetLinkInvalid,
+        AuthLinkFailure.wrongDevice => s.resetLinkWrongDevice,
+      };
+      // Deferred for two reasons: the messenger does not exist yet during the
+      // first build, and clearing the provider here would be a write during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
+        );
+        ref.read(authLinkErrorProvider.notifier).state = null;
+      });
     });
 
     return MaterialApp(
+      scaffoldMessengerKey: _messengerKey,
       title: 'URniversity',
       debugShowCheckedModeBanner: false,
       theme: appTheme,

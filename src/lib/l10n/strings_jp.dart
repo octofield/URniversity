@@ -247,4 +247,6 @@ class StringsJp implements AppStrings {
   @override String get setNewPassword => '新しいパスワードを設定';
   @override String get newPasswordLabel => '新しいパスワード（6文字以上）';
   @override String get passwordUpdated => 'パスワードを更新しました';
+  @override String get resetLinkInvalid => 'この再設定リンクは期限切れか使用済みです。もう一度送信してください（最新のメールのみ有効です）';
+  @override String get resetLinkWrongDevice => '「パスワードをお忘れですか？」を押した端末とブラウザでリンクを開いてください';
 }

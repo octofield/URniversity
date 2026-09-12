@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
+import 'package:urniversity/providers/auth_link_error_provider.dart';
 import 'package:urniversity/providers/guest_provider.dart';
 import 'package:urniversity/providers/password_recovery_provider.dart';
 import 'package:urniversity/providers/settings_provider.dart';
@@ -92,6 +93,40 @@ void main() {
       expect(c.read(passwordRecoveryProvider), isFalse);
       expect(find.byType(ResetPasswordScreen), findsNothing);
       expect(find.byType(LoginScreen), findsOneWidget);
+    });
+  });
+
+  // The message has to reach the user wherever _AuthGate put them, which is why
+  // it goes through MaterialApp's scaffoldMessengerKey rather than a Scaffold
+  group('a link that does not work says so', () {
+    testWidgets('expired or already used', (tester) async {
+      final c = await pumpApp(tester);
+      c.read(authLinkErrorProvider.notifier).state = AuthLinkFailure.expired;
+      await tester.pumpAndSettle();
+      expect(find.text(zh.resetLinkInvalid), findsOneWidget);
+    });
+
+    testWidgets('opened on a different device', (tester) async {
+      final c = await pumpApp(tester);
+      c.read(authLinkErrorProvider.notifier).state = AuthLinkFailure.wrongDevice;
+      await tester.pumpAndSettle();
+      expect(find.text(zh.resetLinkWrongDevice), findsOneWidget);
+    });
+
+    testWidgets('reaches a guest, who is on the home screen', (tester) async {
+      final c = testContainer();
+      await c.read(guestModeProvider.notifier).enable();
+      await pumpApp(tester, container: c);
+
+      c.read(authLinkErrorProvider.notifier).state = AuthLinkFailure.expired;
+      await tester.pumpAndSettle();
+      expect(find.text(zh.resetLinkInvalid), findsOneWidget);
+    });
+
+    testWidgets('nothing is shown when the link is fine', (tester) async {
+      await pumpApp(tester);
+      expect(find.text(zh.resetLinkInvalid), findsNothing);
+      expect(find.text(zh.resetLinkWrongDevice), findsNothing);
     });
   });
 

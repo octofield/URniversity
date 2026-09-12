@@ -23,7 +23,9 @@
 `persistLocally()` 就返回，不會連上 Supabase，所以整個畫面樹可以在沒有網路、
 沒有 stub 的情況下跑起來。
 
-其餘部分仍以「依測試計畫手動執行 + 記錄結果」為主。**雲端持久化、信件送達、
+其餘部分仍以「依測試計畫手動執行 + 記錄結果」為主。累積的手動案例依風險分層在
+[test-plans/2026-09-12-manual-checklist.md](./test-plans/2026-09-12-manual-checklist.md)
+（P0 擋住發布／P1 自動測試只涵蓋一半／P2 日常已驗證），不確定先測哪些時從那裡開始。**雲端持久化、信件送達、
 視覺外觀（字距／權重／顏色）、實機平台行為（deep link、旋轉、launcher widget）
 這四類無法自動化**，會長期留在手動清單裡。
 
@@ -74,6 +76,7 @@
 | `test/restore_sanitize_test.dart` | `sanitizeForRestore()` 清掉指向已刪除列的懸空外鍵 |
 | `test/merge_order_test.dart` | `mergeOrder()` 的拓撲排序：父先於子、懸空 parent 視為根、循環不會無窮迴圈 |
 | `test/trash_snapshot_test.dart` | `remove()` 回傳整棵子樹（目標／願景／任務），還原後父子關係完整 |
+| `test/auth_link_error_test.dart` | 失效的驗證連結分類：query string／fragment／Android custom scheme 三種形式，以及 PKCE 跨裝置與一般登入錯誤的區分 |
 
 選擇標準：**只測不依賴 Supabase／SharedPreferences 的純函式**，或在沒有設定
 `user_id` 的狀態下操作 Provider（此時 `upsert()`／`deleteRow()` 會直接返回）。
@@ -132,7 +135,7 @@
 | 測試檔 | 覆蓋範圍 | 退役的手動案例 |
 |---|---|---|
 | `test/widget/responsive_test.dart` | 13 個單欄畫面在 767／768px 的斷點切換與限寬值（420／640），四個分頁不得使用 `ResponsiveBody` | `2026-08-23-style-and-responsive.md` 23–38 |
-| `test/widget/password_reset_test.dart` | 忘記密碼入口與預填、新密碼的不一致／長度驗證、`_AuthGate` 的 recovery 優先序、關閉後離開 recovery、三語在地化 | `2026-09-05-phase0-reliability.md` 7、8、10、14、15、17 |
+| `test/widget/password_reset_test.dart` | 忘記密碼入口與預填、新密碼的不一致／長度驗證、`_AuthGate` 的 recovery 優先序、關閉後離開 recovery、失效連結的提示（含訪客在首頁時也看得到）、三語在地化 | `2026-09-05-phase0-reliability.md` 7、8、10、14、15、17 |
 | `test/widget/goal_link_visibility_test.dart` | 「只有頂層目標能連結願景」在新增／編輯表單、詳情頁、願景選單四處一致 | `2026-08-23-known-issues.md` 20–25、28 |
 | `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |

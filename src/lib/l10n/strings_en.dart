@@ -253,4 +253,6 @@ class StringsEn implements AppStrings {
   @override String get setNewPassword => 'Set a new password';
   @override String get newPasswordLabel => 'New password (at least 6 characters)';
   @override String get passwordUpdated => 'Password updated';
+  @override String get resetLinkInvalid => 'That reset link has expired or was already used. Send a new one — only the latest email works.';
+  @override String get resetLinkWrongDevice => 'Open the link on the same device and browser where you asked for the reset';
 }
