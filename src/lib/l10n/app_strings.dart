@@ -278,4 +278,9 @@ abstract class AppStrings {
 
   // Shown when a write did not reach Supabase
   String get syncFailed;
+
+  // Shown when a password-reset link does not work. Only the newest email is
+  // valid, and PKCE ties the link to the device that requested it
+  String get resetLinkInvalid;
+  String get resetLinkWrongDevice;
 }

@@ -98,12 +98,99 @@ Phase 0 的定義是「先讓現有功能可信」。以下三份計畫**從未�
 
 ## 發現的問題
 
-（記錄測試中發現的 bug 或行為不符預期之處）
+### F-1　重設連結點開得到 `otp_expired`（2026-09-12，**已結**）
+
+網域與 SMTP 設定完成、信寄得出去，但點連結後落在：
+
+```
+https://urniversity.netlify.app/?error=access_denied
+  &error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired
+```
+
+這個錯誤來自 Supabase 的 `/auth/v1/verify` 端點，代表**連結裡的 token 找不到或
+已失效**，不是 SMTP、網域或程式碼的設定錯誤（那些會給別的錯誤碼）。
+
+**依可能性排序的成因：**
+
+| # | 成因 | 為什麼可能 | 怎麼確認 |
+|---|---|---|---|
+| 1 | **點到舊的那封信** | `auth.users` 只有**一個** `recovery_token` 欄位。每次請求重設都會**覆蓋**它，所以只有**最新一封**有效。測試時連按幾次「寄出重設連結」再點到早期那封，就是這個錯誤 | 重寄一封，**只點最新那封** |
+| 2 | **連結被信箱的安全掃描器先點掉** | `{{ .ConfirmationURL }}` 指向 `/auth/v1/verify?token=…`，那是**一次性的 GET**。Outlook Safe Links、防毒、企業郵件掃描會先 GET 一次驗證連結安全，token 就被消耗了 | 換一個不做連結掃描的信箱（個人 Gmail）再試 |
+| 3 | **Resend 開了 click tracking** | 它會把 href 改寫成自己的追蹤網址，多一個轉址跳轉，某些掃描器更容易先觸發 | Resend Dashboard → 該網域 → 關掉 Click Tracking |
+| 4 | **真的過期** | Dashboard 的 Email OTP Expiration 預設 3600 秒。若被調小，信件範本寫的「有效期限為 1 小時」就與實際不符 | Dashboard → Authentication → 確認該值 |
+| 5 | **點了兩次／重新整理頁面** | 第一次已經消耗掉 token，第二次必定失敗 | 點完不要重新整理 |
+
+**最快的鑑別測試**：重新寄一封 → **一分鐘內**、**在請求重設的那個瀏覽器裡**、
+**只點一次**。會過就是成因 1／2／5；仍然失敗再往 3、4 查。
+
+**結論**：鑑別測試通過 → 屬於成因 1／2／5，重設流程本身沒問題。
+信件範本已加上「只有最新這封信的連結有效」與「只能使用一次」，降低重複發生。
+
+### F-2　錯誤被 App 靜默吞掉（2026-09-12，**已修**）
+
+不論 F-1 的成因是什麼，使用者看到的是**一個普通的登入頁**，網址列有錯誤訊息但
+畫面上什麼都沒說。App 沒有讀 `Uri.base.queryParameters` 裡的 `error_description`。
+
+這是獨立於 F-1 的缺陷：即使 F-1 修好，連結真的過期時（1 小時後）使用者仍然會
+遇到同樣的沉默。
+
+**根因比預期深**：`supabase_flutter` 的 `_isAuthCallbackDeeplink`
+（`supabase_auth.dart:183-189`）判斷錯誤時**只檢查 fragment（`#`）**：
+
+```dart
+(uri.fragment.contains('error_description'))
+```
+
+但 Supabase 的 verify 端點是把錯誤放在 **query string（`?`）**。所以那個網址
+根本不被當成 auth callback，`getSessionFromUrl()` 從未被呼叫，**沒有丟出例外、
+沒有進入 auth stream**。原本打算「監聽 authStateProvider 的錯誤」的修法抓不到。
+
+**修法**：新增 `providers/auth_link_error_provider.dart`，自己從兩條路徑收集：
+
+| 路徑 | 來源 | 為什麼需要 |
+|---|---|---|
+| 網址參數 | web 讀 `Uri.base`；mobile 自己訂閱 `AppLinks().uriLinkStream` | SDK 因上述 bug 完全忽略這條 |
+| auth stream | `authStateProvider` 的 `AsyncError` | SDK 有丟出例外，但它自己用**空的 onError** 訂閱（`supabase_auth.dart:89`），不看就沒了 |
+
+訊息透過 `MaterialApp.scaffoldMessengerKey` 顯示，所以不論 `_AuthGate` 把使用者
+放在登入頁還是（訪客的）首頁都看得到。
+
+`app_links` 因此升為直接依賴（原本是 `supabase_flutter` 的傳遞依賴）。
+
+### F-3　PKCE 的跨裝置限制（2026-09-12，**已緩解**）
+
+App 使用 gotrue 預設的 **PKCE** 流程（`gotrue_client.dart:114`）。
+`resetPasswordForEmail()` 會把 `code_verifier` 存在**發出請求的那個裝置**上
+（`gotrue_client.dart:967-971`）。
+
+因此「**在手機 App 按忘記密碼 → 在筆電開信點連結**」這條路徑會失敗——
+verify 這一步會過，但後續的 code 交換在筆電上找不到 verifier。
+反過來也一樣。這不是 F-1 的成因（錯誤碼不同），但對學生是很常見的操作，
+案例 12、13 要分別在「同裝置」與「跨裝置」各走一次。
+
+**處理方式**：**不改流程**。把整個 client 換成 implicit flow 可以讓連結在任何裝置
+都能用，但那會連 Google 登入一起降級——PKCE 正是為了 OAuth 的安全性而存在，
+為了一個邊緣情境換掉它不划算。
+
+改為**明確告知**：`AuthPKCEGrantCodeExchangeError` 會進到 auth stream，
+被 `authLinkFailureFromError()` 分類成 `wrongDevice`，顯示
+「請在按下『忘記密碼』的那個裝置與瀏覽器開啟連結」。
+
+若之後跨裝置真的變成常見抱怨，正解是改用 OTP 驗證碼（範本改用 `{{ .Token }}`、
+App 加輸入六位數的畫面），而不是降級 flow。
 
 ## 結論
 
 - [ ] 全部案例通過，可視為完成
-- [ ] 部分未通過，需修正後重測（列出待修項目）
+- [x] 部分未通過，需修正後重測
+
+待重測項目（2026-09-12）：
+
+1. F-1 已結，但案例 1–6、9、11–13、16 仍**從未執行過**——網域設定完成了，現在可以跑
+2. F-2 的修正需要驗證：故意讓連結過期（等一小時，或點兩次）→ 應看到
+   「重設連結已失效或已被使用」而不是一片沉默
+3. F-3 的提示需要驗證：在手機 App 按忘記密碼 → 在筆電開信點連結 →
+   應看到「請在按下『忘記密碼』的那個裝置與瀏覽器開啟連結」
 
 ## 備註
 

@@ -40,6 +40,9 @@ dependencies:
   shared_preferences: ^2.3.3
   # Direct: SyncedListNotifier classifies ClientException as a retryable failure
   http: ^1.6.0
+  # Direct: supabase_flutter drops a deep link that carries only an error, so
+  # auth_link_error_provider watches the stream itself (see that file's comment)
+  app_links: ^7.0.0
 
 dev_dependencies:
   flutter_test:

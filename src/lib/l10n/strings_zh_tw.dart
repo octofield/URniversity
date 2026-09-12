@@ -251,4 +251,6 @@ class StringsZhTw implements AppStrings {
   @override String get setNewPassword => '設定新密碼';
   @override String get newPasswordLabel => '新密碼（至少 6 字元）';
   @override String get passwordUpdated => '密碼已更新';
+  @override String get resetLinkInvalid => '重設連結已失效或已被使用，請重新寄送一次（只有最新一封有效）';
+  @override String get resetLinkWrongDevice => '請在按下「忘記密碼」的那個裝置與瀏覽器開啟連結';
 }
