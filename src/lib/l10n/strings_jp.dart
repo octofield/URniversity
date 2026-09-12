@@ -239,4 +239,12 @@ class StringsJp implements AppStrings {
   @override String dateLongDate(int month, int day) => '$month月$day日';
 
   @override String get syncFailed => '同期に失敗しました。変更が保存されていない可能性があります';
+
+  @override String get forgotPassword => 'パスワードをお忘れですか？';
+  @override String get resetPasswordHint => '登録に使用したメールアドレスを入力してください。再設定リンクをお送りします。';
+  @override String get sendResetLink => '再設定リンクを送信';
+  @override String get resetEmailSent => '再設定リンクを送信しました。メールをご確認ください';
+  @override String get setNewPassword => '新しいパスワードを設定';
+  @override String get newPasswordLabel => '新しいパスワード（6文字以上）';
+  @override String get passwordUpdated => 'パスワードを更新しました';
 }

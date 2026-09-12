@@ -267,6 +267,15 @@ abstract class AppStrings {
   String dateWithWeekday(String date, String weekday);
   String dateLongDate(int month, int day);
 
+  // Password reset
+  String get forgotPassword;
+  String get resetPasswordHint;
+  String get sendResetLink;
+  String get resetEmailSent;
+  String get setNewPassword;
+  String get newPasswordLabel;
+  String get passwordUpdated;
+
   // Shown when a write did not reach Supabase
   String get syncFailed;
 }

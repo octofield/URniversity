@@ -23,6 +23,9 @@ class TasksNotifier extends SyncedListNotifier<Task> {
   @override
   String idOf(Task item) => item.id;
 
+  @override
+  String? parentIdOf(Task item) => item.parentTaskId;
+
   // tasks has no parent_task_id foreign key, so an orphaned subtask only needs
   // re-attaching for consistency (see system_design.md UC6). The link columns do
   // have real foreign keys with ON DELETE SET NULL, but that only fires while
@@ -58,7 +61,7 @@ class TasksNotifier extends SyncedListNotifier<Task> {
         .where((t) => t.parentTaskId == parentTaskId)
         .fold(0, (prev, t) => t.sortOrder > prev ? t.sortOrder : prev);
     final task = Task(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: newRowId(),
       title: title,
       content: content,
       dueTime: dueTime,

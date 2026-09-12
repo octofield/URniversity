@@ -245,4 +245,12 @@ class StringsEn implements AppStrings {
   }
 
   @override String get syncFailed => 'Sync failed — that change may not have reached the cloud';
+
+  @override String get forgotPassword => 'Forgot password?';
+  @override String get resetPasswordHint => 'Enter the email you signed up with and we will send you a reset link.';
+  @override String get sendResetLink => 'Send reset link';
+  @override String get resetEmailSent => 'Reset link sent — check your inbox';
+  @override String get setNewPassword => 'Set a new password';
+  @override String get newPasswordLabel => 'New password (at least 6 characters)';
+  @override String get passwordUpdated => 'Password updated';
 }

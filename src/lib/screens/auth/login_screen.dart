@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/guest_provider.dart';
+import '../../l10n/app_strings.dart';
 import '../../providers/settings_provider.dart';
 import 'register_screen.dart';
 import '../../widgets/responsive_body.dart';
@@ -71,6 +72,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _sendResetLink() async {
+    final s = ref.read(stringsProvider);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _ForgotPasswordDialog(s: s, initialEmail: _emailCtrl.text.trim()),
+    );
+    if (result == null || result.isEmpty) return;
+
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        result,
+        // Same scheme the Google flow already registers in AndroidManifest
+        redirectTo: kIsWeb ? Uri.base.origin : 'com.octofield.urniversity://login-callback',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.resetEmailSent)),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
@@ -121,7 +150,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           onSubmitted: (_) => _login(),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _loading ? null : _sendResetLink,
+            child: Text(s.forgotPassword),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         SizedBox(
           width: double.infinity,
           child: FilledButton(
@@ -215,6 +251,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+// Asks which address the reset link should go to. Pre-filled from the login
+// field so the common case is one tap
+class _ForgotPasswordDialog extends StatefulWidget {
+  final AppStrings s;
+  final String initialEmail;
+  const _ForgotPasswordDialog({required this.s, required this.initialEmail});
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  late final TextEditingController _ctrl =
+      TextEditingController(text: widget.initialEmail);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.s;
+    return AlertDialog(
+      title: Text(s.forgotPassword),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.resetPasswordHint,
+              style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(labelText: s.emailLabel),
+            onSubmitted: (v) => Navigator.pop(context, v.trim()),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _ctrl.text.trim()),
+          child: Text(s.sendResetLink),
+        ),
+      ],
     );
   }
 }

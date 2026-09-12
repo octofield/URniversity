@@ -19,6 +19,13 @@
 
 ---
 
+## D0. 共通慣例
+
+- **列 id 由前端產生**：`newRowId()`（`src/lib/providers/synced_list_notifier.dart`），
+  格式為 `{毫秒時間戳}_{隨機數}`。⚠️ 2026-09-05 之前只有毫秒時間戳，
+  同一毫秒建立的多列會共用 id 而互相覆蓋（id 是主鍵）。舊資料的 id 維持原樣，不需遷移。
+- **寫入失敗一律經 `reportSyncError()`** 顯示，不得靜默吞掉（詳見 system_design.md §3-I）。
+
 ## D1. `tasks`（任務）
 
 對應 Dart 型別：`Task`（`src/lib/models/task.dart`）

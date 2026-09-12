@@ -69,6 +69,9 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
   @override
   String idOf(SemesterGoal item) => item.id;
 
+  @override
+  String? parentIdOf(SemesterGoal item) => item.parentId;
+
   // Both references are real foreign keys, and a trashed goal keeps the ids it
   // held when it was deleted. Restoring it after its parent or its vision was
   // deleted would insert a dangling reference (see system_design.md UC6)
@@ -97,7 +100,7 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
         .where((g) => g.parentId == parentId && g.semester == semester)
         .fold(0, (prev, g) => g.sortOrder > prev ? g.sortOrder : prev);
     final goal = SemesterGoal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: newRowId(),
       parentId: parentId,
       title: title,
       semester: semester,
