@@ -64,11 +64,14 @@ Dashboard → Authentication → Rate Limits → **Rate limit for sending emails
 Dashboard → Authentication → Emails，把 [`supabase/email-templates/`](../supabase/email-templates/)
 底下的檔案內容貼進對應的 Message body：
 
-| 檔案 | 對應範本 |
-|---|---|
-| `confirm-signup.html` | Confirm signup |
-| `reset-password.html` | Reset password |
-| `change-email.html` | Change email address |
+| 檔案 | 對應範本 | Subject heading |
+|---|---|---|
+| `confirm-signup.html` | Confirm signup | `URniversity 帳號驗證 / Confirm your account` |
+| `reset-password.html` | Reset password | `重設 URniversity 密碼 / Reset your password` |
+| `change-email.html` | Change email address | `確認新的電子郵件 / Confirm your new email` |
+
+⚠️ **Subject heading 是獨立欄位，不在 HTML 裡**。只貼 Message body 的話，標題會維持
+Supabase 的英文預設值（`Confirm Your Signup`）。兩個欄位都要改。
 
 範本用 `{{ .ConfirmationURL }}`，由 Supabase 自行組出正確的驗證網址，不需要手動拼。
 

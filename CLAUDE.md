@@ -121,6 +121,7 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
 | A new list-shaped provider | extend `SyncedListNotifier<T>` | `providers/synced_list_notifier.dart` |
 | Current account's display name / avatar | `displayIdentityProvider` | `providers/profile_provider.dart` |
 | `—` `→` ` · ` placeholders | `kEmptyValue`, `kArrow`, `kDotSeparator` | `core/ui_symbols.dart` |
+| Pumping a screen in a widget test | `setUpTestSupabase()`, `pumpScreen()`, `pumpApp()` | `test/helpers/pump_app.dart` |
 
 ### Hard rules
 
@@ -143,6 +144,12 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
    does not.
 7. **Only top-level semester goals carry `future_goal_id`.** Enforced in
    `linkFutureGoal()` and cleared by `reparent()`; see `system_design.md` UC4.
+8. **Widget tests run in guest mode, and guest mode never reaches Supabase.**
+   Three traps are documented in `docs/testing.md` §2.6 — the tab pages own no
+   `Scaffold`, `IndexedStack` hides the unselected ones from the default finder,
+   and `pumpApp()` reloads every provider from SharedPreferences, so seed data
+   *after* the pump. Assert UI text through `StringsZhTw()` and friends, never
+   as a literal. No golden tests.
 
 ---
 

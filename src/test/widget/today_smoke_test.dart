@@ -1,0 +1,153 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:urniversity/l10n/strings_zh_tw.dart';
+import 'package:urniversity/providers/inspirations_provider.dart';
+import 'package:urniversity/providers/semester_goals_provider.dart';
+import 'package:urniversity/providers/tasks_provider.dart';
+import 'package:urniversity/screens/today_screen.dart';
+
+import '../helpers/pump_app.dart';
+
+// today_screen.dart was split into three part files; showTaskSheet and
+// showAddInspirationSheet are the cross-file exports the split could have
+// broken. Retires cases 30, 31, 33, 34 and 35 of
+// docs/test-plans/2026-08-23-known-issues.md. Case 32 (drag to reorder and to
+// nest) stays manual — the drop zones need real pointer geometry.
+void main() {
+  const zh = StringsZhTw();
+
+  setUp(() => setUpTestSupabase());
+
+  // The sheets are opened from a plain Scaffold rather than from TodayScreen,
+  // which has no Scaffold of its own and reaches for Scaffold.of(context)
+  Widget sheetHost(void Function(BuildContext, WidgetRef) open) => Consumer(
+        builder: (ctx, ref, _) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => open(ctx, ref),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+
+  Future<void> openSheet(
+    WidgetTester tester,
+    ProviderContainer c,
+    void Function(BuildContext, WidgetRef) open,
+  ) async {
+    await pumpScreen(tester, sheetHost(open), container: c);
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+  }
+
+  group('task sheet', () {
+    testWidgets('adds a task', (tester) async {
+      final c = testContainer();
+      await openSheet(tester, c, (ctx, ref) => showTaskSheet(ctx, ref));
+
+      await tester.enterText(
+          find.widgetWithText(TextField, zh.titleField), '寫測試');
+      await tester.enterText(
+          find.widgetWithText(TextField, zh.taskNotes), '備註');
+      await tester.tap(find.widgetWithText(FilledButton, zh.add));
+      await tester.pumpAndSettle();
+
+      final tasks = c.read(tasksProvider);
+      expect(tasks, hasLength(1));
+      expect(tasks.single.title, '寫測試');
+      expect(tasks.single.content, '備註');
+    });
+
+    testWidgets('ignores an empty title', (tester) async {
+      final c = testContainer();
+      await openSheet(tester, c, (ctx, ref) => showTaskSheet(ctx, ref));
+      await tester.tap(find.widgetWithText(FilledButton, zh.add));
+      await tester.pumpAndSettle();
+      expect(c.read(tasksProvider), isEmpty);
+    });
+
+    testWidgets('edits a task and clears its notes', (tester) async {
+      final c = testContainer();
+      c.read(tasksProvider.notifier).add('原標題', content: '原備註');
+      final task = c.read(tasksProvider).single;
+
+      await openSheet(
+          tester, c, (ctx, ref) => showTaskSheet(ctx, ref, existing: task));
+      expect(find.text(zh.editTask), findsOneWidget);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, zh.titleField), '新標題');
+      await tester.enterText(
+          find.widgetWithText(TextField, zh.taskNotes), '');
+      await tester.tap(find.widgetWithText(FilledButton, zh.save));
+      await tester.pumpAndSettle();
+
+      final updated = c.read(tasksProvider).single;
+      expect(updated.title, '新標題');
+      expect(updated.content, isNull);
+    });
+  });
+
+  testWidgets('inspiration sheet adds an inspiration', (tester) async {
+    final c = testContainer();
+    await openSheet(tester, c, (ctx, ref) => showAddInspirationSheet(ctx, ref));
+
+    await tester.enterText(
+        find.widgetWithText(TextField, zh.titleField), '一個點子');
+    await tester.tap(find.widgetWithText(FilledButton, zh.add));
+    await tester.pumpAndSettle();
+
+    expect(c.read(inspirationsProvider).single.title, '一個點子');
+  });
+
+  group('today screen', () {
+    testWidgets('switches between the three task views', (tester) async {
+      await pumpApp(tester);
+
+      for (final label in [zh.weeklyTasks, zh.dailyTasks, zh.allTasks]) {
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+        expect(find.text(label), findsOneWidget);
+      }
+    });
+
+    testWidgets('shows and clears the filter banner', (tester) async {
+      final c = await pumpApp(tester);
+      expect(find.textContaining(zh.filters), findsNothing);
+
+      c.read(semesterGoalsProvider.notifier).addGoal('目標', '114-1');
+      c.read(taskTargetFilterProvider.notifier).state = {
+        c.read(semesterGoalsProvider).single.id,
+      };
+      await tester.pumpAndSettle();
+      expect(find.textContaining(zh.filters), findsOneWidget);
+
+      // The banner's own clear button; the only tappable close icon on screen
+      await tester.tap(find.widgetWithIcon(GestureDetector, Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(zh.filters), findsNothing);
+    });
+
+    testWidgets('lists completed tasks in their own section', (tester) async {
+      final c = await pumpApp(tester);
+      // The daily view only lists tasks that apply to the date, and a task with
+      // no due time and no recurrence applies to none
+      c.read(taskViewProvider.notifier).state = 0;
+      c.read(tasksProvider.notifier).add('做完的事');
+      await tester.pumpAndSettle();
+      expect(find.text(zh.completedTasks), findsNothing);
+
+      c.read(tasksProvider.notifier).toggle(c.read(tasksProvider).single.id);
+      await tester.pumpAndSettle();
+      expect(find.text(zh.completedTasks), findsOneWidget);
+    });
+  });
+
+  testWidgets('HomeScreen still hosts TodayScreen after the split',
+      (tester) async {
+    await pumpApp(tester);
+    expect(find.byType(TodayScreen), findsOneWidget);
+  });
+}
