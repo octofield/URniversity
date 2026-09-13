@@ -326,6 +326,67 @@
 
 ---
 
+## D13. 裝置本機儲存 — `notification_settings`（Phase 1 通知設定）
+
+媒介：SharedPreferences，存一段 **JSON 字串**。
+對應 Dart 型別：`NotificationSettings`（`src/lib/models/notification_settings.dart`）
+讀寫處理程序：`NotificationSettingsNotifier`（`src/lib/providers/notification_provider.dart`）
+
+| 欄位（JSON key） | 型別 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `enabled` | bool | ✗ | `false` | 總開關。**預設關閉**：要先向系統要到通知權限才有意義，而在使用者還沒有任何資料時就跳權限請求最容易被永久拒絕 |
+| `task_due_enabled` | bool | ✗ | `true` | 任務到期提醒 |
+| `task_lead_minutes` | int | ✗ | `30` | 提前幾分鐘提醒；`0` = 準時。可選值見 `NotificationConstants.taskLeadMinuteOptions` |
+| `daily_summary_enabled` | bool | ✗ | `true` | 每日摘要 |
+| `summary_minute_of_day` | int | ✗ | `480` | 摘要時間，以「當日第幾分鐘」儲存（480 = 08:00） |
+| `goal_deadline_enabled` | bool | ✗ | `true` | 學期目標截止提醒 |
+| `goal_lead_days` | int | ✗ | `7` | 學期結束前幾天提醒。可選值見 `NotificationConstants.goalLeadDayOptions` |
+
+**特別說明：**
+
+- **為什麼放本機而不是 `user_settings`（D8-B）**：兩個理由。其一，「哪一台裝置該震動」
+  本來就是**每台裝置各自的問題**，同步到雲端反而會讓手機的設定影響到網頁版。
+  其二，D8-B 在**訪客模式下完全不持久化**（`_saveSettings()` 開頭直接 return），
+  放那裡會讓訪客每次重開 App 都要重設一次。
+- **每個欄位在 `fromJson` 都有各自的預設值**。舊版寫入的 JSON 缺少新欄位時，
+  只會退回該欄位的預設，不會整組設定失效——那等於靜默關掉通知。
+- 通知**不產生任何持久化資料**。排程是從 D1 `tasks` 與 D2 `semester_goals` **推導**出來的
+  （`buildNotificationSchedule()`），存在作業系統的待送佇列裡，不寫回任何資料表。
+  資料一變就整批重算重排，所以沒有會過期的快取。
+- 這把 key **不在** `_GuestModeNotifier._dataKeys` 裡：退出訪客模式時清掉的是訪客的**資料**，
+  通知偏好屬於這台裝置，不該被一起清掉。
+
+---
+
+## D14. 裝置本機儲存 — `notification_action_log`（通知動作的暫存結果）
+
+媒介：SharedPreferences，存一段 **JSON 陣列字串**。
+寫入處理程序：`applyDoneAction()`（`src/lib/services/notification_background.dart`，**背景 isolate**）
+讀取處理程序：`drainNotificationActions()`（`src/lib/providers/notification_action_provider.dart`，主 isolate）
+
+| 欄位（JSON key） | 型別 | 必填 | 說明 |
+|---|---|---|---|
+| `task_id` | string | ✓ | 被動到的任務 id |
+| `error` | string | ✗ | 有這個欄位就代表**寫入失敗**，內容是錯誤描述；沒有代表成功 |
+
+**這把 key 存在的唯一理由**：使用者在通知上按「標示為已完成」時，Android **一律**另開一個
+FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 App 是否活著）。
+那個 isolate **沒有任何 UI**，所以失敗沒有地方可以顯示。
+
+把結果寫進這裡，主 isolate 在下次啟動或回到前景時讀走，就能做兩件事：
+
+1. **重載資料**——背景已經改過 D1 `tasks`（或訪客的 `guest_tasks`），主 isolate 的記憶體狀態
+   一定是舊的，不重載畫面會一直顯示任務未完成
+2. **把失敗浮現出來**——透過既有的 `reportSyncError()` 顯示 SnackBar
+
+⚠️ 這是 **CLAUDE.md §9 硬規則 2**（絕不靜默吞掉寫入錯誤）在沒有 UI 的情境下的作法：
+失敗被**延後**顯示，不是被吞掉。
+
+⚠️ **SharedPreferences 每個 isolate 各自快取**。主 isolate 讀這把 key 之前必須先呼叫
+`prefs.reload()`，否則讀到的是自己那份還沒有這筆記錄的舊快取。讀完即清空。
+
+---
+
 ## 列舉值與特殊格式總表
 
 | 名稱 | 定義位置 | 可能值 |
@@ -333,6 +394,8 @@
 | `RecurrenceType` | `src/lib/models/task.dart` | `none` / `daily` / `weekly` / `monthly` / `everyNDays` |
 | `TrashItemType`（儲存為字串） | `src/lib/models/trash_item.dart` | `task` / `semester_goal` / `future_goal` |
 | `FutureCategories`（內建分類） | `src/lib/models/future_goal.dart` | `exchange` / `intern` / `competition` / `certification` / `performance` / `other` |
+| `NotificationKind` | `src/lib/models/notification_settings.dart` | `taskDue` / `dailySummary` / `goalDeadline` |
+| 通知 payload 格式 | `src/lib/core/notification_payload.dart` | `"{task_id}\|{yyyy-MM-dd}"`；日期是**該次提醒對應的那一天**，循環任務靠它決定勾掉哪一天 |
 | `DateDisplayFormat`（儲存為字串） | `src/lib/providers/settings_provider.dart` | `mmddWeekday` / `mmdd` / `yyyymmdd` / `longDate` |
 | `AppLanguage`（儲存為字串） | `src/lib/providers/settings_provider.dart` | `zh_tw` / `en` / `jp` |
 | 學期字串格式 | `semester_goals_provider.dart` / `future_goal.dart` | 一般學期：`"{民國年}-{學期序}"`，例如 `"114-1"`；假期：`"{民國年}-B{學期序}"`，例如 `"114-B1"` 代表「第 1 學期後面那個假期」（見下方假期字串格式）。比較大小一律用 `compareSemesters()`，不要用字串或數字直接比較 |

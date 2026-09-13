@@ -292,6 +292,14 @@ flowchart TD
 - `compareSemesters(a, b)`：把 `"YYY-N"` 或 `"YYY-Bk"` 換算成同一套權重（一般學期 k → `2k-1`，
   假期 k → `2k`）後比較 `(年, 權重)`，讓假期正確排在對應學期之後、下一個學期之前。**禁止**直接
   用字串或轉數字比較。
+- `semesterStart(token, settings)`（`semester_helpers.dart`）：把 token 換算成該學期的
+  **起始日期**。`currentSemester()` 現在也是呼叫它來取得起始點，避免兩處各算一次而漂移。
+  假期 token 沒有自己可推導的起始日（`SemesterSettings` 只有起始月份，沒有「哪天停課」），
+  所以它回傳的是所屬學期的起始日。
+- `semesterEnd(token, settings)`（`semester_helpers.dart`）：該學期的**最後一天**，定義為
+  **下一個學期起始日的前一天**（最後一個學期則接到下學年第 1 學期）。⚠️ 這表示學期的範圍
+  **涵蓋它後面那段假期**——資料裡沒有任何欄位能區分「學期結束」與「假期開始」，
+  而對「目標截止提醒」而言，算到下學期開始正是想要的語意。
 - `breakName(k, count, s)` / `formatSemester(token, settings, s)`（`semester_helpers.dart`）：
   假期名稱依「目前配置的學期數 `count`」查表決定（例如 3 學期制的假期依序是寒假／春假／暑假，
   4 學期制是秋假／寒假／春假／暑假），**不是**存在 token 裡固定不變的——所有顯示學期字串的地方
@@ -391,6 +399,72 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
   決定顯示內容——只連結一邊就顯示該分類的實心色條；兩邊都連結且分類顏色相同也顯示單一實心色；
   兩邊都連結但分類顏色不同，色條上半用目標顏色、下半用願景顏色（`Column` + 兩個 `Expanded`）；
   都沒連結則不顯示色條（寬度 0）。
+
+### 3-K 通知排程計算（`core/notification_schedule.dart`）
+
+`buildNotificationSchedule()` 是**純函式**：吃任務、學期目標、通知設定與「現在」，
+吐出一份 `ScheduledNotification` 清單。不碰任何平台 API，所以整條規則都能用單元測試涵蓋；
+唯一碰 platform channel 的是 `NotificationService.apply()`。
+
+**產生規則**（三種各自獨立開關，總開關由 `NotificationSettings.isOn()` 統一折入）：
+
+| 種類 | 何時產生 | 刻意排除的情況 |
+|---|---|---|
+| 任務到期 | 有 `dueTime` 的任務，於 `dueTime − taskLeadMinutes` | **沒有 `dueTime` 的任務**（沒有可提醒的時刻，交給每日摘要）；**子任務**（避免父子重複響）；已完成的 |
+| ↑ 內容 | **只有標題（任務名稱），沒有內文**——下方的空間留給兩顆動作按鈕 | — |
+| 每日摘要 | 每天 `summaryMinuteOfDay`，內容是當天適用且未完成的任務數 | **當天沒有任何任務時整則跳過**——每天都說「今天沒安排」會訓練使用者把整個頻道關掉 |
+| 學期目標截止 | `semesterEnd(學期) − goalLeadDays`，於摘要時間 | **子目標**（會與父目標重複計算同一件事）；已完成的；整學期都完成的則完全不發 |
+
+**循環任務**：`dueTime` 的**日期部分無意義、時間部分才是提醒時刻**（哪幾天由 `recurrence`
+決定，見 3-A）。因此排程對每一天呼叫 `taskAppliesTo()`（與今日頁同一個函式，不另寫一份），
+命中的那天再用 `dueTime` 的時／分組出當天的提醒時刻，並跳過 `isCompletedOn(那天)` 為真的日子。
+
+**為什麼要有上限**：`scheduleHorizonDays`（14 天）與 `maxScheduled`（48 則）都在
+`NotificationConstants`。一個每日循環任務會產生無限多則，而 iOS 本身只保留 64 則待送通知；
+排程在資料一有變動就整批重算，所以短的視野不會漏掉東西。
+
+**id 配置**：排序後才依序發號（`taskIdBase + i` 等）。不從資料列 id 雜湊而來，因為
+`apply()` 每次都先 `cancelAll()`，順序發號必不碰撞，雜湊則有機會碰撞。
+
+**payload**：只有任務提醒帶，格式 `"{taskId}|{yyyy-MM-dd}"`
+（`core/notification_payload.dart`）。**日期是必要的**——循環任務的提醒是針對「那一天那一次」，
+沒有日期就分不出要勾掉哪一天。解析失敗回傳 `null` 而非拋例外，因為它會在**背景 isolate**
+被解析，那裡的例外沒有地方可去。
+
+### 3-L 通知動作的處理（`services/notification_background.dart`）
+
+兩顆按鈕走的是**完全不同的兩條路**：
+
+| 按鈕 | `showsUserInterface` | 跑在哪 | 做什麼 |
+|---|---|---|---|
+| 標示為已完成 | `false` | **背景 isolate** | 直接寫入資料，App 不會跳出來 |
+| 重新安排時間 | `true` | 主 isolate | 把 App 帶到前景，打開該任務的編輯 sheet |
+
+**為什麼「已完成」一定要在背景 isolate 做完**：Android 的 `ActionBroadcastReceiver`
+在 `showsUserInterface: false` 時**一律**另開一個 FlutterEngine，**不檢查主 App 是否活著**。
+所以不能寄望主 isolate 來處理。
+
+**流程**：
+
+```
+1. DartPluginRegistrant.ensureInitialized()   ← 背景引擎預設沒有註冊任何外掛
+2. 解析 payload → taskId + 日期
+3. prefs.reload() ← 這個 isolate 的快取是舊的
+4. 訪客 → 改寫 guest_tasks 的 JSON
+   已登入 → Supabase.initialize() → select 該列 → Task.toggledOn() → update
+5. 不論成功或失敗，把結果寫進 D14
+```
+
+**第 5 步是符合硬規則 2 的關鍵**。背景沒有 UI 可以報錯，所以錯誤被寫進磁碟；
+主 isolate 在啟動與每次回到前景時（`drainNotificationActions()`）讀走，
+重載資料並用 `reportSyncError()` 把失敗浮現出來。**延後顯示，不是靜默吞掉。**
+
+**完成邏輯只有一份**：`Task.toggledOn()`（`models/task.dart`）。UI 的
+`TasksNotifier.toggleOnDate()` 與背景 isolate 用的是同一個函式——否則那條沒人看得到的
+路徑會慢慢跟 UI 漂開。它是 `isCompletedOn()` 的反函式，兩者必須一直維持這個關係。
+
+**「重新安排時間」要等資料載入**：冷啟動時通知早在任何一列資料抵達之前就被處理了。
+`pendingTaskEditProvider` 會一直保留那個 id，直到該任務出現在 `tasksProvider` 裡才打開 sheet。
 
 ---
 
@@ -582,6 +656,31 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 4. 關閉對話框後呼叫 `Navigator.popUntil((route) => route.isFirst)`（沿用 UC 登出的既有作法）
    跳回堆疊最底層，讓 `_AuthGate` 依新的 session 狀態顯示 `LoginScreen`；若不做這一步，畫面會
    卡在已經失去 session 的設定頁而非自動導回登入頁。
+
+### UC13　設定通知提醒
+1. 設定頁點「通知」→ `NotificationSettingsScreen`。
+2. 打開總開關 → 向作業系統請求通知權限（`NotificationService.requestPermission()`）。
+   - **被拒絕時開關自動彈回關閉**並顯示提示。若不這樣做，畫面會宣稱提醒已開啟，
+     但系統永遠不會送出任何一則。
+3. 三種提醒（任務到期／每日摘要／學期目標截止）各自有獨立開關；總開關關閉時三者一律變灰不可動。
+4. 每種提醒可調整一個數值：提前幾分鐘、摘要時間（`showTimePicker`）、提前幾天。
+5. 任何一項變更 → 寫入 D13 → `notificationScheduleProvider` 重算 → `NotificationService.apply()`
+   先 `cancelAll()` 再整批重新排入作業系統。
+6. 之後只要任務或學期目標有任何變動（新增、完成、刪除），同一條路徑會再跑一次，
+   不需要使用者做任何事。
+7. Web 與桌面版讀得到設定也算得出排程，但沒有可用的送出管道，畫面會顯示不支援並鎖住總開關。
+
+### UC13-B　從通知直接處理任務
+1. 任務提醒跳出來，下方有兩顆按鈕：「標示為已完成」與「重新安排時間」。
+   通知**沒有內文**——原本顯示到期時間的位置讓給按鈕。
+2. 按「標示為已完成」→ **App 不會打開**。背景 isolate 直接寫入（已登入寫 Supabase，
+   訪客寫本機），通知消失。
+3. 若那次寫入失敗（例如沒有網路）→ 失敗被記進 D14 → **下次開 App 時跳出同步失敗提示**。
+   這是硬規則 2 在沒有 UI 的情境下的作法，失敗不會無聲無息。
+4. 下次開 App（或回到前景）時，資料會重載一次，畫面才會反映背景那次寫入。
+5. 按「重新安排時間」→ App 開啟 → 直接跳出**該任務**的編輯 sheet，使用者自己改時間。
+6. 循環任務的提醒只針對**那一天那一次**：勾掉今天不會影響明天的提醒。
+7. 每日摘要與學期目標提醒**沒有按鈕**——它們不對應單一任務。
 
 ---
 

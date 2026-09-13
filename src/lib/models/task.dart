@@ -82,6 +82,22 @@ class Task {
     return completedDates.contains(_dateKey(date));
   }
 
+  // Flips completion for one day and returns the result.
+  //
+  // Lives on the model rather than in TasksNotifier because the notification's
+  // "mark as done" action runs in a background isolate with no providers, and a
+  // second copy of this rule there would drift from the one the UI uses. The
+  // inverse of isCompletedOn(), and has to stay that way
+  Task toggledOn(DateTime date) {
+    if (recurrence == null || recurrence!.isNone) {
+      return copyWith(isCompleted: !isCompleted);
+    }
+    final key = _dateKey(date);
+    final next = List<String>.from(completedDates);
+    if (!next.remove(key)) next.add(key);
+    return copyWith(completedDates: next);
+  }
+
   factory Task.fromJson(Map<String, dynamic> j) {
     List<String> completedDates = const [];
     // Tolerated on purpose: a malformed stored value costs the completion

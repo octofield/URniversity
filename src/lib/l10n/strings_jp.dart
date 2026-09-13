@@ -249,4 +249,31 @@ class StringsJp implements AppStrings {
   @override String get passwordUpdated => 'パスワードを更新しました';
   @override String get resetLinkInvalid => 'この再設定リンクは期限切れか使用済みです。もう一度送信してください（最新のメールのみ有効です）';
   @override String get resetLinkWrongDevice => '「パスワードをお忘れですか？」を押した端末とブラウザでリンクを開いてください';
+
+  @override String get notifications => '通知';
+  @override String get notifEnabled => '通知をオンにする';
+  @override String get notifEnabledHint => 'オフにすると下の3つはすべて通知されません';
+  @override String get notifTaskDue => 'タスクの期限通知';
+  @override String get notifTaskLead => '通知タイミング';
+  @override String get notifDailySummary => '今日のまとめ';
+  @override String get notifSummaryTime => 'まとめの時刻';
+  @override String get notifGoalDeadline => '学期目標の締切通知';
+  @override String get notifGoalLead => '何日前に通知';
+  @override String get notifPermissionDenied => '通知の許可がブロックされています。端末の設定から有効にしてください';
+  @override String get notifUnsupportedPlatform => 'このプラットフォームでは通知を表示できません。モバイルアプリをご利用ください';
+  @override String notifLeadMinutes(int minutes) {
+    if (minutes == 0) return '時間ちょうど';
+    if (minutes < 60) return '$minutes 分前';
+    if (minutes < 1440) return '${minutes ~/ 60} 時間前';
+    return '1 日前';
+  }
+  @override String notifLeadDays(int days) => '$days 日前';
+  @override String get notifActionDone => '完了にする';
+  @override String get notifActionReschedule => '時間を変更';
+  @override String notifActionFailed(String detail) => '通知から完了にした際に同期できませんでした：$detail';
+  @override String get notifSummaryTitle => '今日の予定';
+  @override String notifSummaryBody(int count) => '今日は $count 件あります';
+  @override String get notifGoalTitle => '学期がもうすぐ終わります';
+  @override String notifGoalBody(String semester, int count) =>
+      '$semester に未完了の目標が $count 件あります';
 }

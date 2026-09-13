@@ -253,4 +253,31 @@ class StringsZhTw implements AppStrings {
   @override String get passwordUpdated => '密碼已更新';
   @override String get resetLinkInvalid => '重設連結已失效或已被使用，請重新寄送一次（只有最新一封有效）';
   @override String get resetLinkWrongDevice => '請在按下「忘記密碼」的那個裝置與瀏覽器開啟連結';
+
+  @override String get notifications => '通知';
+  @override String get notifEnabled => '開啟通知';
+  @override String get notifEnabledHint => '關閉後，下面三項都不會提醒';
+  @override String get notifTaskDue => '任務到期提醒';
+  @override String get notifTaskLead => '提前多久提醒';
+  @override String get notifDailySummary => '每日摘要';
+  @override String get notifSummaryTime => '摘要時間';
+  @override String get notifGoalDeadline => '學期目標截止提醒';
+  @override String get notifGoalLead => '提前幾天提醒';
+  @override String get notifPermissionDenied => '系統擋下了通知權限，請到系統設定開啟';
+  @override String get notifUnsupportedPlatform => '這個平台不支援通知，請用手機 App';
+  @override String notifLeadMinutes(int minutes) {
+    if (minutes == 0) return '準時';
+    if (minutes < 60) return '$minutes 分鐘前';
+    if (minutes < 1440) return '${minutes ~/ 60} 小時前';
+    return '1 天前';
+  }
+  @override String notifLeadDays(int days) => '$days 天前';
+  @override String get notifActionDone => '標示為已完成';
+  @override String get notifActionReschedule => '重新安排時間';
+  @override String notifActionFailed(String detail) => '從通知標示完成時同步失敗：$detail';
+  @override String get notifSummaryTitle => '今天的安排';
+  @override String notifSummaryBody(int count) => '今天有 $count 件事要做';
+  @override String get notifGoalTitle => '學期快結束了';
+  @override String notifGoalBody(String semester, int count) =>
+      '$semester 還有 $count 個目標沒完成';
 }

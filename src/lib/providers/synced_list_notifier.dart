@@ -140,6 +140,22 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     }
   }
 
+  // Forces a fetch even though the user has not changed.
+  //
+  // load() no-ops when _userId already matches, which is right for ordinary
+  // startup but wrong after the notification's background isolate wrote to the
+  // row store behind this isolate's back — the in-memory list would stay stale
+  Future<void> reload() async {
+    final userId = _userId;
+    if (userId == null) return;
+    if (userId == 'guest') {
+      await loadGuest();
+      return;
+    }
+    _userId = null;
+    await load(userId);
+  }
+
   Future<void> loadGuest() async {
     _userId = 'guest';
     final p = await SharedPreferences.getInstance();

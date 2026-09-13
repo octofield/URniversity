@@ -7,6 +7,10 @@ import 'core/theme/app_theme.dart';
 import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/guest_provider.dart';
+import 'providers/notification_action_provider.dart';
+import 'providers/notification_provider.dart';
+import 'providers/tasks_provider.dart';
+import 'screens/today_screen.dart';
 import 'providers/password_recovery_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/settings_provider.dart';
@@ -31,6 +35,10 @@ Future<void> main() async {
 // as a guest, on the home screen
 final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
+// The task edit sheet is a modal route, so opening it from a notification needs
+// a context below the Navigator rather than App's own
+final _navigatorKey = GlobalKey<NavigatorState>();
+
 class App extends ConsumerWidget {
   const App({super.key});
 
@@ -38,6 +46,9 @@ class App extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(syncProvider);
     ref.watch(authLinkWatcherProvider);
+    // Keeps the device's pending reminders in step with the task and goal data
+    ref.watch(notificationSyncProvider);
+    ref.watch(notificationActionProvider);
     final lang = ref.watch(languageProvider);
     final s = ref.watch(stringsProvider);
 
@@ -75,7 +86,24 @@ class App extends ConsumerWidget {
       });
     });
 
+    // "Reschedule" from a notification. Deliberately watched rather than
+    // listened to: on a cold start the id arrives before the rows do, so this
+    // rebuilds until the task exists and only then opens its sheet
+    final pendingEdit = ref.watch(pendingTaskEditProvider);
+    if (pendingEdit != null) {
+      final task =
+          ref.watch(tasksProvider).where((t) => t.id == pendingEdit).firstOrNull;
+      if (task != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final navContext = _navigatorKey.currentContext;
+          ref.read(pendingTaskEditProvider.notifier).state = null;
+          if (navContext != null) showTaskSheet(navContext, ref, existing: task);
+        });
+      }
+    }
+
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       scaffoldMessengerKey: _messengerKey,
       title: 'URniversity',
       debugShowCheckedModeBanner: false,

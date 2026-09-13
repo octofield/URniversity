@@ -3,6 +3,7 @@ import '../models/semester_goal.dart';
 import 'synced_list_notifier.dart';
 import 'future_goals_provider.dart';
 import 'settings_provider.dart';
+import '../utils/semester_helpers.dart';
 
 String currentSemester(SemesterSettings settings) {
   final now = DateTime.now();
@@ -11,14 +12,14 @@ String currentSemester(SemesterSettings settings) {
   String result = '${rocYear - 1}-1';
   DateTime resultStart = DateTime(2000);
 
+  // The latest term that has already begun. Start dates come from
+  // semesterStart() so the deadline reminders cannot drift from this
   for (int ay = rocYear - 1; ay <= rocYear + 1; ay++) {
-    int yearOffset = 0;
-    for (int t = 0; t < settings.startMonths.length; t++) {
-      if (t > 0 && settings.startMonths[t] <= settings.startMonths[t - 1]) yearOffset++;
-      final semStart = DateTime(ay + 1911 + yearOffset, settings.startMonths[t]);
+    for (int t = 1; t <= settings.startMonths.length; t++) {
+      final semStart = semesterStart('$ay-$t', settings);
       if (!semStart.isAfter(now) && semStart.isAfter(resultStart)) {
         resultStart = semStart;
-        result = '$ay-${t + 1}';
+        result = '$ay-$t';
       }
     }
   }

@@ -283,4 +283,28 @@ abstract class AppStrings {
   // valid, and PKCE ties the link to the device that requested it
   String get resetLinkInvalid;
   String get resetLinkWrongDevice;
+
+  // ── Notifications (Phase 1) ───────────────────────────────────────────────
+  String get notifications;
+  String get notifEnabled;
+  String get notifEnabledHint;
+  String get notifTaskDue;
+  String get notifTaskLead;
+  String get notifDailySummary;
+  String get notifSummaryTime;
+  String get notifGoalDeadline;
+  String get notifGoalLead;
+  String get notifPermissionDenied;
+  String get notifUnsupportedPlatform;
+  // Label for a lead time: 0 means "on time", otherwise minutes/hours/a day
+  String notifLeadMinutes(int minutes);
+  String notifLeadDays(int days);
+  // Notification bodies and action buttons
+  String get notifActionDone;
+  String get notifActionReschedule;
+  String notifActionFailed(String detail);
+  String get notifSummaryTitle;
+  String notifSummaryBody(int count);
+  String get notifGoalTitle;
+  String notifGoalBody(String semester, int count);
 }
