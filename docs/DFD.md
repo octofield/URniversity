@@ -238,6 +238,56 @@ flowchart LR
 
 ---
 
+## Diagram 1-F：通知排程與通知動作
+
+```mermaid
+flowchart LR
+    User(["使用者：設定 → 通知"])
+    Shade(["使用者：通知欄的兩個按鈕"])
+    P5["NotificationSettingsNotifier\n(notification_provider.dart)"]
+    P6["buildNotificationSchedule()\n(core/notification_schedule.dart)"]
+    P7["NotificationService.apply()\n(services/notification_service.dart)"]
+    P8["applyDoneAction()\n背景 isolate\n(notification_background.dart)"]
+    P9["drainNotificationActions()\n(notification_action_provider.dart)"]
+    D1[("D1 tasks")]
+    D11[("D11 guest_tasks")]
+    D13[("D13 notification_settings")]
+    D14[("D14 notification_action_log")]
+    OS(["作業系統的待送通知佇列"])
+
+    User -- "開關 / 提前時間 / 摘要時間" --> P5
+    P5 -- "寫入 JSON" --> D13
+    D13 -- "讀取設定" --> P6
+    D1 -- "讀取（到期時間、循環規則、完成狀態）" --> P6
+    P6 -- "ScheduledNotification 清單（含 payload）" --> P7
+    P7 -- "cancelAll 後全部重新排入" --> OS
+    OS -- "時間到時顯示" --> Shade
+
+    Shade -- "標示為已完成" --> P8
+    P8 -- "已登入：讀取後更新該列" --> D1
+    P8 -- "訪客：改寫 JSON" --> D11
+    P8 -- "成功或失敗都記錄" --> D14
+    D14 -- "啟動與回到前景時讀走並清空" --> P9
+    P9 -- "重載" --> D1
+    P9 -- "失敗 → reportSyncError" --> User
+```
+
+- **P8 是全系統唯一不經過主 App 的寫入**。使用者在通知欄按「標示為已完成」時，
+  Android 一律另開一個 FlutterEngine（`ActionBroadcastReceiver.java:83-89`），
+  **不檢查主 App 是否還活著**。所以那裡沒有 Provider、沒有 Riverpod、**也沒有 UI**。
+- **因此一定要有 D14**。背景寫入的失敗沒有地方可以當場顯示，就寫進 D14 等主 isolate 收，
+  由 P9 走既有的 `reportSyncError()` 浮現——**延後顯示，不是吞掉**（CLAUDE.md §9 規則 2）。
+- **P9 還負責重載**。P8 已經改過 D1／D11，主 isolate 的記憶體狀態必定過期；
+  不重載的話畫面會一直顯示任務未完成。
+- 「重新安排時間」那顆按鈕**不在這張圖裡**：它不寫任何資料，只是把 App 帶到前景並打開
+  該任務的編輯 sheet，走的是一般的 UI 路徑。
+- 排程本身**不產生持久化資料**，是從 D1 與 D2 推導出來的，沒有會過期的快取。
+- P6 是**純函式**，所以「什麼時候該響」可以完全用單元測試涵蓋；
+  P7 與 P8 是僅有的兩個碰平台的地方。
+- 僅 Android 與 iOS 有這整條流程（`NotificationService.isSupported`）。
+
+---
+
 ## 靜態參考資料（唯讀，不經任何資料流）
 
 | 資料 | 來源 | 說明 |
@@ -265,6 +315,11 @@ flowchart LR
 | — | `settingsProvider` / `languageProvider` / `semesterSettingsProvider` 等 | `src/lib/providers/settings_provider.dart` |
 | — | `universitiesProvider` | `src/lib/providers/universities_provider.dart`（唯讀靜態資料） |
 | — | `dateProvider` | `src/lib/providers/date_provider.dart`（純記憶體狀態，不持久化） |
+| P5 | `notificationSettingsProvider` | `src/lib/providers/notification_provider.dart` |
+| P6 | `notificationScheduleProvider` | `src/lib/providers/notification_provider.dart`（推導，不持久化） |
+| P7 | `notificationSyncProvider` → `NotificationService` | `src/lib/services/notification_service.dart` |
+| P8 | `applyDoneAction()`（**背景 isolate**，非 Provider） | `src/lib/services/notification_background.dart` |
+| P9 | `notificationActionProvider` | `src/lib/providers/notification_action_provider.dart` |
 
 > 補充：`src/lib/providers/custom_categories_provider.dart` 中的 `customCategoriesProvider`
 > 目前未被任何畫面使用（死碼），與實際運作中的分類管理（`categories_provider.dart` /
@@ -288,3 +343,5 @@ flowchart LR
 | D10 | `auth.users` | Supabase Auth（由 Supabase 管理，App 不直接寫入自訂欄位） |
 | D11 | `guest_*` 系列 key | 裝置本機 SharedPreferences |
 | D12 | `is_guest_mode` | 裝置本機 SharedPreferences |
+| D13 | `notification_settings` | 裝置本機 SharedPreferences（每台裝置各自設定，不同步到雲端） |
+| D14 | `notification_action_log` | 裝置本機 SharedPreferences（背景 isolate 留給主 isolate 的交接資料，讀完即清空） |

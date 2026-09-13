@@ -27,7 +27,7 @@
 |---|---|---|
 | [Phase 0](#phase-0可靠度) | 密碼重設、訪客合併、列 id 碰撞、信件管道 | ✅ 程式碼完成／網域與信件管道設定完成／⏳ 手動驗證待跑 |
 | [Phase 0.5](#phase-05驗證地基) | 自動化測試 + 手動 P0 清單 | ⏳ 自動測試完成（78 → 135）／手動待跑 |
-| [Phase 1](#phase-1通知) | ① 通知功能 | 待開始 |
+| [Phase 1](#phase-1通知) | ① 通知功能 | ✅ 程式碼完成／⏳ 實機驗證待跑 |
 | [Phase 2](#phase-2android-widget) | ② Android widget | |
 | [Phase 3](#phase-3新手留存) | ⑩ 新手教學與模板、⑨ 靈感歸檔 | |
 | [Phase 4](#phase-4回顧系統) | ⑥ 回顧系統 | |
@@ -90,8 +90,24 @@
 手動建立的資料**驗證過。等 Phase 3 的模板產生一批資料之後，要回頭再測一次通知
 （尤其是「一次產生很多筆截止日」會不會造成通知轟炸）。
 
-**技術上的注意**：本機通知（`flutter_local_notifications`）與推播是兩件事。
-本機通知不需要後端，排程在裝置上；推播需要 FCM 與後端觸發。先確認你要的是哪一種。
+**決定**：**本機通知**，Android + iOS。每一則提醒都從裝置上已有的資料算出來，
+沒有伺服器、沒有 FCM。三種提醒各自可獨立開關：任務到期前、每日摘要、學期目標截止
+（**不做逾期提醒**——容易變成騷擾，之後真的需要再補）。
+
+**產出**：`core/notification_constants.dart`（常數集中一處）、
+`core/notification_schedule.dart`（**純函式**排程計算，可完整單元測試）、
+`services/notification_service.dart`（唯一碰 platform channel 的地方）、
+`providers/notification_provider.dart`、`screens/notification_settings_screen.dart`、
+`utils/semester_helpers.dart` 新增 `semesterStart()` / `semesterEnd()`。
+文件：DD.md D13、DFD.md 1-F、system_design.md UC13 與 §3-K。
+
+**追加**（2026-09-13）：任務提醒移除內文的到期時間，改為兩顆動作按鈕——
+「標示為已完成」**不開 App** 直接寫入（背景 isolate），「重新安排時間」跳進該任務的編輯頁。
+見 [test-plans/2026-09-13-notification-actions.md](./test-plans/2026-09-13-notification-actions.md)。
+
+**未完成**：實機驗證。[test-plans/2026-09-13-notifications.md](./test-plans/2026-09-13-notifications.md)
+的 27 個案例，其中案例 9–19 **只能實機驗**（通知是否真的送達、App 關掉後還在不在、
+重開機後還在不在）。自動測試涵蓋的是「什麼時候該響」，不是「真的響了沒有」。
 
 ---
 

@@ -100,20 +100,9 @@ class TasksNotifier extends SyncedListNotifier<Task> {
     final task = state.where((t) => t.id == id).firstOrNull;
     if (task == null) return;
 
-    final Task updated;
-    if (task.recurrence == null || task.recurrence!.isNone) {
-      updated = task.copyWith(isCompleted: !task.isCompleted);
-    } else {
-      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      final newDates = List<String>.from(task.completedDates);
-      if (newDates.contains(key)) {
-        newDates.remove(key);
-      } else {
-        newDates.add(key);
-      }
-      updated = task.copyWith(completedDates: newDates);
-    }
-
+    // Task.toggledOn() holds the rule so the notification's background handler
+    // can apply exactly the same one without a copy
+    final updated = task.toggledOn(date);
     state = [for (final t in state) if (t.id == id) updated else t];
     upsert(updated);
   }
@@ -185,8 +174,10 @@ bool _recurringAppliesTo(Task task, DateTime date) {
   }
 }
 
-// Daily view: recurring tasks by recurrence rule; non-recurring only if dueTime matches date
-bool _taskAppliesTo(Task task, DateTime date) {
+// Daily view: recurring tasks by recurrence rule; non-recurring only if dueTime matches date.
+// Public because the notification scheduler needs the same answer and a second
+// copy of this would drift from the one the UI uses
+bool taskAppliesTo(Task task, DateTime date) {
   if (_isRecurring(task)) return _recurringAppliesTo(task, date);
   if (task.dueTime == null) return false;
   return _dateOnly(task.dueTime!) == _dateOnly(date);
@@ -212,7 +203,7 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
 
   if (taskView == 1) {
     final date = ref.watch(dateProvider);
-    final matching = all.where((t) => _taskAppliesTo(t, date)).toList();
+    final matching = all.where((t) => taskAppliesTo(t, date)).toList();
     final recurring = matching.where(_isRecurring).toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     final nonRecurring = matching.where((t) => !_isRecurring(t)).toList()
@@ -236,7 +227,7 @@ final taskGoalFilterProvider = StateProvider<Set<String>>((ref) => const {});
 // Completion stats for a single day; null when no task applies that day
 // (distinct from 0%, which means tasks existed but none were done)
 ({int done, int total})? taskCompletionStatsOn(List<Task> all, DateTime date) {
-  final matching = all.where((t) => _taskAppliesTo(t, date)).toList();
+  final matching = all.where((t) => taskAppliesTo(t, date)).toList();
   if (matching.isEmpty) return null;
   final done = matching.where((t) => t.isCompletedOn(date)).length;
   return (done: done, total: matching.length);
@@ -244,7 +235,7 @@ final taskGoalFilterProvider = StateProvider<Set<String>>((ref) => const {});
 
 final tasksForDateProvider = Provider.family<List<Task>, DateTime>((ref, date) {
   final all = ref.watch(tasksProvider);
-  final matching = all.where((t) => _taskAppliesTo(t, date)).toList();
+  final matching = all.where((t) => taskAppliesTo(t, date)).toList();
   final recurring = matching.where(_isRecurring).toList()
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   final nonRecurring = matching.where((t) => !_isRecurring(t)).toList()

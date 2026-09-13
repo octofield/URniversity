@@ -255,4 +255,31 @@ class StringsEn implements AppStrings {
   @override String get passwordUpdated => 'Password updated';
   @override String get resetLinkInvalid => 'That reset link has expired or was already used. Send a new one — only the latest email works.';
   @override String get resetLinkWrongDevice => 'Open the link on the same device and browser where you asked for the reset';
+
+  @override String get notifications => 'Notifications';
+  @override String get notifEnabled => 'Enable notifications';
+  @override String get notifEnabledHint => 'Turning this off silences all three below';
+  @override String get notifTaskDue => 'Task reminders';
+  @override String get notifTaskLead => 'Remind me';
+  @override String get notifDailySummary => 'Daily summary';
+  @override String get notifSummaryTime => 'Summary time';
+  @override String get notifGoalDeadline => 'Semester goal deadline';
+  @override String get notifGoalLead => 'Days before';
+  @override String get notifPermissionDenied => 'The system blocked notifications. Enable them in your device settings.';
+  @override String get notifUnsupportedPlatform => 'This platform cannot show notifications — use the mobile app';
+  @override String notifLeadMinutes(int minutes) {
+    if (minutes == 0) return 'On time';
+    if (minutes < 60) return '$minutes min before';
+    if (minutes < 1440) return '${minutes ~/ 60} h before';
+    return '1 day before';
+  }
+  @override String notifLeadDays(int days) => '$days days before';
+  @override String get notifActionDone => 'Mark as done';
+  @override String get notifActionReschedule => 'Reschedule';
+  @override String notifActionFailed(String detail) => 'Marking it done from the notification did not sync: $detail';
+  @override String get notifSummaryTitle => 'Today';
+  @override String notifSummaryBody(int count) => '$count things to do today';
+  @override String get notifGoalTitle => 'The semester is nearly over';
+  @override String notifGoalBody(String semester, int count) =>
+      '$count unfinished target(s) in $semester';
 }

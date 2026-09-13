@@ -15,7 +15,7 @@
 
 ## 現況說明
 
-本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，135 個案例，
+本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，193 個案例，
 `flutter test` 全綠）。`flutter create` 產生的預設計數器範例 `widget_test.dart` 已刪除。
 
 自動測試分兩層：**單元測試**涵蓋不依賴 Supabase／SharedPreferences 的純函式（§2.1）；
@@ -77,6 +77,8 @@
 | `test/merge_order_test.dart` | `mergeOrder()` 的拓撲排序：父先於子、懸空 parent 視為根、循環不會無窮迴圈 |
 | `test/trash_snapshot_test.dart` | `remove()` 回傳整棵子樹（目標／願景／任務），還原後父子關係完整 |
 | `test/auth_link_error_test.dart` | 失效的驗證連結分類：query string／fragment／Android custom scheme 三種形式，以及 PKCE 跨裝置與一般登入錯誤的區分 |
+| `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期 |
+| `test/notification_action_test.dart` | 通知動作依賴的純邏輯（§3-L）：`Task.toggledOn()` 與 `isCompletedOn()` 互為反函式、payload 編解碼、畸形輸入回 null 不拋例外、動作結果的成功／失敗記錄 |
 
 選擇標準：**只測不依賴 Supabase／SharedPreferences 的純函式**，或在沒有設定
 `user_id` 的狀態下操作 Provider（此時 `upsert()`／`deleteRow()` 會直接返回）。
@@ -139,6 +141,8 @@
 | `test/widget/goal_link_visibility_test.dart` | 「只有頂層目標能連結願景」在新增／編輯表單、詳情頁、願景選單四處一致 | `2026-08-23-known-issues.md` 20–25、28 |
 | `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
+| `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
+| `test/widget/notification_reschedule_test.dart` | 「重新安排時間」會打開**該任務**的編輯 sheet；冷啟動時資料還沒到會等待而不是放棄 | —（新功能） |
 
 **可行的前提**：訪客模式下 `SyncedListNotifier.upsert()` 走完 `persistLocally()`
 就返回，不碰 Supabase。Supabase 本身仍需初始化（多個 Provider 會讀
@@ -154,6 +158,15 @@
 3. **`pumpApp()` 之後才能種資料**。`App` 會 watch `syncProvider`，訪客模式下它呼叫
    `loadGuest()` 把每個 Provider 的 state 從 SharedPreferences 重新載入，
    pump 之前種的資料會被洗掉。
+
+**平台相關的坑**：`flutter test` 的 `defaultTargetPlatform` **預設回報 android**，
+不是 host 平台。要測「不支援的平台」那條路徑必須用 `debugDefaultTargetPlatformOverride`，
+而且**要在測試本體裡還原**（用 `try/finally`）——框架在 `addTearDown` 之前就會斷言
+foundation 的 debug 變數已經復原。
+
+**背景 isolate 測不到**：「標示為已完成」跑在另一個 FlutterEngine 裡，自動測試無法涵蓋。
+因應方式是把它依賴的東西全部做成純函式（`Task.toggledOn()`、payload 編解碼、動作記錄的
+序列化）並逐一測試，讓真正只能實機驗的部分縮到最小——剩下的就是「它有沒有被呼叫到」。
 
 **不做的事**：不用 golden test 測視覺。沒有可信的基準圖時，測試紅了也分不出是真的
 跑版還是基準過期，維護成本高於價值。字距／權重／顏色留在手動清單。

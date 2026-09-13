@@ -10,6 +10,7 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
 import 'category_settings_screen.dart';
+import 'notification_settings_screen.dart';
 import 'trash_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -83,6 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               MaterialPageRoute(builder: (_) => const CategorySettingsScreen()),
             ),
           ),
+          notificationSettingsTile(context, s),
           SwitchListTile(
             title: Text(s.showJournalDayCounter),
             value: showDayCounter,

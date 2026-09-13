@@ -43,6 +43,13 @@ dependencies:
   # Direct: supabase_flutter drops a deep link that carries only an error, so
   # auth_link_error_provider watches the stream itself (see that file's comment)
   app_links: ^7.0.0
+  # Phase 1 notifications. Local only: every reminder is computed from data
+  # already on the device, so there is no server and no FCM
+  flutter_local_notifications: ^22.3.0
+  # zonedSchedule needs a tz location, and flutter_timezone is how the device's
+  # own zone is discovered — a fixed UTC offset breaks across DST
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:
