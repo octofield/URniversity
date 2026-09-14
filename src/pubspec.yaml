@@ -50,6 +50,7 @@ dependencies:
   # own zone is discovered — a fixed UTC offset breaks across DST
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
+  home_widget: ^0.9.4
 
 dev_dependencies:
   flutter_test:

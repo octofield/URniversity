@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/future_goal.dart';
+import '../models/semester_goal.dart';
 import '../models/task.dart';
 import 'synced_list_notifier.dart';
 import 'future_goals_provider.dart';
@@ -220,6 +222,57 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   return _applyManualOrder([...recurring, ...withDue, ...withoutDue]);
 });
+
+// Goal-link filtering. Public and living here rather than inside today_screen
+// because the home screen widget applies the same rule, and the widget's copy
+// would drift from the one the user sees in the app.
+
+// A task passes when it is linked to any selected target or goal. An empty
+// selection means "no filter", not "nothing matches"
+bool passesTaskFilter(Task t, Set<String> targetIds, Set<String> goalIds) {
+  if (targetIds.isEmpty && goalIds.isEmpty) return true;
+  if (targetIds.isNotEmpty &&
+      t.linkedTargetId != null &&
+      targetIds.contains(t.linkedTargetId)) {
+    return true;
+  }
+  if (goalIds.isNotEmpty && t.linkedGoalId != null && goalIds.contains(t.linkedGoalId)) {
+    return true;
+  }
+  return false;
+}
+
+// Selecting a parent has to catch tasks linked to its children too, otherwise
+// filtering by a target silently hides the work done under its milestones
+Set<String> expandSemGoalIds(Set<String> selected, List<SemesterGoal> all) {
+  if (selected.isEmpty) return selected;
+  final expanded = Set<String>.from(selected);
+  void collect(String parentId) {
+    for (final g in all.where((g) => g.parentId == parentId)) {
+      if (expanded.add(g.id)) collect(g.id);
+    }
+  }
+
+  for (final id in List<String>.from(selected)) {
+    collect(id);
+  }
+  return expanded;
+}
+
+Set<String> expandFutureGoalIds(Set<String> selected, List<FutureGoal> all) {
+  if (selected.isEmpty) return selected;
+  final expanded = Set<String>.from(selected);
+  void collect(String parentId) {
+    for (final g in all.where((g) => g.parentId == parentId)) {
+      if (expanded.add(g.id)) collect(g.id);
+    }
+  }
+
+  for (final id in List<String>.from(selected)) {
+    collect(id);
+  }
+  return expanded;
+}
 
 final taskTargetFilterProvider = StateProvider<Set<String>>((ref) => const {});
 final taskGoalFilterProvider = StateProvider<Set<String>>((ref) => const {});

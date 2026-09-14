@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's own chrome. Everything inside the list comes from the Dart
+     snapshot and is already localized there; these are the few labels the
+     native layout owns. Traditional Chinese is the default, matching the app. -->
+<resources>
+    <string name="widget_description">今日任務、學期目標與未來願景</string>
+    <string name="widget_tab_tasks">任務</string>
+    <string name="widget_tab_targets">目標</string>
+    <string name="widget_tab_goals">願景</string>
+    <string name="widget_period_day">本日</string>
+    <string name="widget_period_week">本週</string>
+    <string name="widget_period_month">本月</string>
+    <string name="widget_toggle_done">標示為已完成</string>
+</resources>

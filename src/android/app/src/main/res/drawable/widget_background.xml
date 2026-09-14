@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppColors.background on a rounded card, matching the app's surfaces -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#F8F4EF" />
+    <corners android:radius="16dp" />
+    <stroke android:width="1dp" android:color="#DDD0C0" />
+</shape>

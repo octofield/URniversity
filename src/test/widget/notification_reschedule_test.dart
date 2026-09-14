@@ -19,7 +19,7 @@ void main() {
     await tester.pumpAndSettle();
     final task = c.read(tasksProvider).single;
 
-    c.read(pendingTaskEditProvider.notifier).state = task.id;
+    c.read(pendingOpenProvider.notifier).state = (kind: 'task', id: task.id);
     await tester.pumpAndSettle();
 
     expect(find.text(zh.editTask), findsOneWidget);
@@ -30,10 +30,11 @@ void main() {
     final c = await pumpApp(tester);
 
     // A cold start: the notification is handled before any row has arrived
-    c.read(pendingTaskEditProvider.notifier).state = 'not-loaded-yet';
+    c.read(pendingOpenProvider.notifier).state =
+        (kind: 'task', id: 'not-loaded-yet');
     await tester.pumpAndSettle();
     expect(find.text(zh.editTask), findsNothing);
-    expect(c.read(pendingTaskEditProvider), 'not-loaded-yet',
+    expect(c.read(pendingOpenProvider)?.id, 'not-loaded-yet',
         reason: 'the request must survive until the rows arrive');
   });
 
@@ -43,11 +44,11 @@ void main() {
     c.read(tasksProvider.notifier).add('任務');
     await tester.pumpAndSettle();
 
-    c.read(pendingTaskEditProvider.notifier).state =
-        c.read(tasksProvider).single.id;
+    c.read(pendingOpenProvider.notifier).state =
+        (kind: 'task', id: c.read(tasksProvider).single.id);
     await tester.pumpAndSettle();
 
     // Otherwise the sheet reopens on every later rebuild
-    expect(c.read(pendingTaskEditProvider), isNull);
+    expect(c.read(pendingOpenProvider), isNull);
   });
 }

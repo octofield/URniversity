@@ -15,7 +15,7 @@
 
 ## 現況說明
 
-本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，193 個案例，
+本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，227 個案例，
 `flutter test` 全綠）。`flutter create` 產生的預設計數器範例 `widget_test.dart` 已刪除。
 
 自動測試分兩層：**單元測試**涵蓋不依賴 Supabase／SharedPreferences 的純函式（§2.1）；
@@ -79,6 +79,8 @@
 | `test/auth_link_error_test.dart` | 失效的驗證連結分類：query string／fragment／Android custom scheme 三種形式，以及 PKCE 跨裝置與一般登入錯誤的區分 |
 | `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期 |
 | `test/notification_action_test.dart` | 通知動作依賴的純邏輯（§3-L）：`Task.toggledOn()` 與 `isCompletedOn()` 互為反函式、payload 編解碼、畸形輸入回 null 不拋例外、動作結果的成功／失敗記錄 |
+| `test/widget_snapshot_test.dart` | 桌面小工具要顯示什麼（§3-M）：三種模式的列、期間 day/week/month 的範圍與去重、篩選（含子目標展開）、篩選挑選器的分組與排序、狀態的序列化與退化 |
+| `test/widget_action_test.dart` | 小工具動作 URI 的形狀。Kotlin 有一半是手寫組出來的，改名只會表現成「點了沒反應」，所以逐一釘住 |
 
 選擇標準：**只測不依賴 Supabase／SharedPreferences 的純函式**，或在沒有設定
 `user_id` 的狀態下操作 Provider（此時 `upsert()`／`deleteRow()` 會直接返回）。
@@ -163,6 +165,11 @@
 不是 host 平台。要測「不支援的平台」那條路徑必須用 `debugDefaultTargetPlatformOverride`，
 而且**要在測試本體裡還原**（用 `try/finally`）——框架在 `addTearDown` 之前就會斷言
 foundation 的 debug 變數已經復原。
+
+**原生 widget 的畫面完全測不到**：桌面小工具是用 Kotlin 的 `RemoteViews` 畫的，跑在
+launcher 的行程裡，`flutter test` 碰不到。因應方式與背景 isolate 相同——把「該顯示什麼」
+全部推進 `buildWidgetSnapshot()` 這個純函式測到滿，讓只能實機驗的縮到「原生端有沒有把
+那些列正確畫出來」。
 
 **背景 isolate 測不到**：「標示為已完成」跑在另一個 FlutterEngine 裡，自動測試無法涵蓋。
 因應方式是把它依賴的東西全部做成純函式（`Task.toggledOn()`、payload 編解碼、動作記錄的

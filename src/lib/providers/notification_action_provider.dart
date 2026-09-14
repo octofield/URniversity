@@ -12,10 +12,14 @@ import 'settings_provider.dart';
 import 'synced_list_notifier.dart';
 import 'tasks_provider.dart';
 
-// Set when the user picks "reschedule". Held until the task it names has
-// actually loaded, because a cold start opens the app long before the rows
-// arrive and the edit sheet needs the task itself
-final pendingTaskEditProvider = StateProvider<String?>((ref) => null);
+// An item the user asked to open from outside the app — the notification's
+// "reschedule" button, or a row on the home screen widget.
+//
+// Held until the row it names has actually loaded: a cold start opens the app
+// long before the data arrives, and the destination needs the item itself.
+// [kind] is 'task', 'semesterGoal' or 'futureGoal'
+final pendingOpenProvider =
+    StateProvider<({String kind, String id})?>((ref) => null);
 
 // Reads what the background isolate left behind and puts the main isolate back
 // in step with it.
@@ -54,7 +58,8 @@ void handleForegroundResponse(Ref ref, NotificationResponse response) {
       response.actionId != NotificationConstants.actionRescheduleId) {
     return;
   }
-  ref.read(pendingTaskEditProvider.notifier).state = payload.taskId;
+  ref.read(pendingOpenProvider.notifier).state =
+      (kind: 'task', id: payload.taskId);
 }
 
 // Wires the service to the app. Watched once from App, the way syncProvider is.
