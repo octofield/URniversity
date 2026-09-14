@@ -14,6 +14,7 @@ import 'providers/notification_provider.dart';
 import 'providers/semester_goals_provider.dart';
 import 'providers/tasks_provider.dart';
 import 'screens/future_goal_detail_screen.dart';
+import 'screens/future_screen.dart';
 import 'screens/semester_goal_detail_screen.dart';
 import 'screens/today_screen.dart';
 import 'providers/password_recovery_provider.dart';
@@ -211,6 +212,17 @@ void _handlePendingOpen(WidgetRef ref) {
               ),
             ));
       }
+
+    // The widget's + button. Nothing to wait for here: the sheet creates the
+    // row, so it can open as soon as the navigator exists
+    case 'newTask':
+      open((ctx) => showTaskSheet(ctx, ref));
+
+    case 'newSemesterGoal':
+      open((ctx) => showSemesterGoalSheet(ctx, ref));
+
+    case 'newFutureGoal':
+      open((ctx) => showFutureGoalSheet(ctx, ref));
 
     default:
       // An unknown kind would otherwise stay pending forever, rebuilding

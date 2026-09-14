@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AppColors.background on a rounded card, matching the app's surfaces -->
+<!-- The widget card. Colours come from widget_colors so night mode swaps them -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#F8F4EF" />
-    <corners android:radius="16dp" />
-    <stroke android:width="1dp" android:color="#DDD0C0" />
+    <solid android:color="@color/widget_background" />
+    <corners android:radius="22dp" />
+    <stroke android:width="1dp" android:color="@color/widget_border" />
 </shape>

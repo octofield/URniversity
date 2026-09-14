@@ -451,7 +451,10 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 2. 解析 payload → taskId + 日期
 3. prefs.reload() ← 這個 isolate 的快取是舊的
 4. 訪客 → 改寫 guest_tasks 的 JSON
-   已登入 → Supabase.initialize() → select 該列 → Task.toggledOn() → update
+   已登入 → Supabase.initialize() → 重讀磁碟上的 session 並 recoverSession()
+           → select 該列 → Task.toggledOn() → update
+   ⚠️ 背景引擎是靜態、跨點擊重用的，initialize() 只在第一次讀 session，
+      所以每次都要重讀，否則引擎若在登入前啟動會永遠停在未登入
 5. 不論成功或失敗，把結果寫進 D14
 ```
 
@@ -469,8 +472,14 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 
 ### 3-M 桌面小工具的內容計算（`core/widget_snapshot.dart`）
 
-`buildWidgetSnapshot()` 是**純函式**：吃任務、學期目標、未來願景、分類、
-目前的 `WidgetState` 與「現在」，吐出一份 `WidgetSnapshot`。
+`buildWidgetSnapshot()` 是**純函式**：吃任務、學期目標、未來願景、分類與「現在」，
+吐出一份 `WidgetSnapshot`。
+
+**所有頁面一次算好**：snapshot 的 `views` 同時裝著 `tasks_day` / `tasks_week` /
+`tasks_month` / `targets` / `goals` / `filter_picker` 六份清單。**目前停在哪一頁
+（`widget_state`）由原生端自己記**，切換分頁、期間、篩選時只是換一份清單重畫，
+**不啟動 Flutter 引擎、不連網**。改版前每次切換都要經過 WorkManager → 背景引擎 →
+查 5 張表，一次要一秒多。
 
 **為什麼要這樣切**：小工具的畫面必須用原生 Kotlin 的 `RemoteViews` 寫，而那裡查不到
 Supabase、也不該懂業務規則。所以 Dart 把「該顯示哪些列」算好，原生端只認得
@@ -495,18 +504,42 @@ Supabase、也不該懂業務規則。所以 Dart 把「該顯示哪些列」算
 ⚠️ **一個任務一列，不是一天一列**。每日循環的任務在「本月」會展開成三十次，
 中等尺寸的小工具放不下。副標顯示的是**最近一次仍未完成**的日期。
 
-**篩選**：走 `expandSemGoalIds()` / `passesTaskFilter()`（`tasks_provider.dart`），
-與 App 內今日頁**同一套函式**。選一個目標會連它的子目標也算進去，
+**篩選**：每個任務列帶一份 `filters`＝它連結的目標／願景**加上所有祖先**的 id
+（`_withAncestors()`，遇到循環的 parent 會停）。原生端只做「`filters` 含不含選中的 id」
+這一個比對，規則仍只存在 Dart。選一個目標等於連它的子孫目標也算進去，
 否則掛在子目標下的工作會被靜默藏起來。
 
 **動作 URI**：`urniversity://{host}?...`。
 ⚠️ **host 一律小寫**——`Uri.host` 會強制小寫，camelCase 的 host 解析回來永遠不會命中。
 
-| host | 開 App？ | 意義 |
-|---|---|---|
-| `toggle` | ❌ | 勾選／取消該任務的那一天 |
-| `mode` / `period` / `filter` | ❌ | 改變小工具的狀態 |
-| `open` | ✅ | 開 App 進該項目 |
+| host | 開 App？ | 誰處理 | 意義 |
+|---|---|---|---|
+| `toggle` | ❌ | 原生先畫、Dart 背景寫入 | 勾選／取消該任務的那一天 |
+| `mode` / `period` / `filter` | ❌ | **只有原生**（`WidgetActionReceiver`） | 改變小工具的狀態 |
+| `open` | ✅ | App（`pendingOpenProvider`） | 開 App 進該項目 |
+| `new` | ✅ | App（`pendingOpenProvider`） | + 按鈕：`kind=task` / `semesterGoal` / `futureGoal`，依目前分頁 |
+
+**勾選的順序**（完成動畫）：
+
+```mermaid
+flowchart TD
+    Tap["點勾選框"] --> Anim["Android 12+：launcher 自己切換 CheckBox\nanimated-selector 當下播放"]
+    Anim --> Opt["WidgetActionReceiver：snapshot 裡該列標成已勾\n→ 重畫（刪除線＋變淡）"]
+    Opt --> Fwd["轉交 Dart 背景引擎"]
+    Fwd --> Write{"toggleTaskFromBackground()"}
+    Write -- 成功 --> Rebuild["重讀資料重算 snapshot\n→ 該列從清單消失"]
+    Write -- 失敗 --> Untick["untickInSnapshot()：取回勾選\n失敗記進 D14，下次開 App 提示"]
+```
+
+- 取回勾選**直接改存著的 snapshot**，不重算：寫入失敗多半是沒網路，那時也查不到資料。
+- Android 11 以下 `RemoteViews` 不允許可互動的 `CheckBox`，退回 `ImageView`，沒有框的動畫，
+  但刪除線仍會立刻出現。兩份版面在 `layout/` 與 `layout-v31/` 的 `widget_row.xml`。
+- `RemoteViews` 不能跑自訂動畫，所以做不到「整列滑出去」；可以做到的只有框的轉場與重畫。
+
+**外觀**：依設計稿（Claude Design canvas），**跟隨系統深淺色**——色票在
+`values/widget_colors.xml` 與 `values-night/widget_colors.xml`。Android 12+ 的顏色用
+`RemoteViews.setColor()` 交給 launcher 解析，切換深淺色不需重畫。字型用系統
+`sans-serif-medium`（`RemoteViews` 讀不到 App 用 `google_fonts` 下載的 Nunito）。
 
 **原生端的兩個限制**（都寫在 Kotlin 的註解裡）：
 
@@ -514,6 +547,11 @@ Supabase、也不該懂業務規則。所以 Dart 把「該顯示哪些列」算
    「開 App」兩種行為。解法是模板指向自己的 `WidgetActionReceiver`，由它依 host 分流。
 2. `home_widget` 自己的 `HomeWidgetBackgroundIntent` 用 `FLAG_IMMUTABLE` 建 PendingIntent，
    那會讓列的 fill-in intent **靜默失效**。模板必須是 `FLAG_MUTABLE`，所以自己建。
+3. **清單怎麼送到 launcher**：Android 12+ 用 `RemoteCollectionItems`，列包在同一次
+   `updateAppWidget` 裡；Android 11 以下才用 `RemoteViewsService`（`WidgetListService`）。
+   ⚠️ 用 service 餵清單時，系統只會通知 launcher「更新延後、自己來拿」，API 37 的 Pixel launcher
+   從來不去拿，小工具會**凍結在第一次畫的樣子**（測試計畫 2026-09-14 F-5）。兩條路共用
+   `WidgetRowViews.build()` 畫每一列。
 
 ---
 
@@ -733,12 +771,15 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 
 ### UC14　使用桌面小工具
 1. 長按桌面 → 小工具 → URniversity，加入一個中等尺寸（約 4×2）的小工具。
-2. 左上三個標籤切換「任務／目標／願景」；任務模式下方再有「本日／本週／本月」。
-3. 右上顯示目前的篩選名稱（沒有篩選時顯示「篩選」）。點它 → 清單換成挑選器：
-   第一列固定是「清除篩選」，接著是**依學期分組**的頂層目標，再接著是願景（不分組，
+2. 第一排左側三個標籤切換「任務／目標／願景」，**點下去立刻切換**（原生端處理，不經 Dart）。
+   第一排右側的 **+** 依目前分頁開 App 進「新增任務／學期目標／願景」的 sheet。
+3. 第二排（只在任務分頁出現）：左側「本日／本週／本月」；最右顯示目前的篩選名稱
+   （沒有篩選時顯示「篩選」）。點篩選 → 清單換成挑選器：
+   第一列固定是「全部」，接著是**依學期分組**的頂層目標，再接著是願景（不分組，
    因為願景跨學期、沒有單一歸屬）。選一個就回到任務清單並套用。
-4. 勾選任務的勾選框 → **App 不會打開**，背景引擎直接寫入（已登入寫 Supabase、訪客寫本機）。
-5. 若那次寫入失敗 → 記進 D14 → **下次開 App 時跳出同步失敗提示**（與通知同一條路徑）。
+4. 勾選任務的勾選框 → 框當下播放勾選動畫、標題加刪除線 → **App 不會打開**，
+   背景引擎直接寫入（已登入寫 Supabase、訪客寫本機）→ 寫完該列從清單消失。
+5. 若那次寫入失敗 → 勾選被取回 → 記進 D14 → **下次開 App 時跳出同步失敗提示**（與通知同一條路徑）。
 6. 點一列的本體 → 開啟 App 並跳到該任務的編輯 sheet，或該目標／願景的詳情頁。
 7. App 在前景時的任何資料變動都會即時推給小工具。
    ⚠️ **但沒有定時的雲端輪詢**：在另一台裝置改了資料，而這台的 App 完全沒開過、

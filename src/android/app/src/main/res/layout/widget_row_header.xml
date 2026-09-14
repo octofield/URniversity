@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A section label in the filter picker (a semester, or the visions). Not a
+     choice, so it carries no click at all -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_title"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="10dp"
+    android:paddingBottom="2dp"
+    android:letterSpacing="0.03"
+    android:maxLines="1"
+    android:ellipsize="end"
+    android:textColor="@color/widget_muted"
+    android:textSize="12sp"
+    android:textStyle="bold" />

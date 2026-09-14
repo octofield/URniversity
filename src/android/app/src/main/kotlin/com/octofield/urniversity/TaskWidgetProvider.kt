@@ -10,16 +10,19 @@ import android.net.Uri
 import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.RequiresApi
+import es.antonborri.home_widget.HomeWidgetLaunchIntent
+import es.antonborri.home_widget.HomeWidgetPlugin
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONObject
 
 /**
  * The home screen widget.
  *
- * Deliberately thin: it renders whatever snapshot Dart last wrote and turns
- * taps into action URIs. Which rows to show, what they say, and what each tap
- * means are all decided by buildWidgetSnapshot() on the Dart side, so there is
- * no business logic here that could drift out of step with the app.
+ * Deliberately thin: it draws the header for the current state and hands the
+ * list to WidgetListService. Which rows exist and what each tap means are
+ * decided by buildWidgetSnapshot() on the Dart side; which of those views is
+ * showing is decided locally, so a tab switch redraws without waking Dart.
  */
 class TaskWidgetProvider : HomeWidgetProvider() {
 
@@ -29,116 +32,165 @@ class TaskWidgetProvider : HomeWidgetProvider() {
         appWidgetIds: IntArray,
         widgetData: SharedPreferences,
     ) {
-        val snapshot = widgetData.getString(KEY_SNAPSHOT, null)
-        val mode = readString(snapshot, "mode") ?: MODE_TASKS
-        val period = readString(snapshot, "period") ?: PERIOD_DAY
-        val filterLabel = readString(snapshot, "filter_label").orEmpty()
-        val emptyLabel = readString(snapshot, "empty").orEmpty()
-
-        for (widgetId in appWidgetIds) {
-            val views = RemoteViews(context.packageName, R.layout.widget_task_list)
-
-            bindTab(context, views, R.id.tab_tasks, mode == MODE_TASKS, MODE_TASKS)
-            bindTab(context, views, R.id.tab_targets, mode == MODE_TARGETS, MODE_TARGETS)
-            bindTab(context, views, R.id.tab_goals, mode == MODE_GOALS, MODE_GOALS)
-
-            // The period and the filter only mean anything for the task list
-            val taskish = mode == MODE_TASKS || mode == MODE_PICKER
-            val rowVisibility = if (taskish) View.VISIBLE else View.GONE
-            views.setViewVisibility(R.id.period_row, rowVisibility)
-
-            bindPeriod(context, views, R.id.period_day, period == PERIOD_DAY, PERIOD_DAY)
-            bindPeriod(context, views, R.id.period_week, period == PERIOD_WEEK, PERIOD_WEEK)
-            bindPeriod(context, views, R.id.period_month, period == PERIOD_MONTH, PERIOD_MONTH)
-
-            views.setTextViewText(R.id.filter_button, filterLabel)
-            views.setOnClickPendingIntent(
-                R.id.filter_button,
-                backgroundIntent(context, action("mode", "value" to MODE_PICKER)),
-            )
-
-            views.setTextViewText(R.id.empty_label, emptyLabel)
-            views.setEmptyView(R.id.widget_list, R.id.empty_label)
-
-            // The list is fed by WidgetListService, which re-reads the snapshot.
-            // Each widget id needs its own data URI or the system hands every
-            // instance the same factory
-            val serviceIntent = Intent(context, WidgetListService::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
-            }
-            views.setRemoteAdapter(R.id.widget_list, serviceIntent)
-
-            // A collection cannot carry a PendingIntent per row: it gets one
-            // template, and each row supplies the rest through a fill-in intent
-            views.setPendingIntentTemplate(R.id.widget_list, rowTemplate(context))
-
-            appWidgetManager.updateAppWidget(widgetId, views)
-            appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_list)
-        }
-    }
-
-    private fun bindTab(
-        context: Context,
-        views: RemoteViews,
-        viewId: Int,
-        selected: Boolean,
-        mode: String,
-    ) {
-        views.setTextColor(viewId, if (selected) COLOR_SELECTED else COLOR_UNSELECTED)
-        views.setOnClickPendingIntent(
-            viewId,
-            backgroundIntent(context, action("mode", "value" to mode)),
-        )
-    }
-
-    private fun bindPeriod(
-        context: Context,
-        views: RemoteViews,
-        viewId: Int,
-        selected: Boolean,
-        period: String,
-    ) {
-        views.setTextColor(viewId, if (selected) COLOR_SELECTED else COLOR_UNSELECTED)
-        views.setOnClickPendingIntent(
-            viewId,
-            backgroundIntent(context, action("period", "value" to period)),
-        )
+        render(context, appWidgetManager, appWidgetIds, widgetData)
     }
 
     companion object {
-        private const val KEY_SNAPSHOT = "widget_snapshot"
+        private const val ROW_ACTION = "com.octofield.urniversity.WIDGET_ROW"
 
-        private const val MODE_TASKS = "tasks"
-        private const val MODE_TARGETS = "targets"
-        private const val MODE_GOALS = "goals"
-        private const val MODE_PICKER = "filterPicker"
-        private const val PERIOD_DAY = "day"
-        private const val PERIOD_WEEK = "week"
-        private const val PERIOD_MONTH = "month"
+        /** Redraws every instance from what is on disk. What a tab switch calls. */
+        fun redrawAll(context: Context) {
+            val manager = AppWidgetManager.getInstance(context)
+            val ids = manager.getAppWidgetIds(ComponentName(context, TaskWidgetProvider::class.java))
+            if (ids.isEmpty()) return
+            render(context, manager, ids, HomeWidgetPlugin.getData(context))
+        }
 
-        // App palette: AppColors.primary and AppColors.textTertiary
-        private const val COLOR_SELECTED = 0xFFA07850.toInt()
-        private const val COLOR_UNSELECTED = 0xFFB09A84.toInt()
+        /**
+         * Sets a colour from a resource. On Android 12+ the launcher resolves it
+         * itself, so the widget follows a light/dark switch without a redraw;
+         * before that the colour is fixed at the moment of drawing.
+         */
+        fun setColorRes(
+            context: Context,
+            views: RemoteViews,
+            viewId: Int,
+            method: String,
+            colorRes: Int,
+        ) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                views.setColor(viewId, method, colorRes)
+            } else {
+                views.setInt(viewId, method, context.getColor(colorRes))
+            }
+        }
 
-        // home_widget keeps its action string private to that package, and its
-        // own helper builds the PendingIntent with FLAG_IMMUTABLE — which
-        // silently stops a list row's fill-in intent from ever being applied.
-        // The template below has to be mutable, so the value is repeated here.
-        private const val BACKGROUND_ACTION = "es.antonborri.home_widget.action.BACKGROUND"
-        private const val BACKGROUND_RECEIVER =
-            "es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+        private fun render(
+            context: Context,
+            manager: AppWidgetManager,
+            ids: IntArray,
+            prefs: SharedPreferences,
+        ) {
+            val snapshot = WidgetData.snapshot(prefs)
+            val state = WidgetData.readState(prefs)
+
+            for (widgetId in ids) {
+                val views = RemoteViews(context.packageName, R.layout.widget_task_list)
+
+                bindChoice(context, views, R.id.tab_tasks, state.mode == WidgetData.MODE_TASKS,
+                    action("mode", "value" to WidgetData.MODE_TASKS))
+                bindChoice(context, views, R.id.tab_targets, state.mode == WidgetData.MODE_TARGETS,
+                    action("mode", "value" to WidgetData.MODE_TARGETS))
+                bindChoice(context, views, R.id.tab_goals, state.mode == WidgetData.MODE_GOALS,
+                    action("mode", "value" to WidgetData.MODE_GOALS))
+
+                // + adds whatever the current tab lists. It opens the app
+                // directly: there is nothing to decide first, so no receiver hop
+                views.setOnClickPendingIntent(R.id.add_button, HomeWidgetLaunchIntent.getActivity(
+                    context,
+                    MainActivity::class.java,
+                    Uri.parse(action("new", "kind" to newKind(state.mode))),
+                ))
+
+                // The period and the filter only mean anything for the task list
+                val taskish = state.mode == WidgetData.MODE_TASKS ||
+                    state.mode == WidgetData.MODE_PICKER
+                views.setViewVisibility(R.id.period_row, if (taskish) View.VISIBLE else View.GONE)
+
+                for ((viewId, period) in listOf(
+                    R.id.period_day to "day",
+                    R.id.period_week to "week",
+                    R.id.period_month to "month",
+                )) {
+                    bindChoice(context, views, viewId, state.period == period,
+                        action("period", "value" to period))
+                }
+
+                val filterLabel = WidgetData.filterLabel(snapshot, state)
+                    .ifEmpty { context.getString(R.string.widget_filter) }
+                views.setTextViewText(R.id.filter_label, filterLabel)
+                val filterColor = colorFor(state.mode == WidgetData.MODE_PICKER || state.filterId != null)
+                setColorRes(context, views, R.id.filter_label, "setTextColor", filterColor)
+                setColorRes(context, views, R.id.filter_arrow, "setColorFilter", filterColor)
+                views.setOnClickPendingIntent(R.id.filter_button,
+                    actionIntent(context, action("mode", "value" to WidgetData.MODE_PICKER)))
+
+                views.setTextViewText(R.id.empty_label, WidgetData.emptyLabel(snapshot, state))
+                views.setEmptyView(R.id.widget_list, R.id.empty_label)
+
+                // A collection cannot carry a PendingIntent per row: it gets one
+                // template, and each row supplies the rest through a fill-in intent
+                views.setPendingIntentTemplate(R.id.widget_list, rowTemplate(context))
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // Rows travel inside this one update. A service-backed list
+                    // makes the system defer the update to the launcher, and the
+                    // Pixel launcher on API 37 never applied those at all
+                    views.setRemoteAdapter(R.id.widget_list, collectionItems(context, snapshot, state))
+                    manager.updateAppWidget(widgetId, views)
+                } else {
+                    // The list is fed by WidgetListService. Each widget id needs its
+                    // own data URI or the system hands every instance one factory
+                    val serviceIntent = Intent(context, WidgetListService::class.java).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                        data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
+                    }
+                    @Suppress("DEPRECATION")
+                    views.setRemoteAdapter(R.id.widget_list, serviceIntent)
+                    manager.updateAppWidget(widgetId, views)
+                    @Suppress("DEPRECATION")
+                    manager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_list)
+                }
+            }
+        }
+
+        @RequiresApi(Build.VERSION_CODES.S)
+        private fun collectionItems(
+            context: Context,
+            snapshot: JSONObject?,
+            state: WidgetData.State,
+        ): RemoteViews.RemoteCollectionItems {
+            val builder = RemoteViews.RemoteCollectionItems.Builder()
+                .setViewTypeCount(WidgetRowViews.VIEW_TYPE_COUNT)
+            WidgetData.visibleRows(snapshot, state).forEachIndexed { index, row ->
+                builder.addItem(index.toLong(), WidgetRowViews.build(context, state, row))
+            }
+            return builder.build()
+        }
+
+        // Matches the kinds homeWidgetLaunchProvider knows how to open
+        private fun newKind(mode: String): String = when (mode) {
+            WidgetData.MODE_TARGETS -> "semesterGoal"
+            WidgetData.MODE_GOALS -> "futureGoal"
+            else -> "task"
+        }
+
+        private fun colorFor(selected: Boolean): Int =
+            if (selected) R.color.widget_accent else R.color.widget_muted
+
+        private fun bindChoice(
+            context: Context,
+            views: RemoteViews,
+            viewId: Int,
+            selected: Boolean,
+            uri: String,
+        ) {
+            setColorRes(context, views, viewId, "setTextColor", colorFor(selected))
+            views.setOnClickPendingIntent(viewId, actionIntent(context, uri))
+        }
 
         fun action(host: String, vararg params: Pair<String, String>): String {
             val query = params.joinToString("&") { "${it.first}=${it.second}" }
             return if (query.isEmpty()) "urniversity://$host" else "urniversity://$host?$query"
         }
 
-        /** Silent: handled by the Dart background engine, the app never opens. */
-        fun backgroundIntent(context: Context, uri: String): PendingIntent {
-            val intent = Intent().apply {
-                component = ComponentName(context.packageName, BACKGROUND_RECEIVER)
-                action = BACKGROUND_ACTION
+        /**
+         * A header tap. Goes to WidgetActionReceiver, which switches locally —
+         * not to home_widget's background receiver, which would start a Flutter
+         * engine for what is only a redraw.
+         */
+        private fun actionIntent(context: Context, uri: String): PendingIntent {
+            val intent = Intent(context, WidgetActionReceiver::class.java).apply {
                 data = Uri.parse(uri)
             }
             var flags = PendingIntent.FLAG_UPDATE_CURRENT
@@ -154,24 +206,12 @@ class TaskWidgetProvider : HomeWidgetProvider() {
          * carrying no URI at all.
          */
         private fun rowTemplate(context: Context): PendingIntent {
-            // WidgetActionReceiver, not home_widget's: a row tap can mean two
-            // different things and only that receiver can tell them apart
             val intent = Intent(context, WidgetActionReceiver::class.java).apply {
-                action = BACKGROUND_ACTION
+                action = ROW_ACTION
             }
             var flags = PendingIntent.FLAG_UPDATE_CURRENT
             if (Build.VERSION.SDK_INT >= 31) flags = flags or PendingIntent.FLAG_MUTABLE
             return PendingIntent.getBroadcast(context, 0, intent, flags)
-        }
-
-        private fun readString(json: String?, key: String): String? {
-            if (json == null) return null
-            return try {
-                val value = JSONObject(json).optString(key)
-                if (value.isNullOrEmpty()) null else value
-            } catch (e: Exception) {
-                null
-            }
         }
     }
 }

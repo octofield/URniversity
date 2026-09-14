@@ -6,93 +6,23 @@ import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
-import '../providers/tasks_provider.dart'
-    show taskAppliesTo, expandSemGoalIds, expandFutureGoalIds, passesTaskFilter;
+import '../providers/tasks_provider.dart' show taskAppliesTo;
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 
-// What the widget is currently showing.
-//
-// The picker is a screen rather than a dialog because a home screen widget has
-// no room for one: it reuses the same list, swapping in selectable rows.
+// What the widget is showing. Owned by the native side now: switching is done
+// there without waking Dart, so these names are only the vocabulary the action
+// URIs and the snapshot keys share with Kotlin
 enum WidgetMode { tasks, targets, goals, filterPicker }
 
-// Only meaningful in [WidgetMode.tasks]
 enum WidgetPeriod { day, week, month }
 
 enum WidgetFilterKind { none, target, goal }
 
-// Persisted between interactions. Small enough to live beside the snapshot
-class WidgetState {
-  final WidgetMode mode;
-  final WidgetPeriod period;
-  final WidgetFilterKind filterKind;
-  final String? filterId;
-
-  const WidgetState({
-    this.mode = WidgetMode.tasks,
-    this.period = WidgetPeriod.day,
-    this.filterKind = WidgetFilterKind.none,
-    this.filterId,
-  });
-
-  WidgetState copyWith({
-    WidgetMode? mode,
-    WidgetPeriod? period,
-    WidgetFilterKind? filterKind,
-    Object? filterId = _absent,
-  }) =>
-      WidgetState(
-        mode: mode ?? this.mode,
-        period: period ?? this.period,
-        filterKind: filterKind ?? this.filterKind,
-        filterId: filterId == _absent ? this.filterId : filterId as String?,
-      );
-
-  Map<String, dynamic> toJson() => {
-        'mode': mode.name,
-        'period': period.name,
-        'filter_kind': filterKind.name,
-        'filter_id': filterId,
-      };
-
-  // Every field falls back to its default. This is read in a background
-  // isolate, where a payload written by an older build must not throw
-  factory WidgetState.fromJson(Map<String, dynamic> j) => WidgetState(
-        mode: _enumByName(WidgetMode.values, j['mode']) ?? WidgetMode.tasks,
-        period: _enumByName(WidgetPeriod.values, j['period']) ?? WidgetPeriod.day,
-        filterKind: _enumByName(WidgetFilterKind.values, j['filter_kind']) ??
-            WidgetFilterKind.none,
-        filterId: j['filter_id'] as String?,
-      );
-
-  static WidgetState decode(String? raw) {
-    if (raw == null || raw.isEmpty) return const WidgetState();
-    try {
-      return WidgetState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (_) {
-      return const WidgetState();
-    }
-  }
-
-  String encode() => jsonEncode(toJson());
-}
-
-const Object _absent = Object();
-
-T? _enumByName<T extends Enum>(List<T> values, Object? name) {
-  if (name is! String) return null;
-  for (final v in values) {
-    if (v.name == name) return v;
-  }
-  return null;
-}
-
 // Whether a row shows a tick box, and its state. Section headers show none
 enum WidgetCheck { none, unchecked, checked }
 
-// One line in the widget's list. The native side renders exactly this and
-// knows nothing about tasks, goals or filters
+// One line in the widget's list. The native side renders exactly this
 class WidgetRow {
   final String title;
   final String? subtitle;
@@ -104,6 +34,11 @@ class WidgetRow {
   // What tapping the tick box does. Null whenever [check] is none
   final String? checkAction;
   final bool isHeader;
+  // Every target and vision id this task counts under: what it links to plus
+  // all of their ancestors. The native side keeps a row when the selected
+  // filter id is in here, so picking a parent still catches the work linked to
+  // its milestones without Kotlin knowing anything about trees
+  final List<String> filters;
 
   const WidgetRow({
     required this.title,
@@ -113,6 +48,7 @@ class WidgetRow {
     this.tapAction,
     this.checkAction,
     this.isHeader = false,
+    this.filters = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -123,68 +59,92 @@ class WidgetRow {
         'tap': tapAction,
         'check_action': checkAction,
         'header': isHeader,
+        'filters': filters,
       };
 }
 
+// Every screen the widget can show, computed up front.
+//
+// Switching tab, period or filter used to go through a background Flutter
+// engine and five Supabase queries — over a second per tap. With every view
+// already here, the native side switches by picking a different list
 class WidgetSnapshot {
-  final WidgetState state;
-  final List<WidgetRow> rows;
-  // Shown when [rows] is empty, e.g. "今天沒有任務"
-  final String emptyLabel;
-  // The current filter's name, for the header button
-  final String filterLabel;
+  // Keyed by [viewKey]
+  final Map<String, List<WidgetRow>> views;
+  // Shown when a view is empty, keyed like [views] minus the period suffix
+  final Map<String, String> emptyLabels;
+  // The filter button's label when nothing is selected
+  final String filterDefaultLabel;
+  // Title for every target and vision id, so the filter button can name the
+  // current selection without another round trip
+  final Map<String, String> filterLabels;
 
   const WidgetSnapshot({
-    required this.state,
-    required this.rows,
-    required this.emptyLabel,
-    required this.filterLabel,
+    required this.views,
+    required this.emptyLabels,
+    required this.filterDefaultLabel,
+    required this.filterLabels,
   });
 
+  static String viewKey(WidgetMode mode, [WidgetPeriod period = WidgetPeriod.day]) =>
+      switch (mode) {
+        WidgetMode.tasks => 'tasks_${period.name}',
+        WidgetMode.targets => 'targets',
+        WidgetMode.goals => 'goals',
+        WidgetMode.filterPicker => 'filter_picker',
+      };
+
   Map<String, dynamic> toJson() => {
-        ...state.toJson(),
-        'empty': emptyLabel,
-        'filter_label': filterLabel,
-        'rows': rows.map((r) => r.toJson()).toList(),
+        'views': {
+          for (final entry in views.entries)
+            entry.key: entry.value.map((r) => r.toJson()).toList(),
+        },
+        'empty': emptyLabels,
+        'filter_default': filterDefaultLabel,
+        'filter_labels': filterLabels,
       };
 
   String encode() => jsonEncode(toJson());
 }
 
-// Everything the widget should display right now.
+// Everything the widget can display right now.
 //
 // Pure: no plugin, no platform, no providers. The foreground sync and the
-// background isolate both call this, so what the widget shows can never depend
+// background engine both call this, so what the widget shows can never depend
 // on which of them happened to run
 WidgetSnapshot buildWidgetSnapshot({
   required List<Task> tasks,
   required List<SemesterGoal> semesterGoals,
   required List<FutureGoal> futureGoals,
   required List<CategoryEntry> categories,
-  required WidgetState state,
   required SemesterSettings semesterSettings,
   required AppStrings s,
   required DateTime now,
 }) {
-  final rows = switch (state.mode) {
-    WidgetMode.tasks => _taskRows(
-        tasks, semesterGoals, futureGoals, categories, state, s, now),
-    WidgetMode.targets => _targetRows(semesterGoals, categories, s),
-    WidgetMode.goals => _goalRows(futureGoals, categories, s),
-    WidgetMode.filterPicker =>
-      _filterPickerRows(semesterGoals, futureGoals, categories, semesterSettings, s, now),
-  };
+  final targetParents = {for (final g in semesterGoals) g.id: g.parentId};
+  final goalParents = {for (final g in futureGoals) g.id: g.parentId};
 
   return WidgetSnapshot(
-    state: state,
-    rows: rows,
-    emptyLabel: switch (state.mode) {
-      WidgetMode.tasks => s.noTasks,
-      WidgetMode.targets => s.noTargets,
-      WidgetMode.goals => s.noGoals,
-      WidgetMode.filterPicker => s.noTargets,
+    views: {
+      for (final period in WidgetPeriod.values)
+        WidgetSnapshot.viewKey(WidgetMode.tasks, period): _taskRows(tasks,
+            semesterGoals, futureGoals, categories, targetParents, goalParents, period, now),
+      WidgetSnapshot.viewKey(WidgetMode.targets): _targetRows(semesterGoals, categories, s),
+      WidgetSnapshot.viewKey(WidgetMode.goals): _goalRows(futureGoals, categories, s),
+      WidgetSnapshot.viewKey(WidgetMode.filterPicker): _filterPickerRows(
+          semesterGoals, futureGoals, categories, semesterSettings, s, now),
     },
-    filterLabel: _filterLabel(state, semesterGoals, futureGoals, s),
+    emptyLabels: {
+      'tasks': s.noTasks,
+      'targets': s.noTargets,
+      'goals': s.noGoals,
+      'filter_picker': s.noTargets,
+    },
+    filterDefaultLabel: s.filters,
+    filterLabels: {
+      for (final g in semesterGoals) g.id: g.title,
+      for (final g in futureGoals) g.id: g.title,
+    },
   );
 }
 
@@ -203,24 +163,31 @@ DateTime _periodEnd(WidgetPeriod period, DateTime today) => switch (period) {
 int _colorForCategories(List<CategoryEntry> categories, List<String> cats) =>
     cats.isEmpty ? 0 : resolveCatColor(categories, cats.first).toARGB32();
 
+// An id plus every ancestor above it. A dangling id is kept on its own, and a
+// parent loop stops at the first repeat rather than spinning
+List<String> _withAncestors(String? id, Map<String, String?> parents) {
+  if (id == null) return const [];
+  final out = <String>[];
+  String? current = id;
+  while (current != null && !out.contains(current)) {
+    out.add(current);
+    current = parents[current];
+  }
+  return out;
+}
+
 List<WidgetRow> _taskRows(
   List<Task> tasks,
   List<SemesterGoal> semesterGoals,
   List<FutureGoal> futureGoals,
   List<CategoryEntry> categories,
-  WidgetState state,
-  AppStrings s,
+  Map<String, String?> targetParents,
+  Map<String, String?> goalParents,
+  WidgetPeriod period,
   DateTime now,
 ) {
   final today = _dateOnly(now);
-  final end = _periodEnd(state.period, today);
-
-  final targetIds = state.filterKind == WidgetFilterKind.target && state.filterId != null
-      ? expandSemGoalIds({state.filterId!}, semesterGoals)
-      : <String>{};
-  final goalIds = state.filterKind == WidgetFilterKind.goal && state.filterId != null
-      ? expandFutureGoalIds({state.filterId!}, futureGoals)
-      : <String>{};
+  final end = _periodEnd(period, today);
 
   // One row per task, not one per occurrence: a daily task over a month would
   // otherwise fill the whole list by itself. The subtitle carries the soonest
@@ -230,7 +197,6 @@ List<WidgetRow> _taskRows(
 
   for (final task in tasks) {
     if (task.parentTaskId != null) continue;
-    if (!passesTaskFilter(task, targetIds, goalIds)) continue;
 
     for (var day = today; !day.isAfter(end); day = day.add(const Duration(days: 1))) {
       if (!taskAppliesTo(task, day)) continue;
@@ -255,11 +221,15 @@ List<WidgetRow> _taskRows(
         final linkedCats = _taskCategories(task, semesterGoals, futureGoals);
         return WidgetRow(
           title: task.title,
-          subtitle: _taskSubtitle(task, entry.value, today, s),
+          subtitle: _taskSubtitle(task, entry.value, today),
           colorArgb: _colorForCategories(categories, linkedCats),
           check: WidgetCheck.unchecked,
           tapAction: WidgetAction.openItem(kind: 'task', id: task.id),
           checkAction: WidgetAction.toggleDone(taskId: task.id, date: entry.value),
+          filters: [
+            ..._withAncestors(task.linkedTargetId, targetParents),
+            ..._withAncestors(task.linkedGoalId, goalParents),
+          ],
         );
       }(),
   ];
@@ -284,7 +254,9 @@ List<String> _taskCategories(
   return const [];
 }
 
-String? _taskSubtitle(Task task, DateTime day, DateTime today, AppStrings s) {
+// Null rather than an empty string when there is nothing to say, so the native
+// side hides the line and the title centres on its own
+String? _taskSubtitle(Task task, DateTime day, DateTime today) {
   final parts = <String>[
     if (day != today) '${day.month}/${day.day}',
     if (task.dueTime != null)
@@ -406,25 +378,8 @@ List<WidgetRow> _filterPickerRows(
   return rows;
 }
 
-String _filterLabel(
-  WidgetState state,
-  List<SemesterGoal> semesterGoals,
-  List<FutureGoal> futureGoals,
-  AppStrings s,
-) {
-  final id = state.filterId;
-  if (id == null) return s.filters;
-  return switch (state.filterKind) {
-    WidgetFilterKind.target =>
-      semesterGoals.where((g) => g.id == id).firstOrNull?.title ?? s.filters,
-    WidgetFilterKind.goal =>
-      futureGoals.where((g) => g.id == id).firstOrNull?.title ?? s.filters,
-    WidgetFilterKind.none => s.filters,
-  };
-}
-
-// The action URIs the widget sends back. Kept beside the rows that carry them
-// so a renamed action cannot go unnoticed on one side
+// The action URIs the widget sends. Kept beside the rows that carry them so a
+// renamed action cannot go unnoticed on one side
 class WidgetAction {
   static const scheme = 'urniversity';
 
@@ -447,4 +402,25 @@ class WidgetAction {
 
   static String openItem({required String kind, required String id}) =>
       '$scheme://open?kind=$kind&id=$id';
+
+  // The + button. [kind] is 'task', 'semesterGoal' or 'futureGoal', matching
+  // whichever tab the widget is on
+  static String newItem({required String kind}) => '$scheme://new?kind=$kind';
+}
+
+// The native side ticks a task the instant it is tapped, ahead of the write
+// that makes it true. When that write fails the tick has to be taken back, and
+// with no network there is nothing to rebuild the snapshot from, so the stored
+// one is patched instead
+String untickInSnapshot(String snapshotJson, String checkAction) {
+  final json = jsonDecode(snapshotJson) as Map<String, dynamic>;
+  final views = json['views'] as Map<String, dynamic>;
+  for (final rows in views.values) {
+    for (final row in (rows as List).cast<Map<String, dynamic>>()) {
+      if (row['check_action'] == checkAction) {
+        row['check'] = WidgetCheck.unchecked.name;
+      }
+    }
+  }
+  return jsonEncode(json);
 }

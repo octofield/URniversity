@@ -405,9 +405,23 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 
 | Key | 型別 | 說明 |
 |---|---|---|
-| `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出：目前模式、期間、篩選標籤、空清單文案，以及要顯示的每一列 |
-| `widget_state` | JSON 字串 | `WidgetState`：`mode` / `period` / `filter_kind` / `filter_id`。使用者在小工具上的選擇，App 重開後要沿用 |
+| `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出（見下表）。**原生端勾選時會先改這份**，把該列的 `check` 標成 `checked` |
+| `widget_state` | JSON 字串 | **原生端寫入**（`WidgetData.writeState()`）：`mode`（`tasks` / `targets` / `goals` / `filterPicker`）/ `period`（`day` / `week` / `month`）/ `filter_id`（null＝不篩選）。使用者在小工具上的選擇，App 重開後沿用。Dart 不讀也不寫 |
 | `widget_language` | text | 語言代碼（`zhTw` / `en` / `jp`）。**背景 isolate 需要它才能用正確語言重建 snapshot**——App 設定在訪客模式完全不持久化，雲端那份背景也未必讀得到 |
+
+`widget_snapshot` 的結構：
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `views` | object | `tasks_day` / `tasks_week` / `tasks_month` / `targets` / `goals` / `filter_picker` → 各自的列陣列。**所有頁一次算好**，切換時原生端直接換 |
+| `views.*[]` | object | 一列：`title`、`subtitle`（無副標為 **JSON null**）、`color`（ARGB）、`check`（`none` / `unchecked` / `checked`）、`tap`、`check_action`、`header`、`filters` |
+| `views.*[].filters` | text[] | 只有任務列有內容：它連結的目標／願景**連同所有祖先**的 id。原生端篩選只比對「含不含選中的 id」 |
+| `empty` | object | `tasks` / `targets` / `goals` / `filter_picker` → 空清單文案 |
+| `filter_default` | text | 沒有篩選時篩選鈕的文字 |
+| `filter_labels` | object | 每個目標與願景的 id → 標題，篩選鈕顯示目前選中者的名稱用 |
+
+⚠️ Kotlin 的 `JSONObject.optString()` 遇到 JSON null 會回傳**字串 `"null"`**，所以原生端
+一律用 `WidgetData.str()` 讀字串欄位。
 
 **特別說明：**
 
@@ -416,8 +430,9 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
   它存在的唯一理由是**原生端讀不到那些來源**——Kotlin 不能查 Supabase，也不該懂業務規則。
 - **原生端只渲染 `rows`**，完全不知道「任務」「目標」「篩選」是什麼。新增一種列的樣式
   不需要改 Kotlin。
-- `widget_state` 由背景 isolate 與 App 兩邊都會寫。兩者不會同時發生（小工具的靜默動作一律
-  另開引擎，那時 App 沒有在處理同一件事），所以沒有加鎖。
+- `widget_state` **只有原生端寫**。`widget_snapshot` 則有三個寫入者：App（P10）、背景引擎
+  （勾選後重算，或寫入失敗時用 `untickInSnapshot()` 取回勾選）、原生端（勾選當下先標成已勾）。
+  原生端一律 `commit()` 完才轉交 Dart，所以 Dart 的結果永遠在後面蓋上去，沒有加鎖。
 
 ---
 

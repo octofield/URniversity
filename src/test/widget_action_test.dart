@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/core/widget_snapshot.dart';
 
@@ -52,6 +54,16 @@ void main() {
       expect(uri.queryParameters['id'], 't1');
     });
 
+    test('the plus button names the kind of item to add', () {
+      for (final kind in ['task', 'semesterGoal', 'futureGoal']) {
+        final uri = Uri.parse(WidgetAction.newItem(kind: kind));
+        // homeWidgetLaunchProvider routes on this host, and the query value
+        // keeps its case even though the host is lower-cased
+        expect(uri.host, 'new');
+        expect(uri.queryParameters['kind'], kind);
+      }
+    });
+
     test('every action shares one scheme', () {
       final all = [
         WidgetAction.toggleDone(taskId: 'a', date: DateTime(2026, 1, 1)),
@@ -59,10 +71,44 @@ void main() {
         WidgetAction.switchPeriod(WidgetPeriod.day),
         WidgetAction.setFilter(),
         WidgetAction.openItem(kind: 'task', id: 'a'),
+        WidgetAction.newItem(kind: 'task'),
       ];
       for (final raw in all) {
         expect(Uri.parse(raw).scheme, WidgetAction.scheme, reason: raw);
       }
+    });
+  });
+
+  group('taking back a tick after a failed write', () {
+    test('only rows carrying that action go back to unticked, in every view', () {
+      final a = WidgetAction.toggleDone(taskId: 'a', date: DateTime(2026, 1, 1));
+      final b = WidgetAction.toggleDone(taskId: 'b', date: DateTime(2026, 1, 1));
+      final raw = jsonEncode({
+        'views': {
+          'tasks_day': [
+            {'check': 'checked', 'check_action': a},
+            {'check': 'checked', 'check_action': b},
+          ],
+          'tasks_week': [
+            {'check': 'checked', 'check_action': a},
+          ],
+          // A finished goal shows a tick with no action behind it
+          'goals': [
+            {'check': 'checked', 'check_action': null},
+          ],
+        },
+        'empty': {},
+      });
+
+      final views = (jsonDecode(untickInSnapshot(raw, a))
+          as Map<String, dynamic>)['views'] as Map<String, dynamic>;
+      String checkOf(String view, int index) =>
+          ((views[view] as List)[index] as Map<String, dynamic>)['check'] as String;
+
+      expect(checkOf('tasks_day', 0), 'unchecked');
+      expect(checkOf('tasks_day', 1), 'checked');
+      expect(checkOf('tasks_week', 0), 'unchecked');
+      expect(checkOf('goals', 0), 'checked');
     });
   });
 }

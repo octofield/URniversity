@@ -11,4 +11,6 @@
     <string name="widget_period_week">本週</string>
     <string name="widget_period_month">本月</string>
     <string name="widget_toggle_done">標示為已完成</string>
+    <string name="widget_filter">篩選</string>
+    <string name="widget_add">新增</string>
 </resources>

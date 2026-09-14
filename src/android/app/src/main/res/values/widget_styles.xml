@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Colours are set from Kotlin so the selected tab can change at runtime;
-     these styles only carry the parts that never change. -->
+     these styles only carry the parts that never change. Sizes are the design
+     canvas's. Full row height, so the whole strip is the tap target rather than
+     just the glyphs. -->
 <resources>
     <style name="WidgetTab">
         <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:paddingStart">6dp</item>
-        <item name="android:paddingEnd">6dp</item>
-        <item name="android:paddingTop">2dp</item>
-        <item name="android:paddingBottom">2dp</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_marginEnd">16dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textSize">17sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <style name="WidgetTabSmall" parent="WidgetTab">
-        <item name="android:textSize">11sp</item>
-        <item name="android:textStyle">normal</item>
+        <item name="android:layout_marginEnd">14dp</item>
+        <item name="android:textSize">13sp</item>
     </style>
 </resources>
