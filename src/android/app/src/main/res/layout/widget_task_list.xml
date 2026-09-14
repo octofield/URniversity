@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget shell. Every label and every row comes from the snapshot Dart
+     writes, so nothing here is translated or hard coded except the tab names,
+     which the provider does not currently rewrite. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="10dp">
+
+    <!-- Mode: tasks / targets / visions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tab_tasks"
+            style="@style/WidgetTab"
+            android:text="@string/widget_tab_tasks" />
+
+        <TextView
+            android:id="@+id/tab_targets"
+            style="@style/WidgetTab"
+            android:text="@string/widget_tab_targets" />
+
+        <TextView
+            android:id="@+id/tab_goals"
+            style="@style/WidgetTab"
+            android:text="@string/widget_tab_goals" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Shows the current filter's name, or a generic label when there is
+             none. Tapping it swaps the list for the picker -->
+        <TextView
+            android:id="@+id/filter_button"
+            style="@style/WidgetTab"
+            android:maxWidth="96dp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Period: only meaningful for the task list -->
+    <LinearLayout
+        android:id="@+id/period_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="2dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/period_day"
+            style="@style/WidgetTabSmall"
+            android:text="@string/widget_period_day" />
+
+        <TextView
+            android:id="@+id/period_week"
+            style="@style/WidgetTabSmall"
+            android:text="@string/widget_period_week" />
+
+        <TextView
+            android:id="@+id/period_month"
+            style="@style/WidgetTabSmall"
+            android:text="@string/widget_period_month" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/empty_label"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:textSize="13sp"
+        android:textColor="#B09A84" />
+
+    <ListView
+        android:id="@+id/widget_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:divider="@null"
+        android:dividerHeight="0dp" />
+</LinearLayout>

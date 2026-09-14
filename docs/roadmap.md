@@ -28,7 +28,7 @@
 | [Phase 0](#phase-0可靠度) | 密碼重設、訪客合併、列 id 碰撞、信件管道 | ✅ 程式碼完成／網域與信件管道設定完成／⏳ 手動驗證待跑 |
 | [Phase 0.5](#phase-05驗證地基) | 自動化測試 + 手動 P0 清單 | ⏳ 自動測試完成（78 → 135）／手動待跑 |
 | [Phase 1](#phase-1通知) | ① 通知功能 | ✅ 程式碼完成／⏳ 實機驗證待跑 |
-| [Phase 2](#phase-2android-widget) | ② Android widget | |
+| [Phase 2](#phase-2android-widget) | ② Android widget | ✅ 程式碼完成／⏳ 實機驗證待跑 |
 | [Phase 3](#phase-3新手留存) | ⑩ 新手教學與模板、⑨ 靈感歸檔 | |
 | [Phase 4](#phase-4回顧系統) | ⑥ 回顧系統 | |
 | [Phase 5](#phase-5課表) | ③ 課表 | |
@@ -118,9 +118,28 @@
 **⚠️ 這一項是你指定提前的**（原本排在 Phase 5，先前已提前到 Phase 3，
 2026-09-12 再提前到 Phase 2），理由都是「我自己要先用」。
 
-**技術上的注意**：widget 與 App 是兩個行程，要處理資料共享（`home_widget` 之類的
-套件配合 SharedPreferences／背景更新）。這是目前為止第一個**平台專屬**的功能，
-自動測試涵蓋不到，測試計畫要明確標成「僅實機」。
+**做出來的東西**：中等尺寸（約 4×2）小工具。左上切換「任務／目標／願景」，
+任務模式再切「本日／本週／本月」，右上依目標或願景篩選（挑選器**依學期分組、可滑動**）。
+勾選任務完成**不開 App**，與通知共用同一套背景寫入。
+
+**核心設計**：`buildWidgetSnapshot()`（`core/widget_snapshot.dart`）是**純函式**，
+決定「該顯示哪些列」；原生 Kotlin 只認得 `WidgetRow`，**完全不知道「任務」「目標」
+「篩選」是什麼**。四種畫面（任務／目標／願景／篩選挑選器）共用同一個 `ListView`。
+所以整個功能的規則都能單元測試，只有「原生端有沒有畫對」需要實機。
+
+**產出**：`core/widget_snapshot.dart`、`services/home_widget_service.dart`、
+`services/home_widget_background.dart`、`services/background_task_writer.dart`
+（從通知抽出來共用）、`providers/home_widget_provider.dart`，
+以及原生的 `TaskWidgetProvider.kt` / `WidgetListService.kt` / `WidgetActionReceiver.kt` 與 layout。
+文件：DD.md D15、DFD.md 1-G、system_design.md UC14 與 §3-M。
+
+**V1 的取捨**（都寫進文件了）：篩選是單選；**沒有定時的雲端輪詢**
+（在另一台裝置改了資料而這台 App 完全沒開過，小工具會是舊的）；只做一種尺寸；
+願景不依學期分組（它跨學期、沒有單一歸屬）。
+
+**未完成**：實機驗證。
+[test-plans/2026-09-13-home-widget.md](./test-plans/2026-09-13-home-widget.md) 的 35 個案例，
+其中案例 20–26（勾選完成）與 27–30（點列開啟）**只能實機驗**。
 
 ---
 

@@ -7,9 +7,14 @@ import 'core/theme/app_theme.dart';
 import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/guest_provider.dart';
+import 'providers/future_goals_provider.dart';
+import 'providers/home_widget_provider.dart';
 import 'providers/notification_action_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/semester_goals_provider.dart';
 import 'providers/tasks_provider.dart';
+import 'screens/future_goal_detail_screen.dart';
+import 'screens/semester_goal_detail_screen.dart';
 import 'screens/today_screen.dart';
 import 'providers/password_recovery_provider.dart';
 import 'providers/profile_provider.dart';
@@ -49,6 +54,10 @@ class App extends ConsumerWidget {
     // Keeps the device's pending reminders in step with the task and goal data
     ref.watch(notificationSyncProvider);
     ref.watch(notificationActionProvider);
+    // Keeps the home screen widget in step with the data, and routes the taps
+    // on it that open the app
+    ref.watch(homeWidgetSyncProvider);
+    ref.watch(homeWidgetLaunchProvider);
     final lang = ref.watch(languageProvider);
     final s = ref.watch(stringsProvider);
 
@@ -86,21 +95,11 @@ class App extends ConsumerWidget {
       });
     });
 
-    // "Reschedule" from a notification. Deliberately watched rather than
-    // listened to: on a cold start the id arrives before the rows do, so this
-    // rebuilds until the task exists and only then opens its sheet
-    final pendingEdit = ref.watch(pendingTaskEditProvider);
-    if (pendingEdit != null) {
-      final task =
-          ref.watch(tasksProvider).where((t) => t.id == pendingEdit).firstOrNull;
-      if (task != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final navContext = _navigatorKey.currentContext;
-          ref.read(pendingTaskEditProvider.notifier).state = null;
-          if (navContext != null) showTaskSheet(navContext, ref, existing: task);
-        });
-      }
-    }
+    // Something the user asked to open from a notification or the home screen
+    // widget. Deliberately watched rather than listened to: on a cold start the
+    // id arrives before the rows do, so this rebuilds until the item exists and
+    // only then navigates
+    _handlePendingOpen(ref);
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
@@ -162,6 +161,60 @@ class _AuthGate extends ConsumerWidget {
         return const HomeScreen();
       },
     );
+  }
+}
+
+// Returns once the named item has loaded and its destination has been opened.
+// Doing nothing while the data is still arriving is the point: a cold start
+// would otherwise find no match and drop the request
+void _handlePendingOpen(WidgetRef ref) {
+  final pending = ref.watch(pendingOpenProvider);
+  if (pending == null) return;
+
+  void open(void Function(BuildContext context) navigate) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navContext = _navigatorKey.currentContext;
+      ref.read(pendingOpenProvider.notifier).state = null;
+      if (navContext != null) navigate(navContext);
+    });
+  }
+
+  switch (pending.kind) {
+    case 'task':
+      final task =
+          ref.watch(tasksProvider).where((t) => t.id == pending.id).firstOrNull;
+      if (task != null) {
+        open((ctx) => showTaskSheet(ctx, ref, existing: task));
+      }
+
+    case 'semesterGoal':
+      final exists = ref
+          .watch(semesterGoalsProvider)
+          .any((g) => g.id == pending.id);
+      if (exists) {
+        open((ctx) => Navigator.push(
+              ctx,
+              MaterialPageRoute(
+                builder: (_) => SemesterGoalDetailScreen(goalId: pending.id),
+              ),
+            ));
+      }
+
+    case 'futureGoal':
+      final exists =
+          ref.watch(futureGoalsProvider).any((g) => g.id == pending.id);
+      if (exists) {
+        open((ctx) => Navigator.push(
+              ctx,
+              MaterialPageRoute(
+                builder: (_) => FutureGoalDetailScreen(goalId: pending.id),
+              ),
+            ));
+      }
+
+    default:
+      // An unknown kind would otherwise stay pending forever, rebuilding
+      ref.read(pendingOpenProvider.notifier).state = null;
   }
 }
 

@@ -288,6 +288,49 @@ flowchart LR
 
 ---
 
+## Diagram 1-G：桌面小工具
+
+```mermaid
+flowchart LR
+    AppUser(["使用者：在 App 內操作"])
+    Home(["使用者：桌面小工具"])
+    P10["homeWidgetSyncProvider\n(home_widget_provider.dart)"]
+    P11["buildWidgetSnapshot()\n(core/widget_snapshot.dart)"]
+    P12["applyWidgetAction()\n背景 isolate\n(home_widget_background.dart)"]
+    P13["toggleTaskFromBackground()\n(background_task_writer.dart)"]
+    Native["TaskWidgetProvider\nWidgetListFactory\n(Kotlin)"]
+    D1[("D1 tasks")]
+    D11[("D11 guest_tasks")]
+    D14[("D14 notification_action_log")]
+    D15[("D15 HomeWidgetPreferences")]
+
+    AppUser -- "新增/完成任務" --> D1
+    D1 -- "讀取" --> P10
+    P10 -- "呼叫" --> P11
+    P11 -- "snapshot + state" --> D15
+    D15 -- "讀取後渲染" --> Native
+    Native -- "顯示" --> Home
+
+    Home -- "切換模式/期間/篩選" --> P12
+    Home -- "勾選任務" --> P13
+    P12 -- "重算" --> P11
+    P13 -- "已登入" --> D1
+    P13 -- "訪客" --> D11
+    P13 -- "成功或失敗都記錄" --> D14
+    Home -- "點列開啟項目" --> AppUser
+```
+
+- **P13 是第二條不經過主 App 的寫入**（第一條是通知的「標示為已完成」，Diagram 1-F）。
+  兩者**共用同一個函式與同一份 D14**——問題完全相同：背景引擎沒有 UI 可以回報失敗。
+- **D15 是推導資料，不是資料來源**。原生 Kotlin 查不到 Supabase，也不該懂業務規則，
+  所以 Dart 把「該顯示什麼」算好放進 D15，Kotlin 只負責渲染。
+- **P11 同時服務兩邊**：App 在前景時由 P10 呼叫，App 關閉時由 P12 呼叫。
+  因此小工具顯示的內容不會因為「剛才是哪個 isolate 在跑」而不一致。
+- ⚠️ **沒有定時的雲端輪詢**。在另一台裝置改了資料、而這台的 App 完全沒開過也沒碰過小工具時，
+  小工具會是舊的。要補得用 WorkManager 定時喚背景引擎，V1 刻意不做。
+
+---
+
 ## 靜態參考資料（唯讀，不經任何資料流）
 
 | 資料 | 來源 | 說明 |
@@ -320,6 +363,10 @@ flowchart LR
 | P7 | `notificationSyncProvider` → `NotificationService` | `src/lib/services/notification_service.dart` |
 | P8 | `applyDoneAction()`（**背景 isolate**，非 Provider） | `src/lib/services/notification_background.dart` |
 | P9 | `notificationActionProvider` | `src/lib/providers/notification_action_provider.dart` |
+| P10 | `homeWidgetSyncProvider` / `homeWidgetLaunchProvider` | `src/lib/providers/home_widget_provider.dart` |
+| P11 | `buildWidgetSnapshot()`（純函式，非 Provider） | `src/lib/core/widget_snapshot.dart` |
+| P12 | `applyWidgetAction()`（**背景 isolate**） | `src/lib/services/home_widget_background.dart` |
+| P13 | `toggleTaskFromBackground()`（**背景 isolate**，通知與小工具共用） | `src/lib/services/background_task_writer.dart` |
 
 > 補充：`src/lib/providers/custom_categories_provider.dart` 中的 `customCategoriesProvider`
 > 目前未被任何畫面使用（死碼），與實際運作中的分類管理（`categories_provider.dart` /
@@ -344,4 +391,5 @@ flowchart LR
 | D11 | `guest_*` 系列 key | 裝置本機 SharedPreferences |
 | D12 | `is_guest_mode` | 裝置本機 SharedPreferences |
 | D13 | `notification_settings` | 裝置本機 SharedPreferences（每台裝置各自設定，不同步到雲端） |
-| D14 | `notification_action_log` | 裝置本機 SharedPreferences（背景 isolate 留給主 isolate 的交接資料，讀完即清空） |
+| D14 | `notification_action_log` | 裝置本機 SharedPreferences（背景 isolate 留給主 isolate 的交接資料，讀完即清空；通知與小工具共用） |
+| D15 | `HomeWidgetPreferences` | 裝置本機 SharedPreferences（`home_widget` 套件自己的檔案；小工具的 snapshot 與狀態，推導資料） |

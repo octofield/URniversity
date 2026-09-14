@@ -463,8 +463,57 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 `TasksNotifier.toggleOnDate()` 與背景 isolate 用的是同一個函式——否則那條沒人看得到的
 路徑會慢慢跟 UI 漂開。它是 `isCompletedOn()` 的反函式，兩者必須一直維持這個關係。
 
-**「重新安排時間」要等資料載入**：冷啟動時通知早在任何一列資料抵達之前就被處理了。
-`pendingTaskEditProvider` 會一直保留那個 id，直到該任務出現在 `tasksProvider` 裡才打開 sheet。
+**要等資料載入**：冷啟動時通知早在任何一列資料抵達之前就被處理了。
+`pendingOpenProvider` 會一直保留 `(kind, id)`，直到該項目出現在對應的 provider 裡才導航。
+同一個機制也服務桌面小工具的「點列開啟」（§3-M）。
+
+### 3-M 桌面小工具的內容計算（`core/widget_snapshot.dart`）
+
+`buildWidgetSnapshot()` 是**純函式**：吃任務、學期目標、未來願景、分類、
+目前的 `WidgetState` 與「現在」，吐出一份 `WidgetSnapshot`。
+
+**為什麼要這樣切**：小工具的畫面必須用原生 Kotlin 的 `RemoteViews` 寫，而那裡查不到
+Supabase、也不該懂業務規則。所以 Dart 把「該顯示哪些列」算好，原生端只認得
+`WidgetRow { title, subtitle, color, check, tap, check_action, header }`，
+**完全不知道「任務」「目標」「篩選」是什麼**。新增一種列不需要改 Kotlin。
+
+**四種畫面共用同一個 `ListView`**（`WidgetMode`）：
+
+| 模式 | 內容 | 點一列 |
+|---|---|---|
+| `tasks` | 依期間與篩選選出的任務 | 勾選框 → 背景標記完成；列 → 開 App 進編輯 |
+| `targets` | 頂層學期目標 + 直屬子目標完成數 | 開 App 進詳情 |
+| `goals` | 頂層未來願景 + 直屬子願景完成數 | 開 App 進詳情 |
+| `filterPicker` | 清除篩選 ／ 目標（**依學期分組**） ／ 願景 | 設定篩選並回到 `tasks` |
+
+**期間語意**（用既有的 `taskAppliesTo()` 逐日展開，與今日頁同一個函式）：
+
+- `day`：今天
+- `week`：**今天起算七天**，不是日曆週——週六看到的日曆週幾乎是空的
+- `month`：到當月最後一天
+
+⚠️ **一個任務一列，不是一天一列**。每日循環的任務在「本月」會展開成三十次，
+中等尺寸的小工具放不下。副標顯示的是**最近一次仍未完成**的日期。
+
+**篩選**：走 `expandSemGoalIds()` / `passesTaskFilter()`（`tasks_provider.dart`），
+與 App 內今日頁**同一套函式**。選一個目標會連它的子目標也算進去，
+否則掛在子目標下的工作會被靜默藏起來。
+
+**動作 URI**：`urniversity://{host}?...`。
+⚠️ **host 一律小寫**——`Uri.host` 會強制小寫，camelCase 的 host 解析回來永遠不會命中。
+
+| host | 開 App？ | 意義 |
+|---|---|---|
+| `toggle` | ❌ | 勾選／取消該任務的那一天 |
+| `mode` / `period` / `filter` | ❌ | 改變小工具的狀態 |
+| `open` | ✅ | 開 App 進該項目 |
+
+**原生端的兩個限制**（都寫在 Kotlin 的註解裡）：
+
+1. **一個 collection 只有一個 PendingIntent 模板**，但一列同時要有「靜默勾選」與
+   「開 App」兩種行為。解法是模板指向自己的 `WidgetActionReceiver`，由它依 host 分流。
+2. `home_widget` 自己的 `HomeWidgetBackgroundIntent` 用 `FLAG_IMMUTABLE` 建 PendingIntent，
+   那會讓列的 fill-in intent **靜默失效**。模板必須是 `FLAG_MUTABLE`，所以自己建。
 
 ---
 
@@ -681,6 +730,20 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 5. 按「重新安排時間」→ App 開啟 → 直接跳出**該任務**的編輯 sheet，使用者自己改時間。
 6. 循環任務的提醒只針對**那一天那一次**：勾掉今天不會影響明天的提醒。
 7. 每日摘要與學期目標提醒**沒有按鈕**——它們不對應單一任務。
+
+### UC14　使用桌面小工具
+1. 長按桌面 → 小工具 → URniversity，加入一個中等尺寸（約 4×2）的小工具。
+2. 左上三個標籤切換「任務／目標／願景」；任務模式下方再有「本日／本週／本月」。
+3. 右上顯示目前的篩選名稱（沒有篩選時顯示「篩選」）。點它 → 清單換成挑選器：
+   第一列固定是「清除篩選」，接著是**依學期分組**的頂層目標，再接著是願景（不分組，
+   因為願景跨學期、沒有單一歸屬）。選一個就回到任務清單並套用。
+4. 勾選任務的勾選框 → **App 不會打開**，背景引擎直接寫入（已登入寫 Supabase、訪客寫本機）。
+5. 若那次寫入失敗 → 記進 D14 → **下次開 App 時跳出同步失敗提示**（與通知同一條路徑）。
+6. 點一列的本體 → 開啟 App 並跳到該任務的編輯 sheet，或該目標／願景的詳情頁。
+7. App 在前景時的任何資料變動都會即時推給小工具。
+   ⚠️ **但沒有定時的雲端輪詢**：在另一台裝置改了資料，而這台的 App 完全沒開過、
+   小工具也沒被點過，小工具會是舊的。
+8. 僅 Android。iOS 需要另外寫 WidgetKit extension，不在此範圍。
 
 ---
 

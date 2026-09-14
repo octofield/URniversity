@@ -361,7 +361,10 @@
 ## D14. 裝置本機儲存 — `notification_action_log`（通知動作的暫存結果）
 
 媒介：SharedPreferences，存一段 **JSON 陣列字串**。
-寫入處理程序：`applyDoneAction()`（`src/lib/services/notification_background.dart`，**背景 isolate**）
+寫入處理程序（**兩個，都在背景 isolate**）：
+`applyDoneAction()`（`src/lib/services/notification_background.dart`，通知的「標示為已完成」）與
+`applyWidgetAction()`（`src/lib/services/home_widget_background.dart`，桌面小工具的勾選框）。
+兩者都經由 `toggleTaskFromBackground()`（`src/lib/services/background_task_writer.dart`）寫入。
 讀取處理程序：`drainNotificationActions()`（`src/lib/providers/notification_action_provider.dart`，主 isolate）
 
 | 欄位（JSON key） | 型別 | 必填 | 說明 |
@@ -384,6 +387,37 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 
 ⚠️ **SharedPreferences 每個 isolate 各自快取**。主 isolate 讀這把 key 之前必須先呼叫
 `prefs.reload()`，否則讀到的是自己那份還沒有這筆記錄的舊快取。讀完即清空。
+
+> **名稱沿用**：這把 key 叫 `notification_action_log` 是因為通知先做。小工具後來也需要
+> 完全相同的東西（背景寫入、沒有 UI 可回報失敗），所以**共用同一把 key 與同一套流程**，
+> 而不是再開一份幾乎一樣的機制。記錄的內容（`task_id` + 選擇性的 `error`）與來源無關。
+
+---
+
+## D15. 裝置本機儲存 — `HomeWidgetPreferences`（桌面小工具）
+
+媒介：SharedPreferences，**注意這是 `home_widget` 套件自己的檔案**（檔名
+`HomeWidgetPreferences`），與 App 其他 key 所在的預設檔**不是同一個**。
+只能透過 `HomeWidget.saveWidgetData()` / `getWidgetData()` 存取。
+
+寫入處理程序：`HomeWidgetService.push()`（`src/lib/services/home_widget_service.dart`）
+讀取處理程序：原生的 `TaskWidgetProvider` / `WidgetListFactory`（Kotlin），以及背景 isolate
+
+| Key | 型別 | 說明 |
+|---|---|---|
+| `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出：目前模式、期間、篩選標籤、空清單文案，以及要顯示的每一列 |
+| `widget_state` | JSON 字串 | `WidgetState`：`mode` / `period` / `filter_kind` / `filter_id`。使用者在小工具上的選擇，App 重開後要沿用 |
+| `widget_language` | text | 語言代碼（`zhTw` / `en` / `jp`）。**背景 isolate 需要它才能用正確語言重建 snapshot**——App 設定在訪客模式完全不持久化，雲端那份背景也未必讀得到 |
+
+**特別說明：**
+
+- **snapshot 是推導出來的，不是資料來源**。內容全部由 D1 `tasks`、D2 `semester_goals`、
+  D3 `future_goals`、D7 `user_categories`（或訪客的本機鏡像）算出來，資料一變就整份重寫。
+  它存在的唯一理由是**原生端讀不到那些來源**——Kotlin 不能查 Supabase，也不該懂業務規則。
+- **原生端只渲染 `rows`**，完全不知道「任務」「目標」「篩選」是什麼。新增一種列的樣式
+  不需要改 Kotlin。
+- `widget_state` 由背景 isolate 與 App 兩邊都會寫。兩者不會同時發生（小工具的靜默動作一律
+  另開引擎，那時 App 沒有在處理同一件事），所以沒有加鎖。
 
 ---
 

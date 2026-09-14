@@ -478,17 +478,17 @@ class _DayColumn extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final normalDate = DateTime(date.year, date.month, date.day);
     // Weekly view honors the same goal filters as the other views
-    final expandedTargetFilter = _expandSemGoalIds(
+    final expandedTargetFilter = expandSemGoalIds(
       ref.watch(taskTargetFilterProvider),
       ref.watch(semesterGoalsProvider),
     );
-    final expandedGoalFilter = _expandFutureGoalIds(
+    final expandedGoalFilter = expandFutureGoalIds(
       ref.watch(taskGoalFilterProvider),
       ref.watch(futureGoalsProvider),
     );
     final tasks = ref
         .watch(tasksForDateProvider(normalDate))
-        .where((t) => _passesFilter(t, expandedTargetFilter, expandedGoalFilter))
+        .where((t) => passesTaskFilter(t, expandedTargetFilter, expandedGoalFilter))
         .toList();
     final selectedDate = ref.watch(dateProvider);
     final now = DateTime.now();
@@ -811,13 +811,13 @@ class _TasksSection extends ConsumerWidget {
     final targetFilter = ref.watch(taskTargetFilterProvider);
     final goalFilter = ref.watch(taskGoalFilterProvider);
     final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
-    final expandedTargetFilter = _expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
-    final expandedGoalFilter = _expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
+    final expandedTargetFilter = expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
+    final expandedGoalFilter = expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
     final tasks = ref
         .watch(filteredTasksProvider)
         .where(
           (t) =>
-              !t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter),
+              !t.isCompletedOn(date) && passesTaskFilter(t, expandedTargetFilter, expandedGoalFilter),
         )
         .toList();
 
@@ -873,47 +873,6 @@ class _TasksSection extends ConsumerWidget {
       ],
     );
   }
-}
-
-bool _passesFilter(Task t, Set<String> targetIds, Set<String> goalIds) {
-  if (targetIds.isEmpty && goalIds.isEmpty) return true;
-  if (targetIds.isNotEmpty &&
-      t.linkedTargetId != null &&
-      targetIds.contains(t.linkedTargetId)) {
-    return true;
-  }
-  if (goalIds.isNotEmpty && t.linkedGoalId != null && goalIds.contains(t.linkedGoalId)) return true;
-  return false;
-}
-
-Set<String> _expandSemGoalIds(Set<String> selected, List<SemesterGoal> all) {
-  if (selected.isEmpty) return selected;
-  final expanded = Set<String>.from(selected);
-  void collect(String parentId) {
-    for (final g in all.where((g) => g.parentId == parentId)) {
-      if (expanded.add(g.id)) collect(g.id);
-    }
-  }
-
-  for (final id in List<String>.from(selected)) {
-    collect(id);
-  }
-  return expanded;
-}
-
-Set<String> _expandFutureGoalIds(Set<String> selected, List<FutureGoal> all) {
-  if (selected.isEmpty) return selected;
-  final expanded = Set<String>.from(selected);
-  void collect(String parentId) {
-    for (final g in all.where((g) => g.parentId == parentId)) {
-      if (expanded.add(g.id)) collect(g.id);
-    }
-  }
-
-  for (final id in List<String>.from(selected)) {
-    collect(id);
-  }
-  return expanded;
 }
 
 List<({SemesterGoal goal, int depth})> _buildTargetTree(List<SemesterGoal> all) {
@@ -1123,13 +1082,13 @@ class _CompletedTasksSection extends ConsumerWidget {
     final date = ref.watch(dateProvider);
     final targetFilter = ref.watch(taskTargetFilterProvider);
     final goalFilter = ref.watch(taskGoalFilterProvider);
-    final expandedTargetFilter = _expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
-    final expandedGoalFilter = _expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
+    final expandedTargetFilter = expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
+    final expandedGoalFilter = expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
     final completed = ref
         .watch(filteredTasksProvider)
         .where(
           (t) =>
-              t.isCompletedOn(date) && _passesFilter(t, expandedTargetFilter, expandedGoalFilter),
+              t.isCompletedOn(date) && passesTaskFilter(t, expandedTargetFilter, expandedGoalFilter),
         )
         .toList();
 
