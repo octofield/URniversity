@@ -15,7 +15,8 @@ class HomeWidgetService {
 
   // The keys the Kotlin side reads out of HomeWidgetPreferences
   static const snapshotKey = 'widget_snapshot';
-  static const stateKey = 'widget_state';
+  // widget_state is not written from here any more: the native side owns it,
+  // because switching tab, period or filter happens there without Dart
   // Stored so the background engine can build the snapshot in the user's own
   // language. App settings never reach SharedPreferences otherwise, and a guest
   // has no cloud row to read the choice back from
@@ -35,7 +36,6 @@ class HomeWidgetService {
     if (!isSupported) return;
     try {
       await HomeWidget.saveWidgetData<String>(snapshotKey, snapshot.encode());
-      await HomeWidget.saveWidgetData<String>(stateKey, snapshot.state.encode());
       if (languageCode != null) {
         await HomeWidget.saveWidgetData<String>(languageKey, languageCode);
       }
@@ -51,6 +51,25 @@ class HomeWidgetService {
     }
   }
 
+  // Takes back a tick the native side drew ahead of a write that then failed
+  Future<void> untick(String checkAction) async {
+    if (!isSupported) return;
+    try {
+      final raw = await HomeWidget.getWidgetData<String>(snapshotKey);
+      if (raw == null) return;
+      await HomeWidget.saveWidgetData<String>(
+          snapshotKey, untickInSnapshot(raw, checkAction));
+      await HomeWidget.updateWidget(
+        androidName: _providerName,
+        qualifiedAndroidName: _qualifiedProviderName,
+      );
+    } catch (e) {
+      // The failed write itself is already in the action log for the app to
+      // report; this only costs the widget a stale tick until the next push
+      debugPrint('[widget] could not take back the tick: $e');
+    }
+  }
+
   // The language the app last pushed. Read back rather than guessed because
   // app settings are not persisted for guests at all
   Future<String?> readLanguageCode() async {
@@ -63,16 +82,4 @@ class HomeWidgetService {
     }
   }
 
-  // The last state the user left the widget in. Defaults are returned when
-  // nothing has been stored yet or the payload is from an older build
-  Future<WidgetState> readState() async {
-    if (!isSupported) return const WidgetState();
-    try {
-      return WidgetState.decode(
-          await HomeWidget.getWidgetData<String>(stateKey));
-    } catch (e) {
-      debugPrint('[widget] could not read state: $e');
-      return const WidgetState();
-    }
-  }
 }

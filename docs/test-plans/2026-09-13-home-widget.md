@@ -128,6 +128,29 @@
   而 PendingIntent 是以建立者的身分送出的，不需要對外開放
 - 順帶加上 `android:previewLayout`，讓挑選器裡看得到樣子而不是一塊空白
 
+### F-0B　顯示「無法新增小工具」（2026-09-14，**已修**）
+
+F-0 修好之後，小工具**出現在挑選器裡了**，但按下去顯示「無法新增小工具」。
+
+**原因**：`RemoteViews` 只能 inflate **一份固定的 view 白名單**，而 layout 裡用了兩個
+不在名單上的：
+
+| 檔案 | 用了什麼 | 改成 |
+|---|---|---|
+| `widget_task_list.xml` | `<Space>`（標籤與篩選鈕之間的留白） | `<FrameLayout>` |
+| `widget_row.xml` | `<View>`（分類色條） | `<FrameLayout>` |
+
+`android.view.View` 與 `Space` **都不在**白名單上。Launcher 無法 inflate 整個 layout，
+就直接拒絕新增——而且錯誤訊息只說「無法新增」，不會告訴你是哪一個 view 有問題。
+
+白名單（`RemoteViews` 的 javadoc）：`FrameLayout` / `LinearLayout` / `RelativeLayout` /
+`GridLayout` / `TextView` / `ImageView` / `Button` / `ImageButton` / `ProgressBar` /
+`ListView` / `GridView` / `StackView` / `ViewFlipper` / `AdapterViewFlipper` /
+`AnalogClock` / `Chronometer` / `ViewStub`。
+
+**順帶修掉**：`empty_label` 與 `ListView` 原本都是 `match_parent`，在垂直 LinearLayout 裡
+會互搶空間。改成 `0dp` + `layout_weight="1"`。
+
 ### F-1　`Uri.host` 會強制小寫（2026-09-13，**已修**）
 
 動作 URI 原本用 `urniversity://toggleDone?...`，但 `Uri.host` 解析回來是
@@ -140,6 +163,38 @@
 這正是那份測試存在的理由：Kotlin 端有一半的 URI 是手寫組出來的，
 名稱對不上只會表現成「點了沒反應」。
 
+### F-2　切換後閃一下又回到任務頁、內容讀不出來（2026-09-14，**已修**）
+
+點「目標」「願景」等切換按鈕，會等一下、閃一下，然後又回到任務頁。
+
+**log**（`adb logcat`）每次點擊都是：
+
+```
+supabase.supabase_flutter: INFO: Supabase is already initialized. Skipping reinitialization.
+[widget] no signed-in session; leaving the widget as it is
+```
+
+App 裡明明有登入 session（`sb-…-auth-token` 存在）。
+
+**原因**：`home_widget` 的 `HomeWidgetBackgroundWorker` 用的是**靜態** FlutterEngine，
+會跨點擊重複使用；而 `Supabase.initialize()` **只有第一次**會從磁碟讀 session，
+之後一律 `Skipping reinitialization`。那個引擎第一次跑的時候使用者**還沒登入**，
+於是它在整個行程存活期間都卡在「未登入」——每次點擊都載不到資料、不存狀態、
+widget 重畫回舊的任務頁。
+
+**驗證**：`adb shell am force-stop` 清掉那個引擎後再模擬一次點擊，全新的引擎就讀得到
+session、snapshot 也成功切到 `targets`。確定是「引擎卡在舊狀態」而非「讀不到 prefs」。
+
+⚠️ **通知的背景引擎也有同樣的 bug**（`ActionBroadcastReceiver` 的 `engine` 也是 static），
+「標示為已完成」在同樣情境下會一直寫入失敗。
+
+**修法**：`ensureBackgroundSupabase()`（兩者共用）改成**每次呼叫都** `prefs.reload()`
+並用磁碟上的 session 做 `recoverSession()`，回傳是否有登入；不再相信 `initialize()`
+當初讀到的結果。一次修好小工具與通知兩條路徑。
+
+「內容讀不出來」在修好後確認為**帳號本身沒有資料**：App 以完整資料推出的 snapshot
+在 targets 模式同樣是 0 列，widget 正確顯示「尚無目標」（已截圖確認）。
+
 ## 結論
 
 - [ ] 全部案例通過，可視為完成
@@ -150,7 +205,14 @@
 1. **案例 23 是這份計畫最重要的一項**。它驗的是硬規則 2 在小工具這條路徑上有沒有被守住。
    與通知共用同一套機制，所以這條過了等於兩邊都過。
 2. **案例 20 與 22 要一起看**。20 證明不開 App 也寫得進去，22 證明主 isolate 有發現資料被改過。
-3. **如果小工具根本沒出現在挑選器裡**，查 `TaskWidgetProvider` 是不是 `exported="true"`（見 F-0）。
+3. **如果小工具根本沒出現在挑選器裡**，先確認**裝上去的是不是新版**：
+   `flutter install` **預設裝 release 版而且不會重新建置**——它會直接把
+   `build/app/outputs/flutter-apk/app-release.apk` 那份舊檔裝上去（2026-09-14 實際踩到：
+   裝上去的是 08-02、widget 還不存在時的版本）。用 `flutter install --debug` 或 `flutter run`。
+   可以用 `adb shell dumpsys appwidget | grep urniversity` 確認系統有沒有登記到 provider。
+   確認是新版之後仍然沒有，再查 `TaskWidgetProvider` 是不是 `exported="true"`（見 F-0）。
+   **如果出現了但按下去說「無法新增」**，查 layout 有沒有用到 RemoteViews 白名單外的
+   view（見 F-0B）——錯誤訊息不會告訴你是哪一個。
 4. **如果勾選框或列完全沒反應**，依序查：
    (a) `AndroidManifest.xml` 有沒有註冊 `WidgetActionReceiver`、`WidgetListService`
        與 `HomeWidgetBackgroundReceiver`；

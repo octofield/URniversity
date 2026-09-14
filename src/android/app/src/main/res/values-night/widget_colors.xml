@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark widget, from the design canvas -->
+<resources>
+    <color name="widget_background">#3D2E1A</color>
+    <color name="widget_border">#3D2E1A</color>
+    <color name="widget_text">#F8F4EF</color>
+    <color name="widget_accent">#F0B964</color>
+    <color name="widget_on_accent">#3D2E1A</color>
+    <color name="widget_muted">#A49B8F</color>
+    <color name="widget_box">#D9D1C7</color>
+</resources>

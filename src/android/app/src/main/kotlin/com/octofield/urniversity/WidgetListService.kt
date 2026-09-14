@@ -3,18 +3,24 @@ package com.octofield.urniversity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
+import com.octofield.urniversity.WidgetData.str
 import es.antonborri.home_widget.HomeWidgetPlugin
-import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Feeds the widget's list.
+ * Feeds the widget's list on Android 11 and below.
  *
- * Knows nothing about tasks, goals or filters — it renders whatever rows the
- * Dart snapshot contains. Adding a new kind of row never needs a change here.
+ * Android 12+ does not come through here: TaskWidgetProvider hands the rows
+ * over directly as RemoteCollectionItems. A service-backed list makes the
+ * system defer every update, and the Pixel launcher on API 37 was seen never
+ * applying those — the widget froze on whatever it showed first.
  */
 class WidgetListService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
@@ -24,85 +30,138 @@ class WidgetListService : RemoteViewsService() {
 private class WidgetListFactory(private val context: Context) :
     RemoteViewsService.RemoteViewsFactory {
 
-    private var rows: JSONArray = JSONArray()
+    private var rows: List<JSONObject> = emptyList()
+    private var state = WidgetData.State()
 
     override fun onCreate() = Unit
 
-    // Called on every notifyAppWidgetViewDataChanged, which is what re-reads
-    // the snapshot Dart last wrote
+    // Called on every notifyAppWidgetViewDataChanged, which is what a tab
+    // switch triggers — so this re-reads the state as well as the snapshot
     override fun onDataSetChanged() {
-        val raw = HomeWidgetPlugin.getData(context).getString(KEY_SNAPSHOT, null)
-        rows = try {
-            if (raw == null) JSONArray() else JSONObject(raw).optJSONArray("rows") ?: JSONArray()
-        } catch (e: Exception) {
-            // A snapshot this build cannot read means an empty list, not a crash
-            // inside the launcher's process
-            JSONArray()
-        }
+        val prefs = HomeWidgetPlugin.getData(context)
+        state = WidgetData.readState(prefs)
+        rows = WidgetData.visibleRows(WidgetData.snapshot(prefs), state)
     }
 
     override fun onDestroy() = Unit
 
-    override fun getCount(): Int = rows.length()
+    override fun getCount(): Int = rows.size
 
     override fun getViewAt(position: Int): RemoteViews {
+        val row = rows.getOrNull(position)
+            ?: return RemoteViews(context.packageName, R.layout.widget_row)
+        return WidgetRowViews.build(context, state, row)
+    }
+
+    override fun getLoadingView(): RemoteViews? = null
+
+    override fun getViewTypeCount(): Int = WidgetRowViews.VIEW_TYPE_COUNT
+
+    override fun getItemId(position: Int): Long = position.toLong()
+
+    override fun hasStableIds(): Boolean = false
+}
+
+/**
+ * Draws one list row. Knows nothing about tasks, goals or filters — WidgetData
+ * picks the rows and this only draws them, for both the service above and the
+ * direct collection on Android 12+.
+ */
+object WidgetRowViews {
+    // A regular row and a picker section header
+    const val VIEW_TYPE_COUNT = 2
+
+    fun build(context: Context, state: WidgetData.State, row: JSONObject): RemoteViews {
+        val title = row.str("title").orEmpty()
+
+        if (row.optBoolean("header", false)) {
+            return RemoteViews(context.packageName, R.layout.widget_row_header).apply {
+                setTextViewText(R.id.row_title, title)
+            }
+        }
+
         val views = RemoteViews(context.packageName, R.layout.widget_row)
-        val row = rows.optJSONObject(position) ?: return views
+        val checkAction = row.str("check_action")
+        val tap = row.str("tap")
+        // Only a task can be ticked from here, and only a ticked task is struck
+        // through. A finished goal shows its tick but keeps its title as is
+        val struck = checkAction != null && row.str("check") == WidgetData.CHECK_CHECKED
 
-        val isHeader = row.optBoolean("header", false)
-        views.setTextViewText(R.id.row_title, row.optString("title"))
-        views.setTextColor(R.id.row_title, if (isHeader) COLOR_HEADER else COLOR_TITLE)
+        views.setTextViewText(R.id.row_title, if (struck) strikethrough(title) else title)
+        val titleColor = when {
+            struck -> R.color.widget_muted
+            state.mode == WidgetData.MODE_PICKER && isCurrentFilter(tap, state) -> R.color.widget_accent
+            else -> R.color.widget_text
+        }
+        TaskWidgetProvider.setColorRes(context, views, R.id.row_title, "setTextColor", titleColor)
 
-        val subtitle = row.optString("subtitle").takeUnless { it.isNullOrEmpty() }
+        // Hidden rather than blank, so a row with nothing to add under its title
+        // centres the title instead of leaving an empty line
+        val subtitle = row.str("subtitle")
         views.setTextViewText(R.id.row_subtitle, subtitle.orEmpty())
         views.setViewVisibility(
             R.id.row_subtitle,
             if (subtitle == null) View.GONE else View.VISIBLE,
         )
+        TaskWidgetProvider.setColorRes(context, views, R.id.row_subtitle, "setTextColor",
+            if (struck) R.color.widget_muted else R.color.widget_accent)
 
-        val color = row.optInt("color", 0)
+        // ARGB arrives as an unsigned 32-bit number; toInt() wraps it back into
+        // the signed colour Android expects
+        val color = row.optLong("color", 0L).toInt()
         views.setViewVisibility(R.id.row_color, if (color == 0) View.INVISIBLE else View.VISIBLE)
         if (color != 0) views.setInt(R.id.row_color, "setBackgroundColor", color)
 
-        // The tick box is only drawn where ticking means something
-        when (row.optString("check")) {
-            CHECK_UNCHECKED -> showCheck(views, android.R.drawable.checkbox_off_background)
-            CHECK_CHECKED -> showCheck(views, android.R.drawable.checkbox_on_background)
-            else -> views.setViewVisibility(R.id.row_check, View.INVISIBLE)
-        }
+        bindCheck(views, state, row.str("check"), checkAction)
 
         // A collection shares one PendingIntent template, so each row carries
         // only the part that differs — the action URI
-        row.optString("check_action").takeUnless { it.isNullOrEmpty() }?.let {
-            views.setOnClickFillInIntent(R.id.row_check, Intent().setData(Uri.parse(it)))
-        }
-        row.optString("tap").takeUnless { it.isNullOrEmpty() }?.let {
+        tap?.let {
             views.setOnClickFillInIntent(R.id.row_body, Intent().setData(Uri.parse(it)))
         }
 
         return views
     }
 
-    private fun showCheck(views: RemoteViews, drawable: Int) {
+    private fun bindCheck(
+        views: RemoteViews,
+        state: WidgetData.State,
+        check: String?,
+        action: String?,
+    ) {
+        if (check != WidgetData.CHECK_CHECKED && check != WidgetData.CHECK_UNCHECKED) {
+            // The picker has no tick box column at all; the goal lists keep the
+            // space so their colour bars line up with the ticked ones
+            views.setViewVisibility(
+                R.id.row_check,
+                if (state.mode == WidgetData.MODE_PICKER) View.GONE else View.INVISIBLE,
+            )
+            return
+        }
         views.setViewVisibility(R.id.row_check, View.VISIBLE)
-        views.setImageViewResource(R.id.row_check, drawable)
+        val checked = check == WidgetData.CHECK_CHECKED
+        val fillIn = action?.let { Intent().setData(Uri.parse(it)) }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setCompoundButtonChecked(R.id.row_check, checked)
+            // A goal's tick is only a display; disabled so tapping cannot flip
+            // a box that nothing would ever write
+            views.setBoolean(R.id.row_check, "setEnabled", fillIn != null)
+            fillIn?.let {
+                views.setOnCheckedChangeResponse(R.id.row_check,
+                    RemoteViews.RemoteResponse.fromFillInIntent(it))
+            }
+        } else {
+            views.setImageViewResource(R.id.row_check,
+                if (checked) R.drawable.widget_check_on else R.drawable.widget_check_off)
+            fillIn?.let { views.setOnClickFillInIntent(R.id.row_check, it) }
+        }
     }
 
-    override fun getLoadingView(): RemoteViews? = null
+    private fun isCurrentFilter(tap: String?, state: WidgetData.State): Boolean =
+        tap != null && Uri.parse(tap).getQueryParameter("id") == state.filterId
 
-    override fun getViewTypeCount(): Int = 1
-
-    override fun getItemId(position: Int): Long = position.toLong()
-
-    override fun hasStableIds(): Boolean = false
-
-    companion object {
-        private const val KEY_SNAPSHOT = "widget_snapshot"
-        private const val CHECK_UNCHECKED = "unchecked"
-        private const val CHECK_CHECKED = "checked"
-
-        // AppColors.textPrimary and AppColors.textTertiary
-        private const val COLOR_TITLE = 0xFF2A1E12.toInt()
-        private const val COLOR_HEADER = 0xFFB09A84.toInt()
+    private fun strikethrough(text: String): CharSequence = SpannableString(text).apply {
+        setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
 }

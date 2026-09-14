@@ -62,11 +62,10 @@ Future<void> _toggleGuestTask(
 // Read-then-write rather than a blind update: toggling is a flip, and for a
 // recurring task it edits a list of dates that only the stored row knows
 Future<void> _toggleCloudTask(TaskNotificationPayload payload) async {
-  await ensureBackgroundSupabase();
-  final db = Supabase.instance.client;
-  if (db.auth.currentUser == null) {
+  if (!await ensureBackgroundSupabase()) {
     throw StateError('no signed-in session in the background isolate');
   }
+  final db = Supabase.instance.client;
 
   final row =
       await db.from('tasks').select().eq('id', payload.taskId).maybeSingle();
@@ -76,12 +75,36 @@ Future<void> _toggleCloudTask(TaskNotificationPayload payload) async {
   await db.from('tasks').update(updated.toJson()).eq('id', payload.taskId);
 }
 
-// initialize() is idempotent, so callers do not have to track whether some
-// other background entry point already ran
-Future<void> ensureBackgroundSupabase() => Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      anonKey: AppConfig.supabaseAnonKey,
-    );
+// The key supabase_flutter persists the session under
+final _persistSessionKey =
+    'sb-${Uri.parse(AppConfig.supabaseUrl).host.split('.').first}-auth-token';
+
+// Returns whether a signed-in session is available in this engine.
+//
+// Both background engines — the notification's and the widget's — are static
+// and outlive a single tap, but Supabase.initialize() reads the persisted
+// session only the first time it runs. An engine that first ran before the user
+// signed in therefore stayed signed out for as long as the process lived, and
+// every later tap reported "no signed-in session". So the session is re-read
+// from disk on every call instead of trusting what initialize() found
+Future<bool> ensureBackgroundSupabase() async {
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    anonKey: AppConfig.supabaseAnonKey,
+  );
+
+  final prefs = await SharedPreferences.getInstance();
+  // The engine's cache predates whatever the app wrote since it last ran
+  await prefs.reload();
+  final persisted = prefs.getString(_persistSessionKey);
+  if (persisted == null) return false;
+
+  // Also refreshes an expired token. A failure throws, and both callers already
+  // route that to the action log rather than dropping it
+  final auth = Supabase.instance.client.auth;
+  await auth.recoverSession(persisted);
+  return auth.currentUser != null;
+}
 
 // The main isolate drains this on launch and on resume: every entry means
 // "the stored rows changed underneath you, reload", and an entry carrying an

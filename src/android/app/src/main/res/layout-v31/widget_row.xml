@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One list row, Android 11 and below. The tick box is an ImageView here
-     because RemoteViews only allows an interactive CheckBox from Android 12;
-     layout-v31/widget_row.xml is the animated version. Keep the two in step.
-     The tick box and the body are separately clickable because a tap on each
-     means a different thing. -->
+<!-- One list row, Android 12 and up: the same as layout/widget_row.xml except
+     the tick box is a real CheckBox, which the launcher toggles and animates
+     on its own the instant it is tapped. Keep the two in step. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -13,15 +11,16 @@
     android:paddingTop="2dp"
     android:paddingBottom="2dp">
 
-    <ImageView
+    <CheckBox
         android:id="@+id/row_check"
         android:layout_width="30dp"
         android:layout_height="30dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:button="@drawable/widget_check"
+        android:background="@null"
         android:contentDescription="@string/widget_toggle_done" />
 
-    <!-- The category colour of whatever the row is linked to.
-         A FrameLayout rather than a plain View: RemoteViews inflates only an
-         allowlist of classes and View itself is not one of them -->
     <FrameLayout
         android:id="@+id/row_color"
         android:layout_width="3dp"

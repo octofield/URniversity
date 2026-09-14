@@ -35,49 +35,33 @@ Future<void> handleWidgetAction(Uri? uri) async {
   }
 }
 
-// Separated from the entry point so it can be driven directly in a test
+// Separated from the entry point so it can be driven directly in a test.
+//
+// Only writes reach Dart now. Switching tab, period or filter is handled by the
+// native side against views that are already computed, so it never wakes this
+// engine — that round trip is what used to take over a second per tap
 Future<void> applyWidgetAction(Uri uri) async {
-  final service = HomeWidgetService.instance;
-  var state = await service.readState();
-
-  switch (uri.host) {
-    case 'toggle':
-      final payload = TaskNotificationPayload.decode(
-          '${uri.queryParameters['id']}|${uri.queryParameters['date']}');
-      if (payload == null) {
-        debugPrint('[widget] unusable toggle payload: $uri');
-        return;
-      }
-      await toggleTaskFromBackground(payload);
-
-    case 'mode':
-      final mode = _byName(WidgetMode.values, uri.queryParameters['value']);
-      if (mode == null) return;
-      state = state.copyWith(mode: mode);
-
-    case 'period':
-      final period = _byName(WidgetPeriod.values, uri.queryParameters['value']);
-      if (period == null) return;
-      // Changing the period only makes sense on the task list, and tapping it
-      // from the picker should take the user back there
-      state = state.copyWith(period: period, mode: WidgetMode.tasks);
-
-    case 'filter':
-      final kind = _byName(WidgetFilterKind.values, uri.queryParameters['kind']);
-      if (kind == null) return;
-      state = state.copyWith(
-        filterKind: kind,
-        filterId: kind == WidgetFilterKind.none ? null : uri.queryParameters['id'],
-        // Picking a filter is the way out of the picker
-        mode: WidgetMode.tasks,
-      );
-
-    default:
-      debugPrint('[widget] unknown action: $uri');
-      return;
+  if (uri.host != 'toggle') {
+    debugPrint('[widget] not a background action: $uri');
+    return;
   }
-
-  await refreshWidgetFromStorage(state);
+  final payload = TaskNotificationPayload.decode(
+      '${uri.queryParameters['id']}|${uri.queryParameters['date']}');
+  if (payload == null) {
+    debugPrint('[widget] unusable toggle payload: $uri');
+    return;
+  }
+  final error = await toggleTaskFromBackground(payload);
+  if (error != null) {
+    // The native side already ticked the row. There may be no network to
+    // rebuild from, so take the tick back directly; the app reports the
+    // failure itself on its next launch
+    await HomeWidgetService.instance.untick(
+        WidgetAction.toggleDone(taskId: payload.taskId, date: payload.date));
+    return;
+  }
+  // Rebuilt from storage so the ticked row drops out of every view
+  await refreshWidgetFromStorage();
 }
 
 // Loads the current data and pushes a freshly built snapshot.
@@ -85,7 +69,7 @@ Future<void> applyWidgetAction(Uri uri) async {
 // Guest data lives in SharedPreferences; a signed-in user's lives in Supabase
 // and is fetched in one go. Either way this is a cold read — the background
 // engine holds nothing between invocations
-Future<void> refreshWidgetFromStorage(WidgetState state) async {
+Future<void> refreshWidgetFromStorage() async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload();
 
@@ -100,7 +84,6 @@ Future<void> refreshWidgetFromStorage(WidgetState state) async {
     semesterGoals: data.semesterGoals,
     futureGoals: data.futureGoals,
     categories: data.categories,
-    state: state,
     semesterSettings: data.semesterSettings,
     s: stringsFor(data.language),
     now: DateTime.now(),
@@ -154,13 +137,12 @@ _WidgetData _loadGuestData(SharedPreferences prefs, String? languageCode) =>
     );
 
 Future<_WidgetData?> _loadCloudData() async {
-  await ensureBackgroundSupabase();
-  final db = Supabase.instance.client;
-  final uid = db.auth.currentUser?.id;
-  if (uid == null) {
+  if (!await ensureBackgroundSupabase()) {
     debugPrint('[widget] no signed-in session; leaving the widget as it is');
     return null;
   }
+  final db = Supabase.instance.client;
+  final uid = db.auth.currentUser!.id;
 
   final tasks = await db.from('tasks').select().eq('user_id', uid);
   final semGoals = await db.from('semester_goals').select().eq('user_id', uid);
@@ -227,10 +209,3 @@ AppLanguage _languageByCode(String? code) => switch (code) {
       'jp' => AppLanguage.jp,
       _ => AppLanguage.zhTw,
     };
-
-T? _byName<T extends Enum>(List<T> values, String? name) {
-  for (final v in values) {
-    if (v.name == name) return v;
-  }
-  return null;
-}
