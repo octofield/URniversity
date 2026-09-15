@@ -146,6 +146,9 @@ class StringsJp implements AppStrings {
   @override String get defaultTaskView => 'デフォルトのタスクビュー';
   @override String get createdAtLabel => '作成日時';
   @override String get completedTasks => '完了したタスク';
+  @override String tasksWithCount(int count) => 'タスク（$count）';
+  @override String completedTasksWithCount(int count) => '完了したタスク（$count）';
+  @override String get noSemester => '学期未設定';
   @override String get delete => '削除';
   @override String weekdayShort(int weekday) {
     const names = ['月', '火', '水', '木', '金', '土', '日'];

@@ -48,7 +48,7 @@
 | `linked_target_id` | text（**真實外鍵** → `semester_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | 連結的學期目標。目標被刪除時資料庫會自動清成 `null`——但只對**當下還存在**的任務列生效，回收桶裡的快照仍留著舊 id（見 §UC6 的還原處理） |
 | `linked_goal_id` | text（**真實外鍵** → `future_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | 連結的未來願景，同上 |
 | `parent_task_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 父任務；`null` 代表頂層任務。**限制一層**：有 `parent_task_id` 的任務不能再有自己的子任務 |
-| `sort_order` | int | ✓ | `0` | 同一層（同 `parent_task_id`）手動拖曳排序用；新增時取同層最大值 `+1000` |
+| `sort_order` | int | ✓ | `0` | 同一層（同 `parent_task_id`）手動拖曳排序用；新增時取同層最小值 `−1000`（新的排最上面，可為負數） |
 | `completed_dates` | text（JSON 字串，`List<String>`） | ✗ | `null` | 僅循環任務使用；陣列內為 `"yyyy-MM-dd"` 字串，記錄哪些日期已完成 |
 
 **特別說明：**
@@ -95,7 +95,7 @@
 | `future_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景（跨層關聯，也是關聯圖頁面畫虛線箭頭的資料來源）。⚠️ 這是**真實的外鍵** `semester_goals_future_goal_id_fkey → future_goals(id) ON DELETE SET NULL`（不是邏輯關聯），指向不存在的願景會被資料庫拒絕。另外 **僅頂層目標（`parent_id IS NULL`）可有值**；`linkFutureGoal()` 會擋下對子目標的連結，`reparent()` 把目標拖成子目標時會清成 `null` |
 | `notes` | text | ✗ | `null` | 備註 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |
-| `sort_order` | int | ✓ | `0` | 同層（同 `parent_id` 且同 `semester`）手動排序用；新增時取同層最大值 `+1000` |
+| `sort_order` | int | ✓ | `0` | 同層（同 `parent_id` 且同 `semester`）手動排序用；新增時取同層最小值 `−1000`（新的排最上面，可為負數） |
 
 **特別說明：**
 - 子目標樹狀結構透過 `parent_id` 自我參照；刪除父節點（`remove()`）會遞迴刪除所有子孫，
@@ -120,7 +120,7 @@
 | `end_semester` | text | ✗ | `null` | 結束學期，格式同上 |
 | `notes` | text | ✗ | `null` | 備註 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |
-| `sort_order` | int | ✓ | `0` | 同層（同 `parent_id`）手動排序用；新增時取同層最大值 `+1000` |
+| `sort_order` | int | ✓ | `0` | 同層（同 `parent_id`）手動排序用；新增時取同層最小值 `−1000`（新的排最上面，可為負數） |
 
 **特別說明：**
 - 分類常數定義於 `FutureCategories`（同檔案）：`exchange` / `intern` / `competition` /

@@ -40,9 +40,11 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
     String? endSemester,
     String? notes,
   }) {
-    final maxOrder = state
+    // Newest first: one step before the smallest in its group, so a new vision
+    // lands on top without moving anything the user has dragged
+    final minOrder = state
         .where((g) => g.parentId == parentId)
-        .fold(0, (prev, g) => g.sortOrder > prev ? g.sortOrder : prev);
+        .fold(0, (prev, g) => g.sortOrder < prev ? g.sortOrder : prev);
     final goal = FutureGoal(
       id: newRowId(),
       parentId: parentId,
@@ -51,7 +53,7 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
       startSemester: startSemester,
       endSemester: endSemester,
       notes: notes,
-      sortOrder: maxOrder + 1000,
+      sortOrder: minOrder - 1000,
     );
     state = [...state, goal];
     upsert(goal);

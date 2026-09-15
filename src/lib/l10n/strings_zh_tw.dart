@@ -146,6 +146,9 @@ class StringsZhTw implements AppStrings {
   @override String get defaultTaskView => '預設任務視角';
   @override String get createdAtLabel => '建立時間';
   @override String get completedTasks => '已完成的任務';
+  @override String tasksWithCount(int count) => '任務（$count）';
+  @override String completedTasksWithCount(int count) => '已完成的任務（$count）';
+  @override String get noSemester => '未設定學期';
   @override String get delete => '刪除';
   @override String weekdayShort(int weekday) {
     const names = ['一', '二', '三', '四', '五', '六', '日'];

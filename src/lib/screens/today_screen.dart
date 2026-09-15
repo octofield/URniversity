@@ -25,6 +25,7 @@ import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/drag_reorder.dart';
+import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
 import 'settings_screen.dart';
@@ -418,60 +419,77 @@ class _WeeklyGrid extends ConsumerStatefulWidget {
   ConsumerState<_WeeklyGrid> createState() => _WeeklyGridState();
 }
 
+// The week as one continuous sheet, Monday to Sunday top to bottom: a fixed
+// date column on the left ruled off from that day's tasks on the right
+// (direction B of the 2026-09-15 design canvas)
 class _WeeklyGridState extends ConsumerState<_WeeklyGrid> {
-  final ScrollController _scrollCtrl = ScrollController();
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  void _scrollToDay(int index) {
-    if (!_scrollCtrl.hasClients) return;
-    const colWidth = 130.0;
-    const gap = 8.0;
-    const hPad = AppSpacing.pageHorizontal;
-    final viewportWidth = MediaQuery.of(context).size.width;
-    final target = hPad + index * (colWidth + gap) + colWidth / 2 - viewportWidth / 2;
-    _scrollCtrl.animateTo(
-      target.clamp(0.0, _scrollCtrl.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-  }
+  final _dayKeys = List.generate(7, (_) => GlobalKey());
 
   @override
   Widget build(BuildContext context) {
     ref.listen(dateProvider, (_, next) {
-      final dayIndex = next.difference(widget.weekStart).inDays;
+      final dayIndex = DateTime(next.year, next.month, next.day)
+          .difference(widget.weekStart)
+          .inDays;
       if (dayIndex >= 0 && dayIndex < 7) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToDay(dayIndex));
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = _dayKeys[dayIndex].currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300));
+          }
+        });
       }
     });
 
+    final isDesktop = MediaQuery.of(context).size.width >= AppBreakpoints.desktop;
+
     return SingleChildScrollView(
-      controller: _scrollCtrl,
-      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pageHorizontal,
-        8,
+        AppSpacing.sm,
         AppSpacing.pageHorizontal,
         80,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (int i = 0; i < 7; i++) _DayColumn(date: widget.weekStart.add(Duration(days: i))),
-        ],
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          // A single column of rows reads badly when stretched across a wide window
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                for (int i = 0; i < 7; i++)
+                  _DayRow(
+                    key: _dayKeys[i],
+                    date: widget.weekStart.add(Duration(days: i)),
+                    isFirst: i == 0,
+                    dateColumnWidth: isDesktop ? 84 : 60,
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-class _DayColumn extends ConsumerWidget {
+class _DayRow extends ConsumerWidget {
   final DateTime date;
-  const _DayColumn({required this.date});
+  final bool isFirst;
+  final double dateColumnWidth;
+  const _DayRow({
+    super.key,
+    required this.date,
+    required this.isFirst,
+    required this.dateColumnWidth,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -497,61 +515,84 @@ class _DayColumn extends ConsumerWidget {
         date.year == selectedDate.year &&
         date.month == selectedDate.month &&
         date.day == selectedDate.day;
-    final headerColor = isToday
-        ? AppColors.primary
-        : (isFocused ? AppColors.primary : AppColors.textTertiary);
 
     return Container(
-      width: 130,
-      margin: const EdgeInsets.only(right: 8),
-      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: (isToday || isFocused) ? AppColors.primary : AppColors.border,
-          width: (isToday || isFocused) ? 1.5 : 1,
-        ),
+        border: isFirst ? null : const Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: InkWell(
-        onTap: () => ref.read(dateProvider.notifier).setDate(normalDate),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    s.weekdayShort(date.weekday),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: headerColor),
+            Material(
+              color: isToday ? AppColors.primaryLight : Colors.transparent,
+              child: InkWell(
+                onTap: () => ref.read(dateProvider.notifier).setDate(normalDate),
+                child: Container(
+                  width: dateColumnWidth,
+                  padding: const EdgeInsets.only(top: 10, bottom: 10),
+                  decoration: const BoxDecoration(
+                    border: Border(right: BorderSide(color: AppColors.border)),
                   ),
-                  Text(
-                    '${date.month}/${date.day}',
-                    // No type-scale role is 15px, and 14 or 16 both break the
-                    // weekly grid column width
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: (isToday || isFocused) ? FontWeight.bold : FontWeight.normal,
-                      color: headerColor,
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        s.weekdayShort(date.weekday),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: isToday ? AppColors.primary : AppColors.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        constraints: const BoxConstraints(minWidth: 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isToday ? AppColors.primary : null,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          // The picked day, when it isn't today, gets an outline
+                          // so tapping a date still shows where you are
+                          border: isFocused && !isToday
+                              ? Border.all(color: AppColors.primary)
+                              : null,
+                        ),
+                        child: Text(
+                          '${date.month}/${date.day}',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: isToday ? AppColors.textOnPrimary : AppColors.textPrimary,
+                              ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-            const Divider(height: 1),
-            if (tasks.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Text('–',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textTertiary)),
-              )
-            else
-              for (final task in tasks) _WeekTaskTile(task: task, date: normalDate),
+            Expanded(
+              child: tasks.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: AppSpacing.sm + 4,
+                      ),
+                      child: Text(
+                        '–',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        for (var j = 0; j < tasks.length; j++) ...[
+                          if (j > 0) const Divider(height: 1, indent: 12),
+                          _WeekTaskTile(task: tasks[j], date: normalDate),
+                        ],
+                      ],
+                    ),
+            ),
           ],
         ),
       ),
@@ -566,13 +607,41 @@ class _WeekTaskTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     final isCompleted = task.isCompletedOn(date);
+    final cats = ref.watch(categoriesProvider);
+    final linkedTarget = task.linkedTargetId != null
+        ? ref.watch(semesterGoalsProvider).where((g) => g.id == task.linkedTargetId).firstOrNull
+        : null;
+    final linkedGoal = task.linkedGoalId != null
+        ? ref.watch(futureGoalsProvider).where((g) => g.id == task.linkedGoalId).firstOrNull
+        : null;
+    // One bar, not the day list's split one: this row is too short to split
+    final linkedCategories = linkedTarget?.categories ?? linkedGoal?.categories;
+    final barColor = linkedCategories != null
+        ? resolveCatColor(cats, linkedCategories.isNotEmpty ? linkedCategories.first : 'other')
+        : Colors.transparent;
+    final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
+    final meta = isRecurring
+        ? _recurrenceShort(task.recurrence!, s, task.createdAt)
+        : (task.dueTime != null ? _formatDueTime(task.dueTime!) : null);
+    final metaStyle = Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary);
+
     return InkWell(
       onTap: () => showTaskSheet(context, ref, existing: task),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
         child: Row(
           children: [
+            Container(
+              width: 3,
+              height: 32,
+              decoration: BoxDecoration(
+                color: barColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
             SizedBox(
               width: 24,
               height: 24,
@@ -583,18 +652,59 @@ class _WeekTaskTile extends ConsumerWidget {
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
-            const SizedBox(width: AppSpacing.xs),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                task.title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  decoration: isCompleted ? TextDecoration.lineThrough : null,
-                  color: isCompleted ? AppColors.textTertiary : null,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          decoration: isCompleted ? TextDecoration.lineThrough : null,
+                          color: isCompleted ? AppColors.textTertiary : AppColors.textPrimary,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (meta != null)
+                    Row(
+                      children: [
+                        Icon(
+                          isRecurring ? Icons.repeat : Icons.calendar_today_outlined,
+                          size: 12,
+                          color: AppColors.textTertiary,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            meta,
+                            style: metaStyle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
+            if (task.priority > 1 && !isCompleted)
+              Container(
+                margin: const EdgeInsets.only(left: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                decoration: BoxDecoration(
+                  color: task.priority == 3 ? AppColors.errorLight : AppColors.warningLight,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  task.priority == 3 ? s.priorityHigh : s.priorityMed,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: task.priority == 3 ? AppColors.error : AppColors.warning,
+                      ),
+                ),
+              ),
           ],
         ),
       ),
@@ -828,7 +938,7 @@ class _TasksSection extends ConsumerWidget {
           height: 40,
           child: Row(
             children: [
-              Text(s.tasks, style: Theme.of(context).textTheme.titleLarge),
+              Text(s.tasksWithCount(tasks.length), style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
               IconButton(
                 icon: Icon(
@@ -1097,7 +1207,10 @@ class _CompletedTasksSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(s.completedTasks, style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          s.completedTasksWithCount(completed.length),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         const SizedBox(height: AppSpacing.sm),
         HoverLift(
           child: Container(

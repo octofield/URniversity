@@ -59,9 +59,11 @@ class TasksNotifier extends SyncedListNotifier<Task> {
     String? linkedGoalId,
     String? parentTaskId,
   }) {
-    final maxOrder = state
+    // Newest first: one step before the smallest in its group, so a new task
+    // lands on top without moving anything the user has dragged
+    final minOrder = state
         .where((t) => t.parentTaskId == parentTaskId)
-        .fold(0, (prev, t) => t.sortOrder > prev ? t.sortOrder : prev);
+        .fold(0, (prev, t) => t.sortOrder < prev ? t.sortOrder : prev);
     final task = Task(
       id: newRowId(),
       title: title,
@@ -73,7 +75,7 @@ class TasksNotifier extends SyncedListNotifier<Task> {
       linkedTargetId: linkedTargetId,
       linkedGoalId: linkedGoalId,
       parentTaskId: parentTaskId,
-      sortOrder: maxOrder + 1000,
+      sortOrder: minOrder - 1000,
     );
     state = [...state, task];
     upsert(task);
