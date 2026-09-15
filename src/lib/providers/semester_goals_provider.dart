@@ -97,9 +97,11 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
     String? futureGoalId,
     String? notes,
   }) {
-    final maxOrder = state
+    // Newest first: one step before the smallest in its group, so a new goal
+    // lands on top without moving anything the user has dragged
+    final minOrder = state
         .where((g) => g.parentId == parentId && g.semester == semester)
-        .fold(0, (prev, g) => g.sortOrder > prev ? g.sortOrder : prev);
+        .fold(0, (prev, g) => g.sortOrder < prev ? g.sortOrder : prev);
     final goal = SemesterGoal(
       id: newRowId(),
       parentId: parentId,
@@ -108,7 +110,7 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
       categories: categories.isEmpty ? ['other'] : categories,
       futureGoalId: futureGoalId,
       notes: notes,
-      sortOrder: maxOrder + 1000,
+      sortOrder: minOrder - 1000,
     );
     state = [...state, goal];
     upsert(goal);

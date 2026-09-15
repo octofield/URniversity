@@ -230,47 +230,25 @@ void _showTargetSelector(
   String? currentId,
   ValueChanged<String?> onSelect,
 ) {
-  final targets = ref.read(semesterGoalsProvider);
   final semSettings = ref.read(semesterSettingsProvider);
-  showDialog(
+  showSemesterGroupedPicker(
     context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.selectTarget),
-      content: SizedBox(
-        width: 400,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ListTile(
-              title: Text(s.noLink),
-              selected: currentId == null,
-              selectedColor: AppColors.primary,
-              onTap: () {
-                onSelect(null);
-                Navigator.pop(dlgCtx);
-              },
-            ),
-            for (final g in targets)
-              ListTile(
-                title: Text(g.title),
-                subtitle: Text(formatSemester(g.semester, semSettings, s)),
-                selected: g.id == currentId,
-                selectedColor: AppColors.primary,
-                onTap: () {
-                  onSelect(g.id);
-                  Navigator.pop(dlgCtx);
-                },
-              ),
-          ],
+    title: s.selectTarget,
+    items: [
+      for (final g in ref.read(semesterGoalsProvider))
+        SemesterPickerItem(
+          id: g.id,
+          title: g.title,
+          semester: g.semester,
+          parentId: g.parentId,
+          sortOrder: g.sortOrder,
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-      ],
-    ),
+    ],
+    currentId: currentId,
+    currentSemester: currentSemester(semSettings),
+    settings: semSettings,
+    s: s,
+    onSelect: onSelect,
   );
 }
 
@@ -281,45 +259,25 @@ void _showGoalSelectorForTask(
   String? currentId,
   ValueChanged<String?> onSelect,
 ) {
-  final goals = ref.read(futureGoalsProvider);
-  showDialog(
+  final semSettings = ref.read(semesterSettingsProvider);
+  showSemesterGroupedPicker(
     context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.selectFutureGoal),
-      content: SizedBox(
-        width: 400,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ListTile(
-              title: Text(s.noLink),
-              selected: currentId == null,
-              selectedColor: AppColors.primary,
-              onTap: () {
-                onSelect(null);
-                Navigator.pop(dlgCtx);
-              },
-            ),
-            for (final g in goals)
-              ListTile(
-                title: Text(g.title),
-                selected: g.id == currentId,
-                selectedColor: AppColors.primary,
-                onTap: () {
-                  onSelect(g.id);
-                  Navigator.pop(dlgCtx);
-                },
-              ),
-          ],
+    title: s.selectFutureGoal,
+    items: [
+      for (final g in ref.read(futureGoalsProvider))
+        SemesterPickerItem(
+          id: g.id,
+          title: g.title,
+          semester: g.startSemester,
+          parentId: g.parentId,
+          sortOrder: g.sortOrder,
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-      ],
-    ),
+    ],
+    currentId: currentId,
+    currentSemester: currentSemester(semSettings),
+    settings: semSettings,
+    s: s,
+    onSelect: onSelect,
   );
 }
 
@@ -444,9 +402,18 @@ void showTaskSheet(
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: contentController,
-                  maxLines: 1,
+                  minLines: 1,
+                  maxLines: 3,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: s.taskNotes, isDense: true),
+                  // One short line at rest, a little lower than the title field
+                  decoration: InputDecoration(
+                    labelText: s.taskNotes,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.inputPadding,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 _linkRow(
@@ -516,7 +483,7 @@ void showTaskSheet(
                       ],
                       selected: {priority},
                       style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
+                        visualDensity: VisualDensity(horizontal: -2, vertical: -4),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       onSelectionChanged: (v) => setState(() => priority = v.first),

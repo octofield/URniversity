@@ -162,6 +162,9 @@ abstract class AppStrings {
   String get defaultTaskView;
   String get createdAtLabel;
   String get completedTasks;
+  String tasksWithCount(int count);
+  String completedTasksWithCount(int count);
+  String get noSemester;
   String get delete;
   String weekdayShort(int weekday);
 

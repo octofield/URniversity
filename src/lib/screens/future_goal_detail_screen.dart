@@ -313,7 +313,10 @@ class GoalSubtreeView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allGoals = ref.watch(futureGoalsProvider);
-    final children = allGoals.where((g) => g.parentId == parentId).toList();
+    // Sorted here because the provider's state keeps insertion order, which
+    // would show a brand-new child at the bottom until the next reload
+    final children = allGoals.where((g) => g.parentId == parentId).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     if (children.isEmpty) return const SizedBox.shrink();
 

@@ -146,6 +146,9 @@ class StringsEn implements AppStrings {
   @override String get defaultTaskView => 'Default Task View';
   @override String get createdAtLabel => 'Created';
   @override String get completedTasks => 'Completed Tasks';
+  @override String tasksWithCount(int count) => 'Tasks ($count)';
+  @override String completedTasksWithCount(int count) => 'Completed Tasks ($count)';
+  @override String get noSemester => 'No semester';
   @override String get delete => 'Delete';
   @override String weekdayShort(int weekday) {
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

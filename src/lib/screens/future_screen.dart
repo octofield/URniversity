@@ -977,9 +977,18 @@ void showFutureGoalSheet(
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: notesCtrl,
-              maxLines: 2,
+              minLines: 1,
+              maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: s.goalNotes, isDense: true),
+              // One short line at rest, a little lower than the title field
+              decoration: InputDecoration(
+                labelText: s.goalNotes,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.inputPadding,
+                  vertical: AppSpacing.sm,
+                ),
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(

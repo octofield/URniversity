@@ -17,6 +17,7 @@ import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
 import 'future_goal_detail_screen.dart';
 
@@ -693,47 +694,24 @@ void _showFutureGoalSelectorForSheet(
   String? currentId,
   ValueChanged<String?> onSelect,
 ) {
-  showDialog(
+  showSemesterGroupedPicker(
     context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.selectFutureGoal),
-      content: SizedBox(
-        width: 400,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ListTile(
-              title: Text(s.noLink),
-              selected: currentId == null,
-              selectedColor: AppColors.primary,
-              onTap: () {
-                onSelect(null);
-                Navigator.pop(dlgCtx);
-              },
-            ),
-            for (final g in goals)
-              ListTile(
-                title: Text(g.title),
-                subtitle: g.startSemester != null
-                    ? Text(formatSemester(g.startSemester!, settings, s))
-                    : null,
-                selected: g.id == currentId,
-                selectedColor: AppColors.primary,
-                onTap: () {
-                  onSelect(g.id);
-                  Navigator.pop(dlgCtx);
-                },
-              ),
-          ],
+    title: s.selectFutureGoal,
+    items: [
+      for (final g in goals)
+        SemesterPickerItem(
+          id: g.id,
+          title: g.title,
+          semester: g.startSemester,
+          parentId: g.parentId,
+          sortOrder: g.sortOrder,
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-      ],
-    ),
+    ],
+    currentId: currentId,
+    currentSemester: currentSemester(settings),
+    settings: settings,
+    s: s,
+    onSelect: onSelect,
   );
 }
 
@@ -821,9 +799,18 @@ void showSemesterGoalSheet(
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: notesCtrl,
-                maxLines: 2,
+                minLines: 1,
+                maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: s.goalNotes, isDense: true),
+                // One short line at rest, a little lower than the title field
+                decoration: InputDecoration(
+                  labelText: s.goalNotes,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.inputPadding,
+                    vertical: AppSpacing.sm,
+                  ),
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(

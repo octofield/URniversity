@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/providers/inspirations_provider.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart';
+import 'package:urniversity/providers/settings_provider.dart';
 import 'package:urniversity/providers/tasks_provider.dart';
 import 'package:urniversity/screens/today_screen.dart';
 
@@ -88,6 +89,34 @@ void main() {
       expect(updated.title, '新標題');
       expect(updated.content, isNull);
     });
+
+    testWidgets('links a target through the semester picker', (tester) async {
+      final c = testContainer();
+      final goals = c.read(semesterGoalsProvider.notifier);
+      goals.addGoal('舊目標', '100-1');
+      goals.addGoal('本學期目標', currentSemester(c.read(semesterSettingsProvider)));
+
+      await openSheet(tester, c, (ctx, ref) => showTaskSheet(ctx, ref));
+      await tester.tap(find.text(zh.linkedTarget));
+      await tester.pumpAndSettle();
+
+      // Every semester is listed until one is picked from the chip row
+      expect(find.widgetWithText(ChoiceChip, zh.catAll), findsOneWidget);
+      expect(find.text('本學期目標'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, '100-1'));
+      await tester.pumpAndSettle();
+      expect(find.text('本學期目標'), findsNothing);
+
+      await tester.tap(find.text('舊目標'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextField, zh.titleField), '連結的任務');
+      await tester.tap(find.widgetWithText(FilledButton, zh.add));
+      await tester.pumpAndSettle();
+
+      final old = c.read(semesterGoalsProvider).firstWhere((g) => g.title == '舊目標');
+      expect(c.read(tasksProvider).single.linkedTargetId, old.id);
+    });
   });
 
   testWidgets('inspiration sheet adds an inspiration', (tester) async {
@@ -130,6 +159,25 @@ void main() {
       expect(find.textContaining(zh.filters), findsNothing);
     });
 
+    testWidgets('weekly view lists a task under its day and ticks it off', (tester) async {
+      final c = await pumpApp(tester);
+      c.read(taskViewProvider.notifier).state = 2;
+      final now = DateTime.now();
+      c.read(tasksProvider.notifier).add(
+            '本週的事',
+            dueTime: DateTime(now.year, now.month, now.day, 23, 0),
+          );
+      await tester.pumpAndSettle();
+
+      // Today's date sits in the left column, and every day of the week has a row
+      expect(find.text('${now.month}/${now.day}'), findsOneWidget);
+      expect(find.text('本週的事'), findsOneWidget);
+
+      await tester.tap(find.byType(Checkbox));
+      await tester.pumpAndSettle();
+      expect(c.read(tasksProvider).single.isCompletedOn(now), isTrue);
+    });
+
     testWidgets('lists completed tasks in their own section', (tester) async {
       final c = await pumpApp(tester);
       // The daily view only lists tasks that apply to the date, and a task with
@@ -137,11 +185,14 @@ void main() {
       c.read(taskViewProvider.notifier).state = 0;
       c.read(tasksProvider.notifier).add('做完的事');
       await tester.pumpAndSettle();
-      expect(find.text(zh.completedTasks), findsNothing);
+      expect(find.textContaining(zh.completedTasks), findsNothing);
+      expect(find.text(zh.tasksWithCount(1)), findsOneWidget);
 
       c.read(tasksProvider.notifier).toggle(c.read(tasksProvider).single.id);
       await tester.pumpAndSettle();
-      expect(find.text(zh.completedTasks), findsOneWidget);
+      // Both headers count the rows they list
+      expect(find.text(zh.completedTasksWithCount(1)), findsOneWidget);
+      expect(find.text(zh.tasksWithCount(0)), findsOneWidget);
     });
   });
 
