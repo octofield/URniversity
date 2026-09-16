@@ -77,9 +77,14 @@ Future<void> runWithRetry(
 // for anything created in a loop — and `id` is the primary key, so the second
 // upsert silently overwrites the first. The random suffix keeps ids roughly
 // time-ordered while making a collision negligible
+//
+// The range is a literal, not `1 << 32`: on the web ints are JavaScript numbers
+// and shifts work on 32 bits, so that expression is 0 there and nextInt(0)
+// throws — every add failed in the browser (test/row_id_test.dart)
 final _idRandom = Random();
+const _idSuffixRange = 0x100000000;
 String newRowId() =>
-    '${DateTime.now().millisecondsSinceEpoch}_${_idRandom.nextInt(1 << 32)}';
+    '${DateTime.now().millisecondsSinceEpoch}_${_idRandom.nextInt(_idSuffixRange)}';
 
 // Shared guest/Supabase plumbing for the list-shaped providers.
 //
