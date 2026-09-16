@@ -15,7 +15,7 @@
 
 ## 現況說明
 
-本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，227 個案例，
+本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，245 個案例，
 `flutter test` 全綠）。`flutter create` 產生的預設計數器範例 `widget_test.dart` 已刪除。
 
 自動測試分兩層：**單元測試**涵蓋不依賴 Supabase／SharedPreferences 的純函式（§2.1）；
@@ -80,6 +80,8 @@
 | `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期 |
 | `test/notification_action_test.dart` | 通知動作依賴的純邏輯（§3-L）：`Task.toggledOn()` 與 `isCompletedOn()` 互為反函式、payload 編解碼、畸形輸入回 null 不拋例外、動作結果的成功／失敗記錄 |
 | `test/widget_snapshot_test.dart` | 桌面小工具要顯示什麼（§3-M）：六份預算好的頁面、三個期間互不影響、day/week/month 的範圍與去重、任務列 `filters` 含祖先 id（含循環 parent 不卡死）、篩選挑選器的分組與排序、序列化（無副標為 null） |
+| `test/row_id_test.dart` | `newRowId()` 在**每個平台**都做得出 id、亂數後綴在 32 位元內。⚠️ 這份要**另外在 Chrome 跑一次**（`flutter test --platform chrome test/row_id_test.dart`）：網頁上 `<<` 只有 32 位元，`1 << 32` 會變成 0，VM 上的測試完全抓不到 |
+| `test/row_id_source_test.dart` | 防呆：`newRowId()` 的亂數上限必須是字面值 `0x100000000`，**原始碼裡不得再出現 `<< 32`**（比對前先去掉註解行）。VM 專用，因為 `1 << 32` 在 VM 上是對的，只有讀原始碼才擋得住這個回歸 |
 | `test/new_item_order_test.dart` | 新增置頂（§3-C）：任務／學期目標／願景新增後排在同層最上面；拖曳過的任務在之後新增時位置不變；子任務、子願景、不同學期只跟自己那一層比 |
 | `test/semester_grouped_picker_test.dart` | 連結選擇器（§3-C）：學期由早到晚、假期 token 夾在前後學期之間、未設定學期放最後、組內新的在上且子項縮排、父項在別學期時子項仍顯示、開啟位置（當前 → 之後最近 → 最晚） |
 | `test/widget_action_test.dart` | 小工具動作 URI 的形狀（含 + 按鈕的 `new`）。Kotlin 有一半是手寫組出來的，改名只會表現成「點了沒反應」，所以逐一釘住。另測寫入失敗時 `untickInSnapshot()` 只取回該列的勾選 |
