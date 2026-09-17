@@ -193,6 +193,12 @@ void main() {
       // Both headers count the rows they list
       expect(find.text(zh.completedTasksWithCount(1)), findsOneWidget);
       expect(find.text(zh.tasksWithCount(0)), findsOneWidget);
+
+      // Collapsed to begin with: the header is there, the finished task is not
+      expect(find.text('做完的事'), findsNothing);
+      await tester.tap(find.text(zh.completedTasksWithCount(1)));
+      await tester.pumpAndSettle();
+      expect(find.text('做完的事'), findsOneWidget);
     });
   });
 

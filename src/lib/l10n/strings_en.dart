@@ -149,6 +149,10 @@ class StringsEn implements AppStrings {
   @override String tasksWithCount(int count) => 'Tasks ($count)';
   @override String completedTasksWithCount(int count) => 'Completed Tasks ($count)';
   @override String get noSemester => 'No semester';
+  @override String get completionEffect => 'Task completion effect';
+  @override String get effectOff => 'Off';
+  @override String get effectBasic => 'Basic';
+  @override String get effectCelebrate => 'Basic + confetti';
   @override String get delete => 'Delete';
   @override String weekdayShort(int weekday) {
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

@@ -9,6 +9,7 @@ import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
 import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
+import '../providers/recent_picks_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
@@ -634,6 +635,9 @@ Widget _goalLinkTile(
   BuildContext context,
   AppStrings s,
   FutureGoal? linked,
+  // The linked vision's own category colour, so the tile says which vision this
+  // is rather than just that there is one
+  Color linkedColor,
   VoidCallback onTap,
   VoidCallback onClear,
 ) {
@@ -650,7 +654,7 @@ Widget _goalLinkTile(
         children: [
           Icon(
             Icons.stars_outlined,
-            color: linked != null ? AppColors.primary : AppColors.textTertiary,
+            color: linked != null ? linkedColor : AppColors.textTertiary,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -667,7 +671,7 @@ Widget _goalLinkTile(
                 Text(
                   linked?.title ?? s.noLink,
                   style: TextStyle(
-                    color: linked != null ? AppColors.primary : AppColors.textTertiary,
+                    color: linked != null ? linkedColor : AppColors.textTertiary,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -755,6 +759,9 @@ void showSemesterGoalSheet(
           final cats = selectedCategories.isEmpty ? ['other'] : selectedCategories.toList();
           final notifier = ref.read(semesterGoalsProvider.notifier);
           final notes = notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim();
+          // Touching a goal counts as using it, so it shows up in the task
+          // sheet's suggestions (D16)
+          final recent = ref.read(recentPicksProvider.notifier);
           if (isEdit) {
             notifier.updateGoal(
               existing.id,
@@ -764,8 +771,9 @@ void showSemesterGoalSheet(
               futureGoalId: isTopLevel ? selectedFutureGoalId : null,
               notes: notes,
             );
+            recent.rememberTarget(existing.id);
           } else {
-            notifier.addGoal(
+            final newId = notifier.addGoal(
               titleCtrl.text.trim(),
               selectedSemester,
               parentId: parentId,
@@ -773,6 +781,7 @@ void showSemesterGoalSheet(
               futureGoalId: parentId != null ? null : selectedFutureGoalId,
               notes: notes,
             );
+            recent.rememberTarget(newId);
           }
           Navigator.pop(sheetCtx);
         }
@@ -854,6 +863,11 @@ void showSemesterGoalSheet(
                   sheetCtx,
                   s,
                   linked,
+                  linked == null
+                      ? AppColors.primary
+                      : resolveCatColor(
+                          ref.read(categoriesProvider),
+                          linked.categories.isNotEmpty ? linked.categories.first : 'other'),
                   () => _showFutureGoalSelectorForSheet(
                     context,
                     futureGoals,

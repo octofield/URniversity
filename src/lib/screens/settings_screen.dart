@@ -46,6 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final semSettings = ref.watch(semesterSettingsProvider);
     final defaultView = ref.watch(defaultTaskViewProvider);
     final showDayCounter = ref.watch(showDayCounterProvider);
+    final completionEffect = ref.watch(completionEffectProvider);
     final dev = ref.watch(devModeProvider);
     final isGuest = ref.watch(guestModeProvider);
 
@@ -85,6 +86,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           notificationSettingsTile(context, s),
+          ListTile(
+            title: Text(s.completionEffect),
+            subtitle: Text(completionEffectLabel(completionEffect, s)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCompletionEffectDialog(context, ref, s, completionEffect),
+          ),
           SwitchListTile(
             title: Text(s.showJournalDayCounter),
             value: showDayCounter,
@@ -276,6 +283,30 @@ String _taskViewLabel(int view, AppStrings s) {
     case 2:  return s.weeklyTasks;
     default: return s.allTasks;
   }
+}
+
+void _showCompletionEffectDialog(BuildContext context, WidgetRef ref,
+    AppStrings s, TaskCompletionEffect current) {
+  showDialog(
+    context: context,
+    builder: (ctx) => SimpleDialog(
+      title: Text(s.completionEffect),
+      children: [
+        for (final effect in TaskCompletionEffect.values)
+          ListTile(
+            title: Text(completionEffectLabel(effect, s)),
+            leading: Icon(
+              effect == current ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: effect == current ? AppColors.primary : null,
+            ),
+            onTap: () {
+              ref.read(completionEffectProvider.notifier).set(effect);
+              Navigator.pop(ctx);
+            },
+          ),
+      ],
+    ),
+  );
 }
 
 void _showDefaultTaskViewDialog(BuildContext context, WidgetRef ref,

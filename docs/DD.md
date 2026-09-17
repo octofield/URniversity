@@ -406,14 +406,14 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 | Key | 型別 | 說明 |
 |---|---|---|
 | `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出（見下表）。**原生端勾選時會先改這份**，把該列的 `check` 標成 `checked` |
-| `widget_state` | JSON 字串 | **原生端寫入**（`WidgetData.writeState()`）：`mode`（`tasks` / `targets` / `goals` / `filterPicker`）/ `period`（`day` / `week` / `month`）/ `filter_id`（null＝不篩選）。使用者在小工具上的選擇，App 重開後沿用。Dart 不讀也不寫 |
+| `widget_state` | JSON 字串 | **原生端寫入**（`WidgetData.writeState()`）：`mode`（`tasks` / `targets` / `goals` / `filterPicker`）/ `period`（`all` / `day` / `week` / `month`）/ `filter_id`（null＝不篩選）。使用者在小工具上的選擇，App 重開後沿用。Dart 不讀也不寫 |
 | `widget_language` | text | 語言代碼（`zhTw` / `en` / `jp`）。**背景 isolate 需要它才能用正確語言重建 snapshot**——App 設定在訪客模式完全不持久化，雲端那份背景也未必讀得到 |
 
 `widget_snapshot` 的結構：
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
-| `views` | object | `tasks_day` / `tasks_week` / `tasks_month` / `targets` / `goals` / `filter_picker` → 各自的列陣列。**所有頁一次算好**，切換時原生端直接換 |
+| `views` | object | `tasks_all` / `tasks_day` / `tasks_week` / `tasks_month` / `targets` / `goals` / `filter_picker` → 各自的列陣列。**所有頁一次算好**，切換時原生端直接換 |
 | `views.*[]` | object | 一列：`title`、`subtitle`（無副標為 **JSON null**）、`color`（ARGB）、`check`（`none` / `unchecked` / `checked`）、`tap`、`check_action`、`header`、`filters` |
 | `views.*[].filters` | text[] | 只有任務列有內容：它連結的目標／願景**連同所有祖先**的 id。原生端篩選只比對「含不含選中的 id」 |
 | `empty` | object | `tasks` / `targets` / `goals` / `filter_picker` → 空清單文案 |
@@ -461,3 +461,36 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 - D2 `semester_goals.category`（單數欄名、JSON 字串陣列）與 D3 `future_goals.categories`
   （複數欄名、原生陣列）的存法不一致，是既有設計，非本次文件撰寫產生的錯誤——修改任一邊的
   序列化邏輯前，請先確認不會影響另一邊。
+
+---
+
+## D16. 裝置本機儲存 — `recent_picks`（任務表單的建議）
+
+媒介：SharedPreferences，存一段 **JSON 字串**。
+
+寫入處理程序：`RecentPicksNotifier`（`src/lib/providers/recent_picks_provider.dart`），
+由任務 sheet 送出與學期目標 sheet 送出時呼叫
+讀取處理程序：任務 sheet 的建議 chip
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `targets` | text[] | 最近用過的學期目標 id，**新的在最前面**、不重複、最多 8 筆。「用過」＝任務連結了它，或新增／編輯了該目標本身 |
+| `times` | text[] | 最近用過的截止時間，`HH:mm`，同樣新的在前、最多 8 筆 |
+
+**特別說明：**
+
+- **純粹是方便，不是資料**：只記 id 與時分，內容都在 D1／D2；整段刪掉只會少了建議。
+  因此**不上雲**，訪客模式一樣能用。
+- 目標可能已被刪除，所以讀取時會過濾掉查不到的 id（`resolveRecent()`），只顯示前 3 筆。
+- 時間套用到「今天」，**若該時刻已經過了就改成明天**（`suggestedDueDate()`）。
+
+---
+
+## D17. 裝置本機儲存 — `task_completion_effect`
+
+媒介：SharedPreferences，`String`（`off` / `basic` / `celebrate`，預設 `celebrate`）。
+
+寫入／讀取處理程序：`CompletionEffectNotifier`（`src/lib/providers/settings_provider.dart`）
+
+勾選任務時的動畫強度。與通知設定（D13）一樣是**這台裝置的體感設定**，不進 D8 `user_settings`，
+所以換裝置不會帶著走，也不需要動 Supabase 結構。

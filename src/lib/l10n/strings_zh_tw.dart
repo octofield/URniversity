@@ -149,6 +149,10 @@ class StringsZhTw implements AppStrings {
   @override String tasksWithCount(int count) => '任務（$count）';
   @override String completedTasksWithCount(int count) => '已完成的任務（$count）';
   @override String get noSemester => '未設定學期';
+  @override String get completionEffect => '完成任務的動畫';
+  @override String get effectOff => '關閉';
+  @override String get effectBasic => '基本';
+  @override String get effectCelebrate => '基本＋彩帶';
   @override String get delete => '刪除';
   @override String weekdayShort(int weekday) {
     const names = ['一', '二', '三', '四', '五', '六', '日'];

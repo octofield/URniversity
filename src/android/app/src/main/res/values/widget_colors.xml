@@ -4,6 +4,7 @@
      without any code deciding which to use. -->
 <resources>
     <color name="widget_background">#F8F4EF</color>
+    <color name="splash_background">#F8F4EF</color>
     <color name="widget_border">#DDD0C0</color>
     <color name="widget_text">#2A1E12</color>
     <color name="widget_accent">#A07850</color>

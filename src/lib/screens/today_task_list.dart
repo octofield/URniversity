@@ -248,10 +248,10 @@ class _TaskTile extends ConsumerWidget {
       minLeadingWidth: 0,
       horizontalTitleGap: AppSpacing.sm,
       titleAlignment: ListTileTitleAlignment.center,
-      leading: Checkbox(
-        visualDensity: VisualDensity.compact,
+      leading: TaskCheckbox(
         value: isCompleted,
-        onChanged: (_) => ref.read(tasksProvider.notifier).toggleOnDate(task.id, effectiveDate),
+        onToggle: () => ref.read(tasksProvider.notifier).toggleOnDate(task.id, effectiveDate),
+        isLastOutstanding: () => _isLastOutstanding(ref, effectiveDate),
       ),
       title: Text(
         task.title,

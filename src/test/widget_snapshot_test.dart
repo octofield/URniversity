@@ -104,12 +104,61 @@ void main() {
   test('every view is present, so the native side never waits for Dart', () {
     final keys = build().views.keys.toSet();
     expect(keys, {
+      'tasks_all',
       'tasks_day',
       'tasks_week',
       'tasks_month',
       'targets',
       'goals',
       'filter_picker',
+    });
+  });
+
+  group('the all-tasks view', () {
+    test('lists a task that has no due time and no recurrence at all', () {
+      // Every other period is built by walking days, so a task that never lands
+      // on one can only appear here
+      final snapshot = build(tasks: [task()]);
+      expect(view(snapshot, WidgetMode.tasks, WidgetPeriod.all), hasLength(1));
+      expect(view(snapshot, WidgetMode.tasks), isEmpty);
+      expect(view(snapshot, WidgetMode.tasks, WidgetPeriod.month), isEmpty);
+    });
+
+    test('a dateless task already ticked off is not listed', () {
+      // A task with no recurrence carries one flag, not a list of days
+      final rows = view(
+        build(tasks: [task(isCompleted: true)]),
+        WidgetMode.tasks,
+        WidgetPeriod.all,
+      );
+      expect(rows, isEmpty);
+    });
+
+    test('dated tasks come first, dateless ones after', () {
+      final rows = view(
+        build(tasks: [
+          task(id: 'none', title: 'Someday'),
+          task(id: 'dated', title: 'Friday', dueTime: DateTime(2026, 9, 18, 9, 0)),
+        ]),
+        WidgetMode.tasks,
+        WidgetPeriod.all,
+      );
+      expect(rows.map((r) => r.title), ['Friday', 'Someday']);
+    });
+
+    test('a dateless row has no subtitle and ticks off against today', () {
+      final row = view(build(tasks: [task()]), WidgetMode.tasks, WidgetPeriod.all).single;
+      expect(row.subtitle, isNull);
+      expect(row.checkAction, contains('date=2026-09-14'));
+    });
+
+    test('reaches further out than a month', () {
+      final rows = view(
+        build(tasks: [task(dueTime: DateTime(2026, 12, 24, 9, 0))]),
+        WidgetMode.tasks,
+        WidgetPeriod.all,
+      );
+      expect(rows, hasLength(1));
     });
   });
 

@@ -21,6 +21,7 @@ object WidgetData {
     const val MODE_TARGETS = "targets"
     const val MODE_GOALS = "goals"
     const val MODE_PICKER = "filterPicker"
+    const val PERIOD_ALL = "all"
     const val PERIOD_DAY = "day"
 
     const val CHECK_UNCHECKED = "unchecked"

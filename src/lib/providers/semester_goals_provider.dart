@@ -89,7 +89,8 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
     );
   }
 
-  void addGoal(
+  // Returns the new id so the caller can remember it as a recent pick
+  String addGoal(
     String title,
     String semester, {
     String? parentId,
@@ -114,6 +115,7 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
     );
     state = [...state, goal];
     upsert(goal);
+    return goal.id;
   }
 
   void updateGoal(
