@@ -98,6 +98,7 @@ class TaskWidgetProvider : HomeWidgetProvider() {
                 views.setViewVisibility(R.id.period_row, if (taskish) View.VISIBLE else View.GONE)
 
                 for ((viewId, period) in listOf(
+                    R.id.period_all to WidgetData.PERIOD_ALL,
                     R.id.period_day to "day",
                     R.id.period_week to "week",
                     R.id.period_month to "month",

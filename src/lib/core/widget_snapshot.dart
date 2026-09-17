@@ -15,7 +15,8 @@ import '../utils/semester_helpers.dart';
 // URIs and the snapshot keys share with Kotlin
 enum WidgetMode { tasks, targets, goals, filterPicker }
 
-enum WidgetPeriod { day, week, month }
+// `all` is first because it sits leftmost in the widget's period row
+enum WidgetPeriod { all, day, week, month }
 
 enum WidgetFilterKind { none, target, goal }
 
@@ -154,11 +155,19 @@ DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 // than a calendar week: on a widget, "what is coming up" beats "what Monday to
 // Sunday holds", which would show almost nothing on a Saturday
 DateTime _periodEnd(WidgetPeriod period, DateTime today) => switch (period) {
+      // "All" has no end; a year is how far ahead a recurring task is searched
+      // for its next outstanding day before it is treated as having none
+      WidgetPeriod.all => today.add(const Duration(days: 365)),
       WidgetPeriod.day => today,
       WidgetPeriod.week => today.add(const Duration(days: 6)),
       // Day 0 of next month is the last day of this one
       WidgetPeriod.month => DateTime(today.year, today.month + 1, 0),
     };
+
+// A task that carries neither a due time nor a recurrence never lands on a
+// day, so only the "all" view can show it
+bool _isUndated(Task task) =>
+    task.dueTime == null && (task.recurrence == null || task.recurrence!.isNone);
 
 int _colorForCategories(List<CategoryEntry> categories, List<String> cats) =>
     cats.isEmpty ? 0 : resolveCatColor(categories, cats.first).toARGB32();
@@ -191,47 +200,59 @@ List<WidgetRow> _taskRows(
 
   // One row per task, not one per occurrence: a daily task over a month would
   // otherwise fill the whole list by itself. The subtitle carries the soonest
-  // day it is still outstanding
-  final due = <String, DateTime>{};
-  final byId = <String, Task>{};
+  // day it is still outstanding; a task with no day at all carries none
+  final dated = <({Task task, DateTime day})>[];
+  final undated = <Task>[];
 
   for (final task in tasks) {
     if (task.parentTaskId != null) continue;
 
+    if (_isUndated(task)) {
+      // Matches the app's "all tasks" view, which hides one once it is ticked
+      // off for today
+      if (period == WidgetPeriod.all && !task.isCompletedOn(today)) {
+        undated.add(task);
+      }
+      continue;
+    }
+
     for (var day = today; !day.isAfter(end); day = day.add(const Duration(days: 1))) {
       if (!taskAppliesTo(task, day)) continue;
       if (task.isCompletedOn(day)) continue;
-      due[task.id] = day;
-      byId[task.id] = task;
+      dated.add((task: task, day: day));
       break;
     }
   }
 
-  final ordered = due.entries.toList()
-    ..sort((a, b) {
-      final byDay = a.value.compareTo(b.value);
-      if (byDay != 0) return byDay;
-      return byId[a.key]!.sortOrder.compareTo(byId[b.key]!.sortOrder);
-    });
+  dated.sort((a, b) {
+    final byDay = a.day.compareTo(b.day);
+    if (byDay != 0) return byDay;
+    return a.task.sortOrder.compareTo(b.task.sortOrder);
+  });
+  undated.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  WidgetRow rowFor(Task task, DateTime? day) {
+    final linkedCats = _taskCategories(task, semesterGoals, futureGoals);
+    return WidgetRow(
+      title: task.title,
+      subtitle: _taskSubtitle(task, day, today),
+      colorArgb: _colorForCategories(categories, linkedCats),
+      check: WidgetCheck.unchecked,
+      tapAction: WidgetAction.openItem(kind: 'task', id: task.id),
+      // A task with no day of its own is ticked off against today, the same
+      // day the app's own list would tick it off against
+      checkAction: WidgetAction.toggleDone(taskId: task.id, date: day ?? today),
+      filters: [
+        ..._withAncestors(task.linkedTargetId, targetParents),
+        ..._withAncestors(task.linkedGoalId, goalParents),
+      ],
+    );
+  }
 
   return [
-    for (final entry in ordered)
-      () {
-        final task = byId[entry.key]!;
-        final linkedCats = _taskCategories(task, semesterGoals, futureGoals);
-        return WidgetRow(
-          title: task.title,
-          subtitle: _taskSubtitle(task, entry.value, today),
-          colorArgb: _colorForCategories(categories, linkedCats),
-          check: WidgetCheck.unchecked,
-          tapAction: WidgetAction.openItem(kind: 'task', id: task.id),
-          checkAction: WidgetAction.toggleDone(taskId: task.id, date: entry.value),
-          filters: [
-            ..._withAncestors(task.linkedTargetId, targetParents),
-            ..._withAncestors(task.linkedGoalId, goalParents),
-          ],
-        );
-      }(),
+    for (final entry in dated) rowFor(entry.task, entry.day),
+    // Tasks with no date sit after the dated ones rather than at the top
+    for (final task in undated) rowFor(task, null),
   ];
 }
 
@@ -256,9 +277,9 @@ List<String> _taskCategories(
 
 // Null rather than an empty string when there is nothing to say, so the native
 // side hides the line and the title centres on its own
-String? _taskSubtitle(Task task, DateTime day, DateTime today) {
+String? _taskSubtitle(Task task, DateTime? day, DateTime today) {
   final parts = <String>[
-    if (day != today) '${day.month}/${day.day}',
+    if (day != null && day != today) '${day.month}/${day.day}',
     if (task.dueTime != null)
       '${task.dueTime!.hour.toString().padLeft(2, '0')}:'
           '${task.dueTime!.minute.toString().padLeft(2, '0')}',

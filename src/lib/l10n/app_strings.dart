@@ -165,6 +165,10 @@ abstract class AppStrings {
   String tasksWithCount(int count);
   String completedTasksWithCount(int count);
   String get noSemester;
+  String get completionEffect;
+  String get effectOff;
+  String get effectBasic;
+  String get effectCelebrate;
   String get delete;
   String weekdayShort(int weekday);
 

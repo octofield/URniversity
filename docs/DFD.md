@@ -400,3 +400,5 @@ flowchart LR
 | D13 | `notification_settings` | 裝置本機 SharedPreferences（每台裝置各自設定，不同步到雲端） |
 | D14 | `notification_action_log` | 裝置本機 SharedPreferences（背景 isolate 留給主 isolate 的交接資料，讀完即清空；通知與小工具共用） |
 | D15 | `HomeWidgetPreferences` | 裝置本機 SharedPreferences（`home_widget` 套件自己的檔案；小工具的 snapshot 與狀態，推導資料） |
+| D16 | `recent_picks` | 裝置本機 SharedPreferences（任務表單的建議：最近用過的目標與時間，推導自使用者操作） |
+| D17 | `task_completion_effect` | 裝置本機 SharedPreferences（完成動畫強度，每台裝置各自設定） |

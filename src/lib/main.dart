@@ -24,16 +24,52 @@ import 'providers/sync_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/setup_profile_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Paint first, connect second: the branded wait screen carries the app name,
+  // which the Android 12 splash API cannot draw, and it picks up exactly where
+  // the native splash leaves off
+  runApp(const _Bootstrap());
+}
+
+Future<void> _startUp() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
   await preloadGuestMode();
-  runApp(const ProviderScope(child: App()));
+}
+
+class _Bootstrap extends StatefulWidget {
+  const _Bootstrap();
+
+  @override
+  State<_Bootstrap> createState() => _BootstrapState();
+}
+
+class _BootstrapState extends State<_Bootstrap> {
+  // Held in state, not rebuilt: a FutureBuilder that re-ran this would
+  // initialize Supabase twice
+  late final Future<void> _ready = _startUp();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _ready,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: SplashScreen(),
+          );
+        }
+        return const ProviderScope(child: App());
+      },
+    );
+  }
 }
 
 // Lets the auth-link listener below show a message from outside any Scaffold,

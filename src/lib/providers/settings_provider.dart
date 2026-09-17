@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_strings.dart';
 import '../l10n/strings_zh_tw.dart';
 import '../l10n/strings_en.dart';
@@ -83,6 +84,49 @@ final defaultTaskViewProvider = StateProvider<int>((ref) => 0);
 // ── Day counter toggle ────────────────────────────────────────────────────────
 
 final showDayCounterProvider = StateProvider<bool>((ref) => true);
+
+// ── Task completion effect ────────────────────────────────────────────────────
+
+// How loudly ticking a task off is celebrated. Device-local like the
+// notification settings: it is about this device's feel, not account data
+enum TaskCompletionEffect { off, basic, celebrate }
+
+String completionEffectLabel(TaskCompletionEffect effect, AppStrings s) {
+  switch (effect) {
+    case TaskCompletionEffect.off:       return s.effectOff;
+    case TaskCompletionEffect.basic:     return s.effectBasic;
+    case TaskCompletionEffect.celebrate: return s.effectCelebrate;
+  }
+}
+
+class CompletionEffectNotifier extends StateNotifier<TaskCompletionEffect> {
+  CompletionEffectNotifier() : super(TaskCompletionEffect.celebrate) {
+    _restore();
+  }
+
+  static const prefsKey = 'task_completion_effect';
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(prefsKey);
+    if (stored == null) return;
+    state = TaskCompletionEffect.values
+        .where((e) => e.name == stored)
+        // A value this build does not know just falls back to the default
+        .firstOrNull ?? TaskCompletionEffect.celebrate;
+  }
+
+  Future<void> set(TaskCompletionEffect effect) async {
+    state = effect;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(prefsKey, effect.name);
+  }
+}
+
+final completionEffectProvider =
+    StateNotifierProvider<CompletionEffectNotifier, TaskCompletionEffect>(
+  (ref) => CompletionEffectNotifier(),
+);
 
 // ── Developer mode ────────────────────────────────────────────────────────────
 

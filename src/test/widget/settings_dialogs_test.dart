@@ -57,6 +57,20 @@ void main() {
     expect(c.read(defaultTaskViewProvider), 2);
   });
 
+  testWidgets('completion effect dialog applies the choice', (tester) async {
+    final c = await pumpScreen(tester, const SettingsScreen());
+    expect(c.read(completionEffectProvider), TaskCompletionEffect.celebrate);
+
+    await openSetting(tester, zh.completionEffect);
+    await tester.tap(find.descendant(
+      of: find.byType(SimpleDialog),
+      matching: find.text(zh.effectOff),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(c.read(completionEffectProvider), TaskCompletionEffect.off);
+  });
+
   testWidgets('semester settings dialog applies the choice', (tester) async {
     final c = await pumpScreen(tester, const SettingsScreen());
     await openSetting(tester, zh.semesterSettings);

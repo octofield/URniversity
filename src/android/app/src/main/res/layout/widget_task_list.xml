@@ -69,6 +69,11 @@
         android:gravity="center_vertical">
 
         <TextView
+            android:id="@+id/period_all"
+            style="@style/WidgetTabSmall"
+            android:text="@string/widget_period_all" />
+
+        <TextView
             android:id="@+id/period_day"
             style="@style/WidgetTabSmall"
             android:text="@string/widget_period_day" />

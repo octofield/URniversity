@@ -320,6 +320,29 @@ Widget _linkRow({
   );
 }
 
+// One-tap suggestions under a link row, from what this device picked lately
+// (core/recent_picks.dart). Aligned with the row's label, not its icon
+Widget _suggestionChips(BuildContext context, List<(String, VoidCallback)> items) {
+  if (items.isEmpty) return const SizedBox.shrink();
+  return Padding(
+    padding: const EdgeInsets.only(left: 40, bottom: 2),
+    child: Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: 2,
+      children: [
+        for (final (label, onTap) in items)
+          ActionChip(
+            label: Text(label, style: Theme.of(context).textTheme.bodySmall),
+            onPressed: onTap,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          ),
+      ],
+    ),
+  );
+}
+
 // ─── Add task sheet ───────────────────────────────────────────────────────────
 
 // Public so HomeScreen FAB can call it
@@ -355,6 +378,12 @@ void showTaskSheet(
         builder: (sheetCtx, setState) {
           final targets = ref.read(semesterGoalsProvider);
           final goals = ref.read(futureGoalsProvider);
+          final recent = ref.read(recentPicksProvider);
+          final targetSuggestions = resolveRecent(
+            recent.targetIds,
+            {for (final g in targets) g.id: g},
+            3,
+          ).where((g) => g.id != linkedTargetId).toList();
           final linkedTarget = linkedTargetId != null
               ? targets.where((g) => g.id == linkedTargetId).firstOrNull
               : null;
@@ -426,6 +455,10 @@ void showTaskSheet(
                   },
                   onClear: () => setState(() => dueTime = null),
                 ),
+                _suggestionChips(sheetCtx, [
+                  for (final clock in recent.times.take(3))
+                    (clock, () => setState(() => dueTime = suggestedDueDate(clock, DateTime.now()))),
+                ]),
                 const SizedBox(height: 2),
                 _linkRow(
                   icon: Icons.repeat,
@@ -456,6 +489,10 @@ void showTaskSheet(
                   ),
                   onClear: () => setState(() => linkedTargetId = null),
                 ),
+                _suggestionChips(sheetCtx, [
+                  for (final target in targetSuggestions)
+                    (target.title, () => setState(() => linkedTargetId = target.id)),
+                ]),
                 const SizedBox(height: 2),
                 _linkRow(
                   icon: Icons.stars_outlined,
@@ -545,6 +582,7 @@ void showTaskSheet(
                               linkedGoalId: linkedGoalId,
                             ),
                           );
+                      _rememberPicks(ref, linkedTargetId, dueTime);
                       Navigator.pop(sheetCtx);
                     },
                     child: Text(isEdit ? s.save : s.add),
@@ -585,7 +623,15 @@ void _submitTask(
         linkedGoalId: linkedGoalId,
         parentTaskId: parentTaskId,
       );
+  _rememberPicks(ref, linkedTargetId, dueTime);
   Navigator.pop(context);
+}
+
+// Only what was really used: an untouched link or time teaches nothing
+void _rememberPicks(WidgetRef ref, String? linkedTargetId, DateTime? dueTime) {
+  final notifier = ref.read(recentPicksProvider.notifier);
+  notifier.rememberTarget(linkedTargetId);
+  notifier.rememberTime(dueTime);
 }
 
 void showAddInspirationSheet(BuildContext context, WidgetRef ref) {

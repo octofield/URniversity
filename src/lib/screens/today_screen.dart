@@ -6,6 +6,7 @@ import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/recent_picks.dart';
 import '../core/ui_symbols.dart';
 import '../l10n/app_strings.dart';
 import '../models/future_goal.dart';
@@ -19,9 +20,11 @@ import '../providers/settings_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/categories_provider.dart';
+import '../providers/recent_picks_provider.dart';
 import '../providers/profile_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/completion_effect.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/drag_reorder.dart';
@@ -645,11 +648,10 @@ class _WeekTaskTile extends ConsumerWidget {
             SizedBox(
               width: 24,
               height: 24,
-              child: Checkbox(
+              child: TaskCheckbox(
                 value: isCompleted,
-                onChanged: (_) => ref.read(tasksProvider.notifier).toggleOnDate(task.id, date),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onToggle: () => ref.read(tasksProvider.notifier).toggleOnDate(task.id, date),
+                isLastOutstanding: () => _isLastOutstanding(ref, date),
               ),
             ),
             const SizedBox(width: 10),
@@ -711,6 +713,15 @@ class _WeekTaskTile extends ConsumerWidget {
     );
   }
 }
+
+// Whether this is the day's last task still outstanding — checked before the
+// tick is written, because afterwards there is nothing left to count
+bool _isLastOutstanding(WidgetRef ref, DateTime date) =>
+    ref
+        .read(tasksForDateProvider(DateTime(date.year, date.month, date.day)))
+        .where((t) => !t.isCompletedOn(date))
+        .length ==
+    1;
 
 class _SummaryCard extends ConsumerWidget {
   const _SummaryCard();
@@ -1183,11 +1194,20 @@ void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
   );
 }
 
-class _CompletedTasksSection extends ConsumerWidget {
+// Collapsed by default: finished work is worth keeping but not worth the room
+// the outstanding list needs. The state is per session, not stored
+class _CompletedTasksSection extends ConsumerStatefulWidget {
   const _CompletedTasksSection();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CompletedTasksSection> createState() => _CompletedTasksSectionState();
+}
+
+class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final date = ref.watch(dateProvider);
     final targetFilter = ref.watch(taskTargetFilterProvider);
@@ -1207,29 +1227,52 @@ class _CompletedTasksSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          s.completedTasksWithCount(completed.length),
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        HoverLift(
-          child: Container(
-            width: double.infinity,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
-            child: Column(
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Row(
               children: [
-                for (var i = 0; i < completed.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, indent: _taskTitleIndent),
-                  _TaskTile(task: completed[i]),
-                ],
+                Text(
+                  s.completedTasksWithCount(completed.length),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.expand_more, color: AppColors.textSecondary),
+                ),
               ],
             ),
           ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: !_expanded
+              ? const SizedBox(width: double.infinity)
+              : HoverLift(
+                  child: Container(
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      border: Border.all(color: AppColors.border, width: 1),
+                    ),
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < completed.length; i++) ...[
+                          if (i > 0) const Divider(height: 1, indent: _taskTitleIndent),
+                          _TaskTile(task: completed[i]),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
         ),
       ],
     );

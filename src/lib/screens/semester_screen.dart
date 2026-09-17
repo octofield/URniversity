@@ -709,6 +709,13 @@ class _SemGoalCardTile extends ConsumerWidget {
             .where((g) => g.id == goal.futureGoalId)
             .firstOrNull
         : null;
+    final visionC = linkedVision == null
+        ? AppColors.primary
+        : resolveCatColor(
+            cats,
+            linkedVision.categories.isNotEmpty
+                ? linkedVision.categories.first
+                : 'other');
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -782,8 +789,11 @@ class _SemGoalCardTile extends ConsumerWidget {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.stars,
-                                    size: 12, color: AppColors.primary),
+                                // The vision's own colour, not the goal's: the
+                                // two differing is what shows they are linked
+                                // rather than the same thing
+                                Icon(Icons.stars,
+                                    size: 12, color: visionC),
                                 const SizedBox(width: 2),
                                 Flexible(
                                   child: Text(
@@ -791,7 +801,7 @@ class _SemGoalCardTile extends ConsumerWidget {
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
-                                        ?.copyWith(color: AppColors.primary),
+                                        ?.copyWith(color: visionC),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),

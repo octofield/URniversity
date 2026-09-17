@@ -7,6 +7,7 @@
     <string name="widget_tab_tasks">任務</string>
     <string name="widget_tab_targets">目標</string>
     <string name="widget_tab_goals">願景</string>
+    <string name="widget_period_all">所有</string>
     <string name="widget_period_day">本日</string>
     <string name="widget_period_week">本週</string>
     <string name="widget_period_month">本月</string>
