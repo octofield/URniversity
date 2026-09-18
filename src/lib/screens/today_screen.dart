@@ -31,6 +31,7 @@ import '../widgets/drag_reorder.dart';
 import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
+import '../widgets/link_color_bar.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 

@@ -14,6 +14,7 @@ import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/link_color_bar.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
@@ -427,6 +428,15 @@ class _SemesterOverviewCard extends ConsumerWidget {
       total += children.length;
     }
 
+    // One pill per category, summing the goals that carry it
+    final byCat = <String, ({int done, int total})>{};
+    for (final r in rows) {
+      final cat = r.goal.categories.isNotEmpty ? r.goal.categories.first : 'other';
+      final prev = byCat[cat] ?? (done: 0, total: 0);
+      byCat[cat] = (done: prev.done + r.done, total: prev.total + r.total);
+    }
+    final progress = total > 0 ? done / total : 0.0;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -446,91 +456,84 @@ class _SemesterOverviewCard extends ConsumerWidget {
                   color: AppColors.textTertiary,
                 ))
           else ...[
-            if (total > 0) ...[
-              Row(
-                children: [
-                  SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: done / total),
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, _) => Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CircularProgressIndicator(
-                            value: value,
-                            strokeWidth: 6,
-                            strokeCap: StrokeCap.round,
-                            color: done == total
-                                ? AppColors.success
-                                : AppColors.primary,
-                            backgroundColor: AppColors.surfaceVariant,
-                          ),
-                          Center(
-                            child: Text(
-                              '${(value * 100).round()}%',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Text(s.goalProgress(done, total),
-                        style: Theme.of(context).textTheme.bodyMedium),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
-            for (final r in rows)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Column(
+            if (total > 0)
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Expanded(
-                          child: Text(r.goal.title,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
+                        Text(
+                          s.percentSuffix((value * 100).round()),
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: done == total ? AppColors.success : AppColors.primary,
+                              ),
                         ),
-                        if (r.total > 0)
-                          Text(s.goalProgress(r.done, r.total),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                color: AppColors.textSecondary,
-                              )),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            s.goalProgress(done, total),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                          ),
+                        ),
                       ],
                     ),
-                    if (r.total > 0) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                        child: LinearProgressIndicator(
-                          value: r.done / r.total,
-                          minHeight: 4,
-                          color: resolveCatColor(cats, r.goal.categories.isNotEmpty
-                              ? r.goal.categories.first
-                              : 'other'),
-                          backgroundColor: AppColors.surfaceVariant,
-                        ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      child: LinearProgressIndicator(
+                        value: value,
+                        minHeight: 6,
+                        color: done == total ? AppColors.success : AppColors.primary,
+                        backgroundColor: AppColors.surfaceVariant,
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                for (final entry in byCat.entries)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: resolveCatColor(cats, entry.key),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${entry.value.done}/${entry.value.total}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ],
         ],
       ),
@@ -728,10 +731,15 @@ class _SemGoalCardTile extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Category color bar; softer on child rows
-            Container(
+            // Category colour bar; softer on child rows. When the goal is
+            // linked to a vision the lower half carries that vision's colour,
+            // the same way a task row shows both of its links
+            LinkColorBar(
               width: goalCatBarWidth,
-              color: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
+              top: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
+              bottom: linkedVision == null
+                  ? null
+                  : visionC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
             ),
             Expanded(
               child: Padding(

@@ -387,35 +387,13 @@ class _TaskTile extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _linkColorBar(targetColor, goalColor),
+            LinkColorBar(top: targetColor, bottom: goalColor),
             Expanded(child: tile),
           ],
         ),
       ),
     );
   }
-}
-
-// Left edge color bar showing the category color of the task's linked
-// target/goal; split top/bottom when both are linked with different colors.
-Widget _linkColorBar(Color? top, Color? bottom) {
-  const width = 6.0;
-  // Always reserve the bar's width so linked and unlinked tiles stay aligned
-  if (top == null && bottom == null) return const SizedBox(width: width);
-  if (bottom == null) return Container(width: width, color: top);
-  if (top == null) return Container(width: width, color: bottom);
-  if (top.toARGB32() == bottom.toARGB32()) {
-    return Container(width: width, color: top);
-  }
-  return SizedBox(
-    width: width,
-    child: Column(
-      children: [
-        Expanded(child: Container(color: top)),
-        Expanded(child: Container(color: bottom)),
-      ],
-    ),
-  );
 }
 
 // ─── Date+time picker (clock style) ──────────────────────────────────────────

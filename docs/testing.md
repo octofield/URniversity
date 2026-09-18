@@ -15,7 +15,7 @@
 
 ## 現況說明
 
-本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，245 個案例，
+本專案目前**沒有自動化 CI 流程**，但**已有可執行的自動測試**（`src/test/`，269 個案例，
 `flutter test` 全綠）。`flutter create` 產生的預設計數器範例 `widget_test.dart` 已刪除。
 
 自動測試分兩層：**單元測試**涵蓋不依賴 Supabase／SharedPreferences 的純函式（§2.1）；
@@ -82,6 +82,7 @@
 | `test/widget_snapshot_test.dart` | 桌面小工具要顯示什麼（§3-M）：六份預算好的頁面、三個期間互不影響、day/week/month 的範圍與去重、任務列 `filters` 含祖先 id（含循環 parent 不卡死）、篩選挑選器的分組與排序、序列化（無副標為 null） |
 | `test/row_id_test.dart` | `newRowId()` 在**每個平台**都做得出 id、亂數後綴在 32 位元內。⚠️ 這份要**另外在 Chrome 跑一次**（`flutter test --platform chrome test/row_id_test.dart`）：網頁上 `<<` 只有 32 位元，`1 << 32` 會變成 0，VM 上的測試完全抓不到 |
 | `test/row_id_source_test.dart` | 防呆：`newRowId()` 的亂數上限必須是字面值 `0x100000000`，**原始碼裡不得再出現 `<< 32`**（比對前先去掉註解行）。VM 專用，因為 `1 << 32` 在 VM 上是對的，只有讀原始碼才擋得住這個回歸 |
+| `test/category_palette_test.dart` | 分類顏色盤：24 色不重複、內建六色仍排在最前且順序不變（既有分類不會因為擴充而改色） |
 | `test/recent_picks_test.dart` | 任務表單的建議（§3-A）：最近用過的排序與去重、上限、已刪除的目標不出現、`suggestedDueDate()` 未過→今天／已過→明天／跨月 |
 | `test/new_item_order_test.dart` | 新增置頂（§3-C）：任務／學期目標／願景新增後排在同層最上面；拖曳過的任務在之後新增時位置不變；子任務、子願景、不同學期只跟自己那一層比 |
 | `test/semester_grouped_picker_test.dart` | 連結選擇器（§3-C）：學期由早到晚、假期 token 夾在前後學期之間、未設定學期放最後、組內新的在上且子項縮排、父項在別學期時子項仍顯示、開啟位置（當前 → 之後最近 → 最晚） |
@@ -149,6 +150,8 @@
 | `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
 | `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
+| `test/widget/completion_effect_test.dart` | 完成動畫：勾選後放大**再回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放 |
+| `test/widget/link_color_bar_test.dart` | 色條：兩個連結顏色不同時上下分色、相同時合併、單一連結一色、沒有連結仍保留寬度 |
 | `test/widget/notification_reschedule_test.dart` | 「重新安排時間」會打開**該任務**的編輯 sheet；冷啟動時資料還沒到會等待而不是放棄 | —（新功能） |
 
 **可行的前提**：訪客模式下 `SyncedListNotifier.upsert()` 走完 `persistLocally()`

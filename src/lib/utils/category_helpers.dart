@@ -72,19 +72,41 @@ const List<IconData> categoryIconPresets = [
   Icons.cloud_outlined,
 ];
 
+// The colours a category can be given, by hue family. The first six are the
+// built-in category colours, so an existing category never changes colour just
+// because the list grew. Saturation is kept in the same warm range as those —
+// a screen full of these has to sit next to the linen background all day.
 const List<Color> categoryColorPresets = [
+  // Built-ins, in their original order
   AppColors.categoryExchange,
   AppColors.categoryIntern,
   AppColors.categoryCompetition,
   AppColors.categoryCert,
   AppColors.categoryPerformance,
   AppColors.categoryOther,
+  // Red / orange
   Color(0xFFE85D75),
-  Color(0xFF2E9E8E),
-  Color(0xFF6B5CA5),
+  Color(0xFFC0432F),
   Color(0xFFC4622D),
+  Color(0xFFE08A3C),
+  // Yellow / green
+  Color(0xFFD9A520),
+  Color(0xFF8C9A2B),
   Color(0xFF3D7A3D),
+  Color(0xFF2E9E8E),
+  // Cyan / blue
+  Color(0xFF2B8C8C),
   Color(0xFF3A6EA5),
+  Color(0xFF2F5C8F),
+  Color(0xFF5B8FC9),
+  // Purple / pink
+  Color(0xFF6B5CA5),
+  Color(0xFF8E6BB5),
+  Color(0xFFB05C9B),
+  Color(0xFFD98BA8),
+  // Neutrals
+  Color(0xFF8A7A66),
+  Color(0xFF5A5148),
 ];
 
 // Default color/icon used to seed a newly created category, and as a fallback

@@ -75,7 +75,11 @@ Future<void> _pickColor(BuildContext context, WidgetRef ref, CategoryEntry entry
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
+            // Capped and scrollable like the icon grid: 24 swatches overflow a
+            // plain Wrap on a short screen
+            Flexible(
+              child: SingleChildScrollView(
+                child: Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: [
@@ -97,7 +101,9 @@ Future<void> _pickColor(BuildContext context, WidgetRef ref, CategoryEntry entry
                       ),
                     ),
                   ),
-              ],
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             _HexColorField(

@@ -63,8 +63,10 @@ flutter_launcher_icons:
   android: true
   ios: true
   # Without an adaptive icon Android 8+ drops the square icon onto a white
-  # plate, which is the white ring around it on the home screen
-  adaptive_icon_background: "#F8F4EF"
+  # plate. The background layer is fully transparent and the foreground fills
+  # the mask, so what shows is the artwork and nothing else — at the cost of
+  # the corners, which the launcher's mask always clips
+  adaptive_icon_background: assets/icon/app_icon_background.png
   adaptive_icon_foreground: assets/icon/app_icon_foreground.png
   web:
     generate: true
