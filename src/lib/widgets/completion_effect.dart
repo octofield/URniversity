@@ -62,11 +62,18 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
   @override
   Widget build(BuildContext context) {
     return ScaleTransition(
-      // Overshoots and settles, so the tick reads as landing rather than just
-      // appearing
-      scale: Tween<double>(begin: 1, end: 1.35).animate(
-        CurvedAnimation(parent: _pop, curve: Curves.easeOutBack, reverseCurve: Curves.easeIn),
-      ),
+      // Out and back in one pass. A one-way tween left the box sitting at its
+      // enlarged size for good — the big square that stayed on screen
+      scale: _pop.drive(TweenSequence<double>([
+        TweenSequenceItem(
+          tween: Tween(begin: 1.0, end: 1.25).chain(CurveTween(curve: Curves.easeOut)),
+          weight: 40,
+        ),
+        TweenSequenceItem(
+          tween: Tween(begin: 1.25, end: 1.0).chain(CurveTween(curve: Curves.easeOutBack)),
+          weight: 60,
+        ),
+      ])),
       child: Checkbox(
         visualDensity: VisualDensity.compact,
         value: widget.value,
@@ -88,7 +95,13 @@ void showCompletionConfetti(BuildContext context) {
   entry = OverlayEntry(
     builder: (_) => Positioned.fill(
       child: IgnorePointer(
-        child: _ConfettiBurst(origin: origin, onDone: () => entry.remove()),
+        child: _ConfettiBurst(
+          origin: origin,
+          // The row it came from may be long gone by now
+          onDone: () {
+            if (entry.mounted) entry.remove();
+          },
+        ),
       ),
     ),
   );

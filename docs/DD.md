@@ -229,6 +229,7 @@
   literal `Icons.xxx`，Flutter 的圖示 tree-shaking 才不會把使用者選到的字型砍掉。
 - 內建分類（`exchange` / `intern` / `competition` / `certification` / `performance` / `other`）
   無法被使用者刪除（`isBuiltIn()` 擋掉），但可以被拖曳排序、改色、改圖示。
+  改色時可挑 `categoryColorPresets` 的 **24 個預設色**（依色系排列，前六個是內建分類原本的顏色，順序固定所以既有分類不會因為清單擴充而變色），也可以直接輸入 HEX。
 - **訪客模式沒有本機持久化**：`reset()` 會讓分類清單還原成僅剩內建分類（含其預設顏色/圖示），
   訪客新增或自訂的內容只存在記憶體中。
 
