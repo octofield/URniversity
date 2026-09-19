@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
+import '../services/notification_service.dart';
 import 'synced_list_notifier.dart';
-import 'future_goals_provider.dart';
 import 'semester_goals_provider.dart';
 import 'date_provider.dart';
 import 'settings_provider.dart';
@@ -25,77 +26,54 @@ class TasksNotifier extends SyncedListNotifier<Task> {
   @override
   String idOf(Task item) => item.id;
 
+  // Tasks are a flat list: the column survives from the subtask feature but
+  // nothing writes it, so no task waits on another to be merged first
   @override
-  String? parentIdOf(Task item) => item.parentTaskId;
+  String? parentIdOf(Task item) => null;
 
-  // tasks has no parent_task_id foreign key, so an orphaned subtask only needs
-  // re-attaching for consistency (see system_design.md UC6). The link columns do
-  // have real foreign keys with ON DELETE SET NULL, but that only fires while
-  // the task row exists — a task sitting in the trash keeps the id of a goal
-  // deleted after it, and restoring it would insert a dangling reference
+  // linked_target_id has a real foreign key with ON DELETE SET NULL, but that
+  // only fires while the task row exists — a task sitting in the trash keeps
+  // the id of a goal deleted after it, and restoring it would insert a dangling
+  // reference (see system_design.md UC6)
   @override
   Task sanitizeForRestore(Task item) {
-    final parentGone =
-        item.parentTaskId != null && !state.any((x) => x.id == item.parentTaskId);
     final targetGone = item.linkedTargetId != null &&
         !ref.read(semesterGoalsProvider).any((g) => g.id == item.linkedTargetId);
-    final goalGone = item.linkedGoalId != null &&
-        !ref.read(futureGoalsProvider).any((g) => g.id == item.linkedGoalId);
-    if (!parentGone && !targetGone && !goalGone) return item;
-    return item.copyWith(
-      parentTaskId: parentGone ? null : item.parentTaskId,
-      linkedTargetId: targetGone ? null : item.linkedTargetId,
-      linkedGoalId: goalGone ? null : item.linkedGoalId,
-    );
+    if (!targetGone) return item;
+    return item.copyWith(linkedTargetId: null);
   }
 
   void add(
     String title, {
     String? content,
-    int priority = 1,
     DateTime? dueTime,
     RecurrenceRule? recurrence,
     String? linkedTargetId,
-    String? linkedGoalId,
-    String? parentTaskId,
   }) {
-    // Newest first: one step before the smallest in its group, so a new task
-    // lands on top without moving anything the user has dragged
-    final minOrder = state
-        .where((t) => t.parentTaskId == parentTaskId)
-        .fold(0, (prev, t) => t.sortOrder < prev ? t.sortOrder : prev);
+    // Newest first: one step before the smallest there is, so a new task lands
+    // on top without moving anything the user has dragged
+    final minOrder =
+        state.fold(0, (prev, t) => t.sortOrder < prev ? t.sortOrder : prev);
     final task = Task(
       id: newRowId(),
       title: title,
       content: content,
       dueTime: dueTime,
-      priority: priority,
       createdAt: DateTime.now(),
       recurrence: recurrence,
       linkedTargetId: linkedTargetId,
-      linkedGoalId: linkedGoalId,
-      parentTaskId: parentTaskId,
       sortOrder: minOrder - 1000,
     );
     state = [...state, task];
     upsert(task);
   }
 
-  // Moves a task within its own group, or between top level and a parent.
-  // Subtasks are capped at one level: a task that has children can't become
-  // a subtask, and a subtask can't gain children
-  void reorderTask(String draggedId, String? newParentId, int newSortOrder) {
-    if (draggedId == newParentId) return;
+  // Moves a task within the list. There is no nesting: a drop is only ever a
+  // new position
+  void reorderTask(String draggedId, int newSortOrder) {
     final dragged = state.where((t) => t.id == draggedId).firstOrNull;
     if (dragged == null) return;
-    if (newParentId != null) {
-      // Can't nest under a subtask, and can't nest a task that has children
-      final newParent = state.where((t) => t.id == newParentId).firstOrNull;
-      if (newParent == null || newParent.parentTaskId != null) return;
-      if (state.any((t) => t.parentTaskId == draggedId)) return;
-    }
-    final updated =
-        dragged.copyWith(parentTaskId: newParentId, sortOrder: newSortOrder);
+    final updated = dragged.copyWith(sortOrder: newSortOrder);
     state = [for (final t in state) if (t.id == draggedId) updated else t];
     upsert(updated);
   }
@@ -109,6 +87,12 @@ class TasksNotifier extends SyncedListNotifier<Task> {
     final updated = task.toggledOn(date);
     state = [for (final t in state) if (t.id == id) updated else t];
     upsert(updated);
+
+    // The reminder stays on screen until the task is actually done, so this is
+    // where it comes down. Not awaited: the tick must not wait on the shade
+    if (updated.isCompletedOn(date)) {
+      unawaited(NotificationService.instance.cancelForTask(id));
+    }
   }
 
   void toggle(String id) => toggleOnDate(id, DateTime.now());
@@ -118,19 +102,13 @@ class TasksNotifier extends SyncedListNotifier<Task> {
     upsert(task);
   }
 
-  // Returns every task actually removed (the task plus its subtasks) so the
-  // caller can snapshot all of them to the trash — snapshotting only the root
-  // would leave the subtasks unrestorable
+  // Returns the removed task as a list so the caller can snapshot it to the
+  // trash the same way the goal providers do
   List<Task> remove(String id) {
-    final removed = state
-        .where((t) => t.id == id || t.parentTaskId == id)
-        .toList();
+    final removed = state.where((t) => t.id == id).toList();
     if (removed.isEmpty) return const [];
-    final removedIds = removed.map((t) => t.id).toSet();
-    state = state.where((t) => !removedIds.contains(t.id)).toList();
-    for (final t in removed) {
-      deleteRow(t.id);
-    }
+    state = state.where((t) => t.id != id).toList();
+    deleteRow(id);
     return removed;
   }
 
@@ -187,6 +165,44 @@ bool taskAppliesTo(Task task, DateTime date) {
   return _dateOnly(task.dueTime!) == _dateOnly(date);
 }
 
+// Which occurrence of a task is the one being looked at right now.
+//
+// A recurring task answers with today when the rule matches, otherwise with the
+// most recent day it did — so the monthly task created for the 20th is still
+// "this month's" on the 21st, and ticking it off there marks that occurrence
+// rather than an unrelated day. A rule that has not come round yet answers with
+// its first day instead. Non-recurring tasks answer with their due day.
+DateTime? currentOccurrence(Task task, DateTime now) {
+  final today = _dateOnly(now);
+  if (!_isRecurring(task)) {
+    return task.dueTime == null ? null : _dateOnly(task.dueTime!);
+  }
+
+  // A year each way: enough for every rule the app offers, and bounded so a
+  // task created long ago cannot turn this into a long walk
+  final createdDay = _dateOnly(task.createdAt);
+  for (var i = 0; i <= 366; i++) {
+    final day = today.subtract(Duration(days: i));
+    if (day.isBefore(createdDay)) break;
+    if (taskAppliesTo(task, day)) return day;
+  }
+  for (var i = 1; i <= 366; i++) {
+    final day = today.add(Duration(days: i));
+    if (taskAppliesTo(task, day)) return day;
+  }
+  return null;
+}
+
+// The day a row in the current view is about. The day and week views are about
+// the date being shown; the all-tasks view is about each task's own current
+// occurrence, which is what lets a finished monthly task drop out of the list
+// until the 20th comes round again
+final taskRowDateProvider = Provider.family<DateTime, Task>((ref, task) {
+  final selected = ref.watch(dateProvider);
+  if (ref.watch(taskViewProvider) != 0) return selected;
+  return currentOccurrence(task, ref.watch(effectiveNowProvider)) ?? selected;
+});
+
 // Manual drag order wins, with the automatic grouping above as the tiebreaker.
 // Tasks that have never been dragged all share sortOrder 0, so the automatic
 // order is what shows until the user actually reorders something
@@ -229,19 +245,11 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
 // because the home screen widget applies the same rule, and the widget's copy
 // would drift from the one the user sees in the app.
 
-// A task passes when it is linked to any selected target or goal. An empty
-// selection means "no filter", not "nothing matches"
-bool passesTaskFilter(Task t, Set<String> targetIds, Set<String> goalIds) {
-  if (targetIds.isEmpty && goalIds.isEmpty) return true;
-  if (targetIds.isNotEmpty &&
-      t.linkedTargetId != null &&
-      targetIds.contains(t.linkedTargetId)) {
-    return true;
-  }
-  if (goalIds.isNotEmpty && t.linkedGoalId != null && goalIds.contains(t.linkedGoalId)) {
-    return true;
-  }
-  return false;
+// A task passes when it is linked to any selected target. An empty selection
+// means "no filter", not "nothing matches"
+bool passesTaskFilter(Task t, Set<String> targetIds) {
+  if (targetIds.isEmpty) return true;
+  return t.linkedTargetId != null && targetIds.contains(t.linkedTargetId);
 }
 
 // Selecting a parent has to catch tasks linked to its children too, otherwise
@@ -261,23 +269,7 @@ Set<String> expandSemGoalIds(Set<String> selected, List<SemesterGoal> all) {
   return expanded;
 }
 
-Set<String> expandFutureGoalIds(Set<String> selected, List<FutureGoal> all) {
-  if (selected.isEmpty) return selected;
-  final expanded = Set<String>.from(selected);
-  void collect(String parentId) {
-    for (final g in all.where((g) => g.parentId == parentId)) {
-      if (expanded.add(g.id)) collect(g.id);
-    }
-  }
-
-  for (final id in List<String>.from(selected)) {
-    collect(id);
-  }
-  return expanded;
-}
-
 final taskTargetFilterProvider = StateProvider<Set<String>>((ref) => const {});
-final taskGoalFilterProvider = StateProvider<Set<String>>((ref) => const {});
 
 // Completion stats for a single day; null when no task applies that day
 // (distinct from 0%, which means tasks existed but none were done)

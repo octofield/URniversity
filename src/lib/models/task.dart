@@ -47,16 +47,19 @@ class Task {
   final String title;
   final String? content;
   final DateTime? dueTime;
-  final int priority; // 1 = low, 2 = medium, 3 = high
+  // Kept for the stored column, no longer read or written: priority was
+  // removed in 2026-09 (1 = low, 2 = medium, 3 = high)
+  final int priority;
   final bool isCompleted;
   final DateTime createdAt;
   final RecurrenceRule? recurrence;
   final String? linkedTargetId;
+  // Kept for the stored column, no longer read or written: a task links to a
+  // target, and the target to a vision
   final String? linkedGoalId;
-  // Parent task id; null = top-level. Subtasks are limited to one level,
-  // so a task with a parentTaskId can never itself be a parent
+  // Kept for the stored column, no longer read or written: subtasks are gone
   final String? parentTaskId;
-  // Manual ordering within one parentTaskId group; new tasks get max + 1000
+  // Manual ordering; new tasks get the smallest order minus 1000
   final int sortOrder;
   // Dates on which a recurring task was completed ("yyyy-MM-dd")
   final List<String> completedDates;

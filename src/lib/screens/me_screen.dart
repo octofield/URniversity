@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/avatars.dart';
+import '../providers/semester_goals_provider.dart';
+import '../providers/tasks_provider.dart';
+import '../core/me_stats.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
@@ -11,6 +14,7 @@ import '../models/inspiration.dart';
 import '../models/journal.dart';
 import '../models/user_profile.dart';
 import '../providers/auth_provider.dart';
+import '../providers/future_goals_provider.dart';
 import '../providers/guest_provider.dart';
 import '../providers/inspirations_provider.dart';
 import '../providers/journal_provider.dart';
@@ -21,6 +25,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
+import '../widgets/page_header.dart';
 import 'inspirations_screen.dart';
 import 'journal_edit_screen.dart';
 import 'journals_screen.dart';
@@ -41,38 +46,18 @@ class MeScreen extends ConsumerWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageHorizontal, AppSpacing.pageTop,
-            AppSpacing.pageHorizontal, 0,
-          ),
-          child: Row(
-            children: [
-              if (!isDesktop) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-              ],
-              Text(
-                s.me,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+        PageHeader(
+          title: s.me,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         Expanded(
           child: SingleChildScrollView(
@@ -116,6 +101,8 @@ class MeScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             const _ProfileCard(),
+                            const SizedBox(height: AppSpacing.sm),
+                            const _SummaryTiles(),
                           ],
                         ),
                       ),
@@ -125,6 +112,8 @@ class MeScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const _ProfileCard(),
+                      const SizedBox(height: AppSpacing.sm),
+                      const _SummaryTiles(),
                       const SizedBox(height: AppSpacing.lg),
                       _InspirationSection(),
                       const SizedBox(height: AppSpacing.lg),
@@ -153,6 +142,88 @@ class MeScreen extends ConsumerWidget {
 }
 
 // ─── Profile Card ─────────────────────────────────────────────────────────────
+
+// The three numbers from the redesign's B direction, kept in A's layout: what
+// the page is about at a glance, above the two lists it is made of.
+class _SummaryTiles extends ConsumerWidget {
+  const _SummaryTiles();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final today = DateUtils.dateOnly(ref.watch(effectiveNowProvider));
+    // What is still open, not what was ever created: a count that only grows
+    // says nothing about how the semester is going
+    final tasks = ref.watch(tasksProvider).where((t) => !t.isCompletedOn(today)).length;
+    final semester = ref.watch(selectedSemesterProvider);
+    final targets = ref
+        .watch(semesterGoalsProvider)
+        .where((g) => g.semester == semester && g.parentId == null && !g.isDone)
+        .length;
+    final visions = ref
+        .watch(futureGoalsProvider)
+        .where((g) => g.parentId == null && !g.isDone)
+        .length;
+    final inspirations = ref.watch(inspirationsProvider).where((i) => !i.isCompleted).length;
+
+    return Row(
+      children: [
+        _StatTile(label: s.tasks, value: tasks),
+        const SizedBox(width: AppSpacing.sm),
+        _StatTile(label: s.targets, value: targets),
+        const SizedBox(width: AppSpacing.sm),
+        _StatTile(label: s.goals, value: visions),
+        const SizedBox(width: AppSpacing.sm),
+        _StatTile(label: s.inspirations, value: inspirations),
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _StatTile({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm + 2,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '$value',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ProfileCard extends ConsumerWidget {
   const _ProfileCard();
@@ -604,6 +675,11 @@ class _JournalSection extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final journals = ref.watch(journalProvider);
     final showDay = ref.watch(showDayCounterProvider);
+    final streak = journalStreak(
+      journals,
+      ref.watch(effectiveNowProvider),
+      written: JournalNotifier.isWrittenByUser,
+    );
 
     // Journals are sorted desc; last entry is the earliest (Day 1)
     DateTime? earliest;
@@ -626,6 +702,10 @@ class _JournalSection extends ConsumerWidget {
           child: Row(
             children: [
               Text(s.journal, style: Theme.of(context).textTheme.titleLarge),
+              if (streak > 0) ...[
+                const SizedBox(width: AppSpacing.sm),
+                _StreakChip(days: streak),
+              ],
               const Spacer(),
               // Navigate to full journals page
               IconButton(
@@ -685,6 +765,40 @@ class _JournalSection extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// How many days in a row the user has written something themselves. Sits by
+// the journal because that is the only place it means anything
+class _StreakChip extends ConsumerWidget {
+  final int days;
+
+  const _StreakChip({required this.days});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_fire_department, size: 14, color: AppColors.primary),
+          const SizedBox(width: 2),
+          Text(
+            s.journalStreakDays(days),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }

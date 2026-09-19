@@ -11,47 +11,32 @@ class _DraggableTaskList extends ConsumerStatefulWidget {
 }
 
 class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
-  String? _draggingId;
   String? _hoveredId;
   DropZone _hoverZone = DropZone.before;
   final _rowCtxs = <String, BuildContext>{};
 
-  // Subtasks are capped at one level, so a row only accepts children when it is
-  // top-level and the dragged task has no children of its own
-  bool _canNestInto(Task row, String draggedId) {
-    if (row.parentTaskId != null) return false;
-    if (row.id == draggedId) return false;
-    return !ref.read(tasksProvider).any((t) => t.parentTaskId == draggedId);
-  }
-
   void _onAccept(String draggedId, Task row, List<Task> siblings, int index) {
     final notifier = ref.read(tasksProvider.notifier);
+    // The list is flat, so a drop only ever means "put it here"
     switch (_hoverZone) {
       case DropZone.before:
         final prev = index > 0 ? siblings[index - 1].sortOrder : null;
-        notifier.reorderTask(
-            draggedId, row.parentTaskId, orderBetween(prev, row.sortOrder));
+        notifier.reorderTask(draggedId, orderBetween(prev, row.sortOrder));
       case DropZone.after:
         final next =
             index < siblings.length - 1 ? siblings[index + 1].sortOrder : null;
-        notifier.reorderTask(
-            draggedId, row.parentTaskId, orderBetween(row.sortOrder, next));
+        notifier.reorderTask(draggedId, orderBetween(row.sortOrder, next));
       case DropZone.into:
-        final childOrders = ref
-            .read(tasksProvider)
-            .where((t) => t.parentTaskId == row.id)
-            .map((t) => t.sortOrder);
-        notifier.reorderTask(draggedId, row.id, orderAfterLast(childOrders));
+        // Nothing takes children any more; dropZoneFor is told so and never
+        // reports this zone
+        break;
     }
-    setState(() {
-      _draggingId = null;
-      _hoveredId = null;
-    });
+    setState(() => _hoveredId = null);
   }
 
-  Widget _buildRow(Task task, int depth, List<Task> siblings, int index) {
+  Widget _buildRow(Task task, List<Task> siblings, int index) {
     final isHovered = _hoveredId == task.id;
-    final tile = _TaskTile(task: task, depth: depth);
+    final tile = _TaskTile(task: task);
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) => details.data != task.id,
@@ -62,8 +47,8 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
         if (box == null) return;
         // details.offset is the pointer because the Draggable below uses
         // pointerDragAnchorStrategy
-        final zone = dropZoneFor(box, details.offset,
-            canNest: _canNestInto(task, details.data));
+        // Nothing nests any more, so a row is split into before/after only
+        final zone = dropZoneFor(box, details.offset, canNest: false);
         if (_hoveredId != task.id || _hoverZone != zone) {
           setState(() {
             _hoveredId = task.id;
@@ -83,11 +68,8 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
                 dragAnchorStrategy: pointerDragAnchorStrategy,
                 feedback: _dragFeedback(task),
                 childWhenDragging: Opacity(opacity: 0.3, child: tile),
-                onDragStarted: () => setState(() => _draggingId = task.id),
-                onDragEnd: (_) => setState(() {
-                  _draggingId = null;
-                  _hoveredId = null;
-                }),
+                onDragStarted: () {},
+                onDragEnd: (_) => setState(() => _hoveredId = null),
                 child: tile,
               )
             : LongPressDraggable<String>(
@@ -95,11 +77,8 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
                 dragAnchorStrategy: pointerDragAnchorStrategy,
                 feedback: _dragFeedback(task),
                 childWhenDragging: Opacity(opacity: 0.3, child: tile),
-                onDragStarted: () => setState(() => _draggingId = task.id),
-                onDragEnd: (_) => setState(() {
-                  _draggingId = null;
-                  _hoveredId = null;
-                }),
+                onDragStarted: () {},
+                onDragEnd: (_) => setState(() => _hoveredId = null),
                 child: tile,
               );
 
@@ -150,43 +129,13 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
   @override
   Widget build(BuildContext context) {
     final tasks = widget.tasks;
-    final topLevel = tasks.where((t) => t.parentTaskId == null).toList();
     final rows = <Widget>[];
 
-    for (var i = 0; i < topLevel.length; i++) {
-      final parent = topLevel[i];
+    for (var i = 0; i < tasks.length; i++) {
       if (rows.isNotEmpty) {
         rows.add(const Divider(height: 1, indent: _taskTitleIndent));
       }
-      rows.add(_buildRow(parent, 0, topLevel, i));
-
-      final children = tasks.where((t) => t.parentTaskId == parent.id).toList();
-      for (var j = 0; j < children.length; j++) {
-        rows.add(const Divider(height: 1, indent: _taskTitleIndent));
-        rows.add(_buildRow(children[j], 1, children, j));
-      }
-    }
-
-    // Tail drop zone: promotes a dragged subtask back to top level
-    if (_draggingId != null && topLevel.isNotEmpty) {
-      rows.add(
-        DragTarget<String>(
-          onAcceptWithDetails: (details) {
-            final lastOrder = topLevel.last.sortOrder;
-            ref.read(tasksProvider.notifier).reorderTask(details.data, null, lastOrder + 1000);
-            setState(() {
-              _draggingId = null;
-              _hoveredId = null;
-            });
-          },
-          builder: (_, candidate, _) => Container(
-            height: 40,
-            alignment: Alignment.center,
-            color: candidate.isNotEmpty ? AppColors.primaryLight : Colors.transparent,
-            child: const Icon(Icons.vertical_align_bottom, size: 16, color: AppColors.textTertiary),
-          ),
-        ),
-      );
+      rows.add(_buildRow(tasks[i], tasks, i));
     }
 
     return Column(children: rows);
@@ -195,59 +144,44 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
 
 class _TaskTile extends ConsumerWidget {
   final Task task;
-  final int depth;
-  const _TaskTile({required this.task, this.depth = 0});
+  const _TaskTile({required this.task});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final date = ref.watch(dateProvider);
-    final effectiveDate = DateTime(date.year, date.month, date.day);
+    // Not the selected date: in the all-tasks view each row is about its own
+    // occurrence, so a monthly task ticks off against the 20th, not today
+    final rowDate = ref.watch(taskRowDateProvider(task));
+    final effectiveDate = DateTime(rowDate.year, rowDate.month, rowDate.day);
     final isCompleted = task.isCompletedOn(effectiveDate);
     final targets = ref.watch(semesterGoalsProvider);
-    final goals = ref.watch(futureGoalsProvider);
     final cats = ref.watch(categoriesProvider);
 
     final linkedTarget = task.linkedTargetId != null
         ? targets.where((g) => g.id == task.linkedTargetId).firstOrNull
         : null;
-    final linkedGoal = task.linkedGoalId != null
-        ? goals.where((g) => g.id == task.linkedGoalId).firstOrNull
-        : null;
 
-    final targetColor = linkedTarget != null
-        ? resolveCatColor(
-            cats,
-            linkedTarget.categories.isNotEmpty ? linkedTarget.categories.first : 'other',
-          )
-        : null;
-    final goalColor = linkedGoal != null
-        ? resolveCatColor(
-            cats,
-            linkedGoal.categories.isNotEmpty ? linkedGoal.categories.first : 'other',
-          )
-        : null;
+    final targetColor = taskLinkColor(cats, linkedTarget);
 
     final hasSubtitle =
         task.content != null ||
         task.dueTime != null ||
         (task.recurrence != null && !task.recurrence!.isNone) ||
-        linkedTarget != null ||
-        linkedGoal != null;
+        linkedTarget != null;
 
     final tile = ListTile(
-      contentPadding: EdgeInsets.fromLTRB(
-        AppSpacing.sm + depth * 20.0,
-        AppSpacing.xs,
-        AppSpacing.sm,
-        AppSpacing.xs,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
       // Drop ListTile's 72dp two-line floor so the row hugs its content, and
       // center it so a link-less task doesn't sit high against the checkbox
       minTileHeight: 0,
       minLeadingWidth: 0,
       horizontalTitleGap: AppSpacing.sm,
-      titleAlignment: ListTileTitleAlignment.center,
+      // Top, not centre: a two-line title would otherwise push the tick box
+      // and the delete button away from the first line
+      titleAlignment: ListTileTitleAlignment.titleHeight,
       leading: TaskCheckbox(
         value: isCompleted,
         onToggle: () => ref.read(tasksProvider.notifier).toggleOnDate(task.id, effectiveDate),
@@ -259,6 +193,8 @@ class _TaskTile extends ConsumerWidget {
           decoration: isCompleted ? TextDecoration.lineThrough : null,
           color: isCompleted ? AppColors.textTertiary : null,
         ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: hasSubtitle
           ? Column(
@@ -327,36 +263,12 @@ class _TaskTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                if (linkedGoal != null)
-                  Text(
-                    '⭐ ${linkedGoal.title}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
               ],
             )
           : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (task.priority > 1)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              margin: const EdgeInsets.only(right: AppSpacing.xs),
-              decoration: BoxDecoration(
-                color: task.priority == 3 ? AppColors.errorLight : AppColors.warningLight,
-                borderRadius: BorderRadius.circular(AppRadius.xs),
-              ),
-              child: Text(
-                task.priority == 3 ? s.priorityHigh : s.priorityMed,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: task.priority == 3 ? AppColors.error : AppColors.warning,
-                ),
-              ),
-            ),
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 20),
             visualDensity: VisualDensity.compact,
@@ -381,16 +293,26 @@ class _TaskTile extends ConsumerWidget {
     // ListTile paints its ink splash on the nearest Material ancestor. The card
     // container and the drag-hover highlight are both DecoratedBoxes that would
     // otherwise sit in between and swallow the splash
+    // A Stack, not IntrinsicHeight + Row. ListTile measures its intrinsic
+    // height against the FULL width, so a title that wraps to two lines at the
+    // real width still reports one line's worth and the subtitle below it gets
+    // cut off. Letting the tile lay itself out and painting the bar over the
+    // left edge keeps the row as tall as its content
     return Material(
       type: MaterialType.transparency,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LinkColorBar(top: targetColor, bottom: goalColor),
-            Expanded(child: tile),
-          ],
-        ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: _linkBarWidth),
+            child: tile,
+          ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            child: LinkColorBar(top: targetColor),
+          ),
+        ],
       ),
     );
   }

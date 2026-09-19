@@ -20,15 +20,49 @@ Future<T?> showAppSheet<T>(
 
 // Shared body for every modal bottom sheet.
 //
-// Two things it fixes that every hand-rolled sheet got wrong:
+// Three things it fixes that every hand-rolled sheet got wrong:
 //  1. The drag handle sits OUTSIDE the scroll view. A scrollable child wins the
 //     vertical drag in the gesture arena, so a handle placed inside it can never
 //     dismiss the sheet once the content overflows.
 //  2. Bottom padding clears the keyboard AND the system navigation bar.
 //     viewInsets alone leaves the submit button under the Android nav bar.
-class SheetBody extends StatelessWidget {
+//  3. Pulling the CONTENT down closes the sheet. Because of (1) the handle was
+//     the only thing that could, and with the keyboard up the sheet covers the
+//     screen — the handle is a 36px strip at the very top, which is not where a
+//     thumb is. Dragging past the top of the scroll view now closes it.
+class SheetBody extends StatefulWidget {
   final Widget child;
   const SheetBody({super.key, required this.child});
+
+  @override
+  State<SheetBody> createState() => _SheetBodyState();
+}
+
+class _SheetBodyState extends State<SheetBody> {
+  // How far past the top the current drag has pulled
+  double _pulled = 0;
+
+  // Far enough that it cannot be a scroll that overshot
+  static const double _closeAfter = 90;
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification is ScrollStartNotification ||
+        notification is ScrollEndNotification) {
+      _pulled = 0;
+    } else if (notification is OverscrollNotification &&
+        notification.overscroll < 0 &&
+        notification.dragDetails != null) {
+      _pulled -= notification.overscroll;
+      if (_pulled >= _closeAfter) {
+        _pulled = 0;
+        // Let the keyboard go first, or it animates out over an empty screen
+        FocusScope.of(context).unfocus();
+        Navigator.of(context).maybePop();
+      }
+    }
+    // Never absorbed: the scroll view still needs its own notifications
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,14 +80,21 @@ class SheetBody extends StatelessWidget {
             child: SheetDragHandle(),
           ),
           Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                left: AppSpacing.pageHorizontal,
-                right: AppSpacing.pageHorizontal,
-                bottom:
-                    mq.viewInsets.bottom + mq.viewPadding.bottom + AppSpacing.lg,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onScroll,
+              child: SingleChildScrollView(
+                // Always scrollable, so a short sheet reports the pull down
+                // the same way a long one does
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  left: AppSpacing.pageHorizontal,
+                  right: AppSpacing.pageHorizontal,
+                  bottom: mq.viewInsets.bottom +
+                      mq.viewPadding.bottom +
+                      AppSpacing.lg,
+                ),
+                child: widget.child,
               ),
-              child: child,
             ),
           ),
         ],

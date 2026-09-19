@@ -20,6 +20,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
+import '../widgets/sheet_fields.dart';
 import 'future_goal_detail_screen.dart';
 
 class SemesterGoalDetailScreen extends ConsumerWidget {
@@ -46,7 +47,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
 
     final cats = ref.watch(categoriesProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
-    final primaryCat = goal.categories.isNotEmpty ? goal.categories.first : 'other';
+    final primaryCat = primaryCategoryOf(goal.categories);
     final catC = resolveCatColor(cats, primaryCat);
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
@@ -246,9 +247,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                 Icons.stars,
                 color: resolveCatColor(
                   cats,
-                  linkedGoal.categories.isNotEmpty
-                      ? linkedGoal.categories.first
-                      : FutureCategories.other,
+                  primaryCategoryOf(linkedGoal.categories),
                 ),
               ),
               title: Text(linkedGoal.title),
@@ -321,7 +320,7 @@ class _SemMilestoneTile extends ConsumerWidget {
     final children = allGoals.where((g) => g.parentId == milestone.id).toList();
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
-    final primaryCat = milestone.categories.isNotEmpty ? milestone.categories.first : 'other';
+    final primaryCat = primaryCategoryOf(milestone.categories);
     final catC = resolveCatColor(cats, primaryCat);
 
     return Column(
@@ -607,27 +606,46 @@ void _showGoalSelectorForTarget(BuildContext context, WidgetRef ref, String semG
 
 // ─── Sheet helpers ────────────────────────────────────────────────────────────
 
-Widget _categoryChipsMulti(
+// Which semester a target belongs to. A dialog rather than a dropdown so it
+// matches the other pickers in the sheet
+void _showSemesterPicker(
   BuildContext context,
   AppStrings s,
-  List<String> allCats,
-  Set<String> selected,
-  void Function(String) onToggle,
+  List<String> semesters,
+  SemesterSettings settings,
+  String current,
+  ValueChanged<String> onSelect,
 ) {
-  return Wrap(
-    spacing: AppSpacing.xs,
-    runSpacing: AppSpacing.xs,
-    children: [
-      for (final cat in allCats)
-        FilterChip(
-          label: Text(catLabel(cat, s)),
-          selected: selected.contains(cat),
-          onSelected: (_) => onToggle(cat),
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
+  showDialog(
+    context: context,
+    builder: (dlgCtx) => AlertDialog(
+      title: Text(s.semester),
+      content: SizedBox(
+        width: 400,
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final sem in semesters)
+              ListTile(
+                dense: true,
+                title: Text(formatSemester(sem, settings, s)),
+                selected: sem == current,
+                selectedColor: AppColors.primary,
+                onTap: () {
+                  onSelect(sem);
+                  Navigator.pop(dlgCtx);
+                },
+              ),
+          ],
         ),
-    ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+      ],
+    ),
   );
 }
 
@@ -737,7 +755,6 @@ void showSemesterGoalSheet(
   final titleCtrl = TextEditingController(text: existing?.title ?? '');
   final notesCtrl = TextEditingController(text: existing?.notes ?? '');
   final s = ref.read(stringsProvider);
-  final allCats = [for (final c in ref.read(categoriesProvider)) c.id];
   final settings = ref.read(semesterSettingsProvider);
   final semesters = generateSemesters(settings);
   var selectedCategories =
@@ -756,7 +773,8 @@ void showSemesterGoalSheet(
 
         void submit() {
           if (titleCtrl.text.trim().isEmpty) return;
-          final cats = selectedCategories.isEmpty ? ['other'] : selectedCategories.toList();
+          // No category is a valid answer; nothing is defaulted to "other"
+          final cats = selectedCategories.toList();
           final notifier = ref.read(semesterGoalsProvider.notifier);
           final notes = notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim();
           // Touching a goal counts as using it, so it shows up in the task
@@ -798,28 +816,18 @@ void showSemesterGoalSheet(
                 style: Theme.of(sheetCtx).textTheme.titleLarge,
               ),
               const SizedBox(height: AppSpacing.md),
-              TextField(
+              SheetTextField(
+                label: s.titleField,
                 controller: titleCtrl,
                 autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: s.titleField),
-                onSubmitted: (_) => submit(),
+                onSubmitted: submit,
               ),
               const SizedBox(height: AppSpacing.sm),
-              TextField(
+              // One short line at rest, growing to three
+              SheetTextField(
+                label: s.goalNotes,
                 controller: notesCtrl,
-                minLines: 1,
                 maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-                // One short line at rest, a little lower than the title field
-                decoration: InputDecoration(
-                  labelText: s.goalNotes,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.inputPadding,
-                    vertical: AppSpacing.sm,
-                  ),
-                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
@@ -829,12 +837,11 @@ void showSemesterGoalSheet(
                 ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
-              _categoryChipsMulti(
-                sheetCtx,
-                s,
-                allCats,
-                selectedCategories,
-                (cat) => setState(() {
+              SheetCategoryChips(
+                categories: ref.read(categoriesProvider),
+                selected: selectedCategories,
+                s: s,
+                onToggle: (cat) => setState(() {
                   if (selectedCategories.contains(cat)) {
                     selectedCategories.remove(cat);
                   } else {
@@ -844,16 +851,19 @@ void showSemesterGoalSheet(
               ),
               // Milestones inherit their parent's semester, so only top-level
               // goals get the picker
-              if (isEdit && isTopLevel) ...[
+              if (isTopLevel) ...[
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedSemester,
-                  decoration: InputDecoration(labelText: s.semester, isDense: true),
-                  items: [
-                    for (final sem in semesters)
-                      DropdownMenuItem(value: sem, child: Text(formatSemester(sem, settings, s))),
-                  ],
-                  onChanged: (v) => setState(() => selectedSemester = v ?? selectedSemester),
+                SheetPickerBox(
+                  label: s.semester,
+                  value: formatSemester(selectedSemester, settings, s),
+                  onTap: () => _showSemesterPicker(
+                    sheetCtx,
+                    s,
+                    semesters,
+                    settings,
+                    selectedSemester,
+                    (sem) => setState(() => selectedSemester = sem),
+                  ),
                 ),
               ],
               // Only top-level goals carry a vision link, in both modes
@@ -867,7 +877,7 @@ void showSemesterGoalSheet(
                       ? AppColors.primary
                       : resolveCatColor(
                           ref.read(categoriesProvider),
-                          linked.categories.isNotEmpty ? linked.categories.first : 'other'),
+                          primaryCategoryOf(linked.categories)),
                   () => _showFutureGoalSelectorForSheet(
                     context,
                     futureGoals,

@@ -111,17 +111,6 @@ void main() {
       expect(clean.title, 'Task', reason: 'other fields untouched');
     });
 
-    test('a task drops a vision link whose vision is gone', () {
-      final task = Task(
-        id: 't1', title: 'Task', createdAt: DateTime(2026, 8, 25),
-        linkedGoalId: 'deleted-vision',
-      );
-      expect(
-        container.read(tasksProvider.notifier).sanitizeForRestore(task).linkedGoalId,
-        isNull,
-      );
-    });
-
     test('a task with nothing dangling is returned untouched', () {
       final task = Task(id: 't1', title: 'Task', createdAt: DateTime(2026, 8, 25));
       final notifier = container.read(tasksProvider.notifier);

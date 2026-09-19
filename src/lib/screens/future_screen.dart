@@ -21,6 +21,8 @@ import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
+import '../widgets/page_header.dart';
+import '../widgets/sheet_fields.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
@@ -517,49 +519,29 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageHorizontal,
-            AppSpacing.pageTop,
-            AppSpacing.pageHorizontal,
-            AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              if (!isDesktop) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-              ],
-              Text(
-                s.goals,
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        PageHeader(
+          title: s.goals,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.hub_outlined),
+              tooltip: s.overview,
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OverviewGraphScreen()),
               ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.hub_outlined),
-                tooltip: s.overview,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const OverviewGraphScreen()),
-                ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
+        const SizedBox(height: AppSpacing.xs),
         // Mobile keeps the chip rows; desktop moves the filters into the sidebar
         if (!isDesktop) ...[
           Padding(
@@ -738,7 +720,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
     final progress = total > 0 ? done / total : 0.0;
-    final primaryCat = goal.categories.isNotEmpty ? goal.categories.first : FutureCategories.other;
+    final primaryCat = primaryCategoryOf(goal.categories);
     final catC = resolveCatColor(cats, primaryCat);
 
     return InkWell(
@@ -797,7 +779,8 @@ class _FutureGoalCardRow extends ConsumerWidget {
                               decoration: goal.isDone ? TextDecoration.lineThrough : null,
                               color: goal.isDone ? AppColors.textTertiary : null,
                             ),
-                            maxLines: 1,
+                            // Two lines like the goal card, for the same reason
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (goal.startSemester != null || goal.endSemester != null)
@@ -908,30 +891,6 @@ Widget _semesterDropdown({
   );
 }
 
-Widget _categoryChipsMulti(
-  BuildContext context,
-  AppStrings s,
-  List<String> allCats,
-  List<String> selected,
-  void Function(String) onToggle,
-) {
-  return Wrap(
-    spacing: AppSpacing.xs,
-    runSpacing: AppSpacing.xs,
-    children: [
-      for (final cat in allCats)
-        FilterChip(
-          label: Text(catLabel(cat, s)),
-          selected: selected.contains(cat),
-          onSelected: (_) => onToggle(cat),
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-        ),
-    ],
-  );
-}
-
 // One sheet for both modes: [existing] null means add, non-null means edit
 void showFutureGoalSheet(
   BuildContext context,
@@ -968,27 +927,17 @@ void showFutureGoalSheet(
               style: Theme.of(sheetCtx).textTheme.titleLarge,
             ),
             const SizedBox(height: AppSpacing.md),
-            TextField(
+            SheetTextField(
+              label: s.titleField,
               controller: titleCtrl,
               autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: s.titleField),
             ),
             const SizedBox(height: AppSpacing.sm),
-            TextField(
+            // One short line at rest, growing to three
+            SheetTextField(
+              label: s.goalNotes,
               controller: notesCtrl,
-              minLines: 1,
               maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              // One short line at rest, a little lower than the title field
-              decoration: InputDecoration(
-                labelText: s.goalNotes,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.inputPadding,
-                  vertical: AppSpacing.sm,
-                ),
-              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -998,12 +947,11 @@ void showFutureGoalSheet(
               ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.xs),
-            _categoryChipsMulti(
-              sheetCtx,
-              s,
-              [for (final c in cats) c.id],
-              selectedCategories,
-              (cat) => setState(() {
+            SheetCategoryChips(
+              categories: cats,
+              selected: selectedCategories.toSet(),
+              s: s,
+              onToggle: (cat) => setState(() {
                 if (selectedCategories.contains(cat)) {
                   selectedCategories.remove(cat);
                 } else {

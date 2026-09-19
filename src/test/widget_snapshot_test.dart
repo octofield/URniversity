@@ -178,16 +178,6 @@ void main() {
       expect(rows, isEmpty);
     });
 
-    test('a subtask does not get its own row', () {
-      final rows = view(
-          build(tasks: [
-            task(id: 'p', dueTime: DateTime(2026, 9, 14, 9, 0)),
-            task(id: 'c', parentTaskId: 'p', dueTime: DateTime(2026, 9, 14, 9, 0)),
-          ]),
-          WidgetMode.tasks);
-      expect(rows, hasLength(1));
-    });
-
     test('the three periods are computed together and do not bleed', () {
       final snapshot = build(tasks: [
         task(id: 'today', dueTime: DateTime(2026, 9, 14, 9, 0)),
@@ -285,16 +275,6 @@ void main() {
       expect(rows.single.filters, containsAll(['grandchild', 'child', 'g1']));
     });
 
-    test('vision links are included the same way', () {
-      final rows = view(
-          build(
-            tasks: [task(dueTime: DateTime(2026, 9, 14, 9, 0), linkedGoalId: 'sub')],
-            futureGoals: [vision(), vision(id: 'sub', parentId: 'v1')],
-          ),
-          WidgetMode.tasks);
-      expect(rows.single.filters, containsAll(['sub', 'v1']));
-    });
-
     test('an unlinked task counts under nothing', () {
       final rows = view(
           build(tasks: [task(dueTime: DateTime(2026, 9, 14, 9, 0))]), WidgetMode.tasks);
@@ -377,11 +357,9 @@ void main() {
       expect(rows, hasLength(1), reason: 'only the clear row remains');
     });
 
-    test('visions get their own section and are not grouped by semester', () {
+    test('visions are not offered: a task can only link to a target', () {
       final rows = view(build(futureGoals: [vision()]), WidgetMode.filterPicker);
-      final headers = rows.where((r) => r.isHeader).toList();
-      expect(headers, hasLength(1));
-      expect(headers.single.title, s.goals);
+      expect(rows.where((r) => r.title == 'Vision'), isEmpty);
     });
 
     test('picking a target produces a filter action carrying its id', () {

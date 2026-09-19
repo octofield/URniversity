@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:urniversity/core/avatars.dart';
 import 'package:urniversity/core/theme/app_colors.dart';
 import 'package:urniversity/models/future_goal.dart';
 import 'package:urniversity/utils/category_helpers.dart';
@@ -22,6 +24,13 @@ void main() {
       AppColors.categoryPerformance.toARGB32(),
       AppColors.categoryOther.toARGB32(),
     ]);
+  });
+
+  test('the avatar presets grew without moving the old ones', () {
+    // avatar_index is stored per user, so reordering swaps everyone's avatar
+    expect(AppAvatars.presets, hasLength(24));
+    expect(AppAvatars.presets.first.icon, Icons.auto_awesome);
+    expect(AppAvatars.presets[9].icon, Icons.rocket_launch);
   });
 
   test('every default category colour is pickable', () {

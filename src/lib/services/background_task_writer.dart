@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
+import '../core/notification_cancel.dart';
 import '../core/notification_constants.dart';
 import '../core/notification_payload.dart';
 import '../models/task.dart';
@@ -24,20 +26,26 @@ import '../models/task.dart';
 // Returns the error text when the write failed, null when it landed
 Future<String?> toggleTaskFromBackground(TaskNotificationPayload payload) async {
   String? error;
+  var nowDone = false;
   try {
     final prefs = await SharedPreferences.getInstance();
     // This engine has its own cache, built after the main isolate last wrote
     await prefs.reload();
 
     if (prefs.getBool('is_guest_mode') ?? false) {
-      await _toggleGuestTask(prefs, payload);
+      nowDone = await _toggleGuestTask(prefs, payload);
     } else {
-      await _toggleCloudTask(payload);
+      nowDone = await _toggleCloudTask(payload);
     }
   } catch (e) {
     error = e.toString();
     debugPrint('[background] task write failed: $e');
   }
+
+  // The reminder stands for work still to do, so it comes down the moment the
+  // work is done — whichever surface did it. Ticking the box back on leaves
+  // the shade alone; the next reschedule will put a reminder back
+  if (error == null && nowDone) await cancelShownReminder(payload.taskId);
 
   await recordBackgroundAction(
       NotificationActionRecord(taskId: payload.taskId, error: error));
@@ -45,7 +53,8 @@ Future<String?> toggleTaskFromBackground(TaskNotificationPayload payload) async 
 }
 
 // Guest data never reaches Supabase, so the local mirror is the real thing here
-Future<void> _toggleGuestTask(
+// Returns whether the task came out of it completed
+Future<bool> _toggleGuestTask(
     SharedPreferences prefs, TaskNotificationPayload payload) async {
   final raw = prefs.getString('guest_tasks');
   if (raw == null) throw StateError('no guest tasks stored');
@@ -57,11 +66,12 @@ Future<void> _toggleGuestTask(
   final updated = Task.fromJson(rows[index]).toggledOn(payload.date);
   rows[index] = updated.toJson();
   await prefs.setString('guest_tasks', jsonEncode(rows));
+  return updated.isCompletedOn(payload.date);
 }
 
 // Read-then-write rather than a blind update: toggling is a flip, and for a
 // recurring task it edits a list of dates that only the stored row knows
-Future<void> _toggleCloudTask(TaskNotificationPayload payload) async {
+Future<bool> _toggleCloudTask(TaskNotificationPayload payload) async {
   if (!await ensureBackgroundSupabase()) {
     throw StateError('no signed-in session in the background isolate');
   }
@@ -73,6 +83,28 @@ Future<void> _toggleCloudTask(TaskNotificationPayload payload) async {
 
   final updated = Task.fromJson(row).toggledOn(payload.date);
   await db.from('tasks').update(updated.toJson()).eq('id', payload.taskId);
+  return updated.isCompletedOn(payload.date);
+}
+
+// Takes the task's reminder off the screen from whichever isolate is running.
+// NotificationService is the app's own wrapper and initialises a great deal
+// more than this needs, so the plugin is used directly here
+Future<void> cancelShownReminder(String taskId) async {
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+    final shown = await plugin.getActiveNotifications();
+    for (final id in notificationIdsForTask(
+      [for (final n in shown) (id: n.id, payload: n.payload)],
+      taskId,
+    )) {
+      await plugin.cancel(id: id);
+    }
+  } catch (e) {
+    // Reading active notifications is unsupported on older Androids, and on
+    // every other platform there is no shade to clear. The reminder just stays
+    // until the user swipes it — never a reason to fail the write
+    debugPrint('[background] could not take down the reminder: $e');
+  }
 }
 
 // The key supabase_flutter persists the session under

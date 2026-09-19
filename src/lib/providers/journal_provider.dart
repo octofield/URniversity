@@ -34,6 +34,11 @@ class JournalNotifier extends SyncedListNotifier<Journal> {
 
   static const _kForgotToWrite = '好像忘記什麼了......';
 
+  // An entry the user actually wrote, as opposed to a day this provider
+  // back-filled. The streak on the me page counts only these
+  static bool isWrittenByUser(Journal j) =>
+      !j.id.startsWith('auto_') && j.content != _kForgotToWrite;
+
   Future<void> _fillMissingDays() async {
     if (state.isEmpty) return;
     final now = DateTime.now();

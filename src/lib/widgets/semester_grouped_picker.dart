@@ -258,3 +258,152 @@ class _SemesterGroupedPickerState extends State<_SemesterGroupedPicker> {
     );
   }
 }
+
+// The multi-select twin of the picker above: same grouping, same opening
+// position, but the rows are checkboxes and the dialog stays open while they
+// are ticked. Used for filtering a task list by target.
+class SemesterGroupedFilterDialog extends StatefulWidget {
+  final String title;
+  final String emptyLabel;
+  final String resetLabel;
+  final List<SemesterPickerItem> items;
+  final Set<String> selectedIds;
+  final String currentSemester;
+  final SemesterSettings settings;
+  final AppStrings s;
+  final void Function(String id, bool selected) onToggle;
+  final VoidCallback onReset;
+
+  const SemesterGroupedFilterDialog({
+    super.key,
+    required this.title,
+    required this.emptyLabel,
+    required this.resetLabel,
+    required this.items,
+    required this.selectedIds,
+    required this.currentSemester,
+    required this.settings,
+    required this.s,
+    required this.onToggle,
+    required this.onReset,
+  });
+
+  @override
+  State<SemesterGroupedFilterDialog> createState() => _SemesterGroupedFilterDialogState();
+}
+
+class _SemesterGroupedFilterDialogState extends State<SemesterGroupedFilterDialog> {
+  final _startKey = GlobalKey();
+  int? _filter;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollToStart();
+  }
+
+  void _scrollToStart() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _startKey.currentContext;
+      if (ctx != null) Scrollable.ensureVisible(ctx);
+    });
+  }
+
+  String _label(SemesterGroup group) => group.semester == null
+      ? widget.s.noSemester
+      : formatSemester(group.semester!, widget.settings, widget.s);
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = groupBySemester(widget.items);
+    final startIndex = startGroupIndex(groups, widget.currentSemester);
+    final visible = _filter == null ? [for (var i = 0; i < groups.length; i++) i] : [_filter!];
+
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SizedBox(
+        width: 400,
+        height: min(420, MediaQuery.of(context).size.height * 0.6),
+        child: groups.isEmpty
+            ? Center(
+                child: Text(widget.emptyLabel,
+                    style: const TextStyle(color: AppColors.textTertiary)),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ChoiceChip(
+                          label: Text(widget.s.catAll),
+                          selected: _filter == null,
+                          onSelected: (_) {
+                            setState(() => _filter = null);
+                            _scrollToStart();
+                          },
+                        ),
+                        for (var i = 0; i < groups.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(left: AppSpacing.xs),
+                            child: ChoiceChip(
+                              label: Text(_label(groups[i])),
+                              selected: _filter == i,
+                              onSelected: (_) => setState(() => _filter = i),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: AppSpacing.md),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final i in visible) ...[
+                            Padding(
+                              key: i == startIndex ? _startKey : null,
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.sm,
+                                AppSpacing.md,
+                                AppSpacing.xs,
+                              ),
+                              child: Text(
+                                _label(groups[i]),
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                            ),
+                            for (final row in groups[i].rows)
+                              CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.only(
+                                  left: AppSpacing.sm + row.depth * 20.0,
+                                  right: AppSpacing.md,
+                                ),
+                                value: widget.selectedIds.contains(row.item.id),
+                                title: Text(row.item.title),
+                                onChanged: (on) => widget.onToggle(row.item.id, on ?? false),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      actions: [
+        TextButton(onPressed: widget.onReset, child: Text(widget.resetLabel)),
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(MaterialLocalizations.of(context).okButtonLabel),
+        ),
+      ],
+    );
+  }
+}

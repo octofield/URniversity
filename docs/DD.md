@@ -38,7 +38,7 @@
 | `title` | text | ✓ | — | 任務標題 |
 | `content` | text | ✗ | `null` | 備註內容 |
 | `due_time` | timestamptz | ✗ | `null` | 截止時間；非循環任務靠此欄位判斷「屬於哪一天」 |
-| `priority` | int | ✓ | `1` | 1=低、2=中、3=高 |
+| `priority` | int | ✓ | `1` | **保留欄位，App 已不再讀寫**。原本是 1=低、2=中、3=高，2026-09-20 移除優先度功能後新增的任務一律寫預設值 `1`；欄位留著不動 |
 | `is_completed` | bool | ✓ | `false` | **僅供非循環任務使用**；循環任務的完成狀態改看 `completed_dates` |
 | `created_at` | timestamptz | ✓ | — | 建立時間；循環任務用來計算「哪些日期符合循環規則」的起算點 |
 | `recurrence_type` | text | ✗ | `null` | 列舉：`daily` / `weekly` / `monthly` / `everyNDays`；`null` 代表不循環 |
@@ -46,9 +46,9 @@
 | `recurrence_weekdays` | int[] | ✗ | `null` | 僅 `recurrence_type = weekly` 時有意義；ISO 星期（週一=1 … 週日=7），可複選。`null`／空陣列代表沿用舊行為「與建立日同一個星期幾」 |
 | `recurrence_month_days` | int[] | ✗ | `null` | 僅 `recurrence_type = monthly` 時有意義；日期 1–31，外加 **`32` 代表「該月最後一天」**（超出合法日數範圍的哨兵值，排序時自然落在最後）。`null`／空陣列代表沿用舊行為「與建立日同一個號數」 |
 | `linked_target_id` | text（**真實外鍵** → `semester_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | 連結的學期目標。目標被刪除時資料庫會自動清成 `null`——但只對**當下還存在**的任務列生效，回收桶裡的快照仍留著舊 id（見 §UC6 的還原處理） |
-| `linked_goal_id` | text（**真實外鍵** → `future_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | 連結的未來願景，同上 |
-| `parent_task_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 父任務；`null` 代表頂層任務。**限制一層**：有 `parent_task_id` 的任務不能再有自己的子任務 |
-| `sort_order` | int | ✓ | `0` | 同一層（同 `parent_task_id`）手動拖曳排序用；新增時取同層最小值 `−1000`（新的排最上面，可為負數） |
+| `linked_goal_id` | text（**真實外鍵** → `future_goals.id` `ON DELETE SET NULL`） | ✗ | `null` | **保留欄位，App 已不再讀寫**。原本是「任務直接連結未來願景」，2026-09 移除該功能後只保留 `任務 → 學期目標 → 未來願景` 一條路徑；欄位與外鍵留著不動，舊資料也不清除 |
+| `parent_task_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | **保留欄位，App 已不再讀寫**。原本是子任務的父任務 id，2026-09 移除子任務功能後新增的任務一律寫 `null`；欄位留著不動 |
+| `sort_order` | int | ✓ | `0` | 手動拖曳排序用；子任務移除後任務是單層清單，新增時取最小值 `−1000`（新的排最上面，可為負數） |
 | `completed_dates` | text（JSON 字串，`List<String>`） | ✗ | `null` | 僅循環任務使用；陣列內為 `"yyyy-MM-dd"` 字串，記錄哪些日期已完成 |
 
 **特別說明：**
@@ -68,7 +68,7 @@
 - ⚠️ **既有資料的 `sort_order` 全部是 `0`**。排序邏輯（`filteredTasksProvider`）刻意設計成
   「`sort_order` 優先，相同時退回原本的自動分組排序」，所以在使用者第一次拖曳之前，畫面順序
   與改版前完全一致，不會因為 migration 而重排。
-- ⚠️ 任務刪除**沒有回收桶快照**：`TasksNotifier.remove()` 直接硬刪（並連帶刪除子任務）。
+- ⚠️ 任務刪除**沒有回收桶快照**：`TasksNotifier.remove()` 直接硬刪該列（子任務移除後不再有連帶刪除）。
   `trash_provider.dart` 雖有 `addTask()`，但**全專案沒有任何地方呼叫它**，是未接線的死碼。
   這與 system_design.md UC6 的描述不符，屬既有落差，尚未處理。
 - 「一個任務屬於哪一天」的判斷邏輯集中在 `src/lib/providers/tasks_provider.dart` 的
@@ -91,7 +91,7 @@
 | `parent_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 子目標的父節點；`null` 代表頂層目標 |
 | `title` | text | ✓ | — | 目標標題 |
 | `semester` | text | ✓ | — | 學期字串，格式 `"{民國年}-{學期序}"`，例如 `"114-1"`；產生規則見 `semester_goals_provider.dart` 的 `currentSemester()` |
-| `category` | text（**JSON 字串**，內容是 `List<String>`） | ✓ | `'["other"]'` | ⚠️ **欄位名為單數，實際存的是分類「陣列」的 JSON 字串**（用 `jsonEncode`/`jsonDecode` 手動轉換），與 D3 `future_goals.categories` 的存法不同，修改時請特別留意，勿混用 |
+| `category` | text（**JSON 字串**，內容是 `List<String>`） | ✓ | `'[]'` | ⚠️ **欄位名為單數，實際存的是分類「陣列」的 JSON 字串**（用 `jsonEncode`/`jsonDecode` 手動轉換），與 D3 `future_goals.categories` 的存法不同，修改時請特別留意，勿混用。**空陣列＝沒有分類**（2026-09-20 起；在那之前空的會被寫成 `["other"]`），畫面用中性色顯示。舊的單一字串值（例如 `'intern'`）仍能讀，會被當成一個元素 |
 | `future_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景（跨層關聯，也是關聯圖頁面畫虛線箭頭的資料來源）。⚠️ 這是**真實的外鍵** `semester_goals_future_goal_id_fkey → future_goals(id) ON DELETE SET NULL`（不是邏輯關聯），指向不存在的願景會被資料庫拒絕。另外 **僅頂層目標（`parent_id IS NULL`）可有值**；`linkFutureGoal()` 會擋下對子目標的連結，`reparent()` 把目標拖成子目標時會清成 `null` |
 | `notes` | text | ✗ | `null` | 備註 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |
@@ -251,7 +251,7 @@
 | `department` | text | ✗ | `null` | 系所名稱 |
 | `grade` | int | ✗ | `null` | 設定當下的年級（1～7） |
 | `grade_set_year` | int | ✗ | `null` | 設定 `grade` 當下的學年度（民國年），用來讓年級隨學年自動推進，見 `settings_provider.dart` 的 `computedGrade()` |
-| `avatar_index` | int | ✗ | `null` | 內建頭像索引（對應 `AppAvatars.presets`）；`null` 代表改用 Google 大頭貼或姓名縮寫 |
+| `avatar_index` | int | ✗ | `null` | 內建頭像索引（對應 `AppAvatars.presets`，目前 **0–23**）；`null` 代表改用 Google 大頭貼或姓名縮寫。**presets 的順序即是這個索引的意義，既有項目不得調換或刪除**，只能往後追加 |
 
 ### 8-B App 設定欄位（`sync_provider.dart` 負責讀寫，`settings_provider.dart` 負責記憶體狀態）
 
@@ -484,6 +484,18 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
   因此**不上雲**，訪客模式一樣能用。
 - 目標可能已被刪除，所以讀取時會過濾掉查不到的 id（`resolveRecent()`），只顯示前 3 筆。
 - 時間套用到「今天」，**若該時刻已經過了就改成明天**（`suggestedDueDate()`）。
+
+---
+
+## D18. 裝置本機儲存 — `fab_pos_main` / `fab_pos_inspiration`（新增鈕的位置）
+
+媒介：SharedPreferences，`String`，格式 `"{x},{y}"`，兩個值都是 **0–1 的比例**。
+
+寫入／讀取處理程序：`FabPositionNotifier`（`src/lib/providers/fab_position_provider.dart`）
+
+兩顆浮動新增鈕（主鈕與靈感鈕）被拖到哪裡。存比例而不是像素：同一支手機轉向、平板與桌面視窗
+讀回同一個值都不會讓按鈕跑到畫面外；讀回來的值一律夾在 0–1 之間。預設值是
+`1,1`（右下）與 `0,1`（左下）。與 D13／D17 一樣是**這台裝置的體感設定**，不上雲。
 
 ---
 

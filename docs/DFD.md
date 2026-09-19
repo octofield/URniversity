@@ -127,8 +127,7 @@ flowchart TD
     User -- "新增/編輯/拖曳排序/刪除未來願景" --> PF
     PF <--> DF
 
-    PT -. "linked_target_id → semester_goals.id\nlinked_goal_id → future_goals.id" .-> DS
-    PT -. " " .-> DF
+    PT -. "linked_target_id → semester_goals.id" .-> DS
     PS -. "future_goal_id → future_goals.id" .-> DF
     PS -. "parent_id → 自身（子目標樹）" .-> DS
     PF -. "parent_id → 自身（子目標樹）" .-> DF
@@ -136,7 +135,8 @@ flowchart TD
 
 - 三張表彼此以「邏輯外鍵」（欄位存 ID 字串，資料庫層級**未**建立實體外鍵約束）串連，形成
   `任務 → 學期目標 → 未來願景` 的三層關聯，這也是 [關聯圖頁面](../src/lib/screens/overview_graph_screen.dart)
-  視覺化的資料來源。
+  視覺化的資料來源。任務**只**連學期目標：`tasks.linked_goal_id`（任務直接連願景）已於 2026-09 移除，
+  欄位保留但不再讀寫（見 DD.md D1）。
 - 刪除學期目標／未來願景時（`remove()`）會遞迴刪除所有子孫節點；刪除前會先呼叫
   `trash_provider` 的 `addSemesterGoal()` / `addFutureGoal()` 做「軟刪除」備份（見 Diagram 1-C）。
 - `reparent()` 會檢查 `isAncestor()` 避免把節點移到自己的子孫底下，形成循環。
@@ -402,3 +402,4 @@ flowchart LR
 | D15 | `HomeWidgetPreferences` | 裝置本機 SharedPreferences（`home_widget` 套件自己的檔案；小工具的 snapshot 與狀態，推導資料） |
 | D16 | `recent_picks` | 裝置本機 SharedPreferences（任務表單的建議：最近用過的目標與時間，推導自使用者操作） |
 | D17 | `task_completion_effect` | 裝置本機 SharedPreferences（完成動畫強度，每台裝置各自設定） |
+| D18 | `fab_pos_*` | 裝置本機 SharedPreferences（兩顆浮動新增鈕被拖到哪裡，存 0–1 的比例） |

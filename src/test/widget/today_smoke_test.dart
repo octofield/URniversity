@@ -8,6 +8,8 @@ import 'package:urniversity/providers/settings_provider.dart';
 import 'package:urniversity/providers/tasks_provider.dart';
 import 'package:urniversity/screens/today_screen.dart';
 
+import 'package:urniversity/widgets/sheet_fields.dart';
+
 import '../helpers/pump_app.dart';
 
 // today_screen.dart was split into three part files; showTaskSheet and
@@ -15,6 +17,13 @@ import '../helpers/pump_app.dart';
 // broken. Retires cases 30, 31, 33, 34 and 35 of
 // docs/test-plans/2026-08-23-known-issues.md. Case 32 (drag to reorder and to
 // nest) stays manual — the drop zones need real pointer geometry.
+// The sheets label their fields above the box now (SheetTextField), so the
+// label is a sibling of the TextField rather than its decoration
+Finder sheetField(String label) => find.descendant(
+      of: find.widgetWithText(SheetTextField, label),
+      matching: find.byType(TextField),
+    );
+
 void main() {
   const zh = StringsZhTw();
 
@@ -49,9 +58,9 @@ void main() {
       await openSheet(tester, c, (ctx, ref) => showTaskSheet(ctx, ref));
 
       await tester.enterText(
-          find.widgetWithText(TextField, zh.titleField), '寫測試');
+          sheetField(zh.titleField), '寫測試');
       await tester.enterText(
-          find.widgetWithText(TextField, zh.taskNotes), '備註');
+          sheetField(zh.taskNotes), '備註');
       await tester.tap(find.widgetWithText(FilledButton, zh.add));
       await tester.pumpAndSettle();
 
@@ -79,15 +88,26 @@ void main() {
       expect(find.text(zh.editTask), findsOneWidget);
 
       await tester.enterText(
-          find.widgetWithText(TextField, zh.titleField), '新標題');
+          sheetField(zh.titleField), '新標題');
       await tester.enterText(
-          find.widgetWithText(TextField, zh.taskNotes), '');
+          sheetField(zh.taskNotes), '');
       await tester.tap(find.widgetWithText(FilledButton, zh.save));
       await tester.pumpAndSettle();
 
       final updated = c.read(tasksProvider).single;
       expect(updated.title, '新標題');
       expect(updated.content, isNull);
+    });
+
+    // A task links to a target and the target to a vision; priority was cut
+    // for the same reason — one more field nobody filled in
+    testWidgets('offers neither a vision link nor a priority', (tester) async {
+      final c = testContainer();
+      await openSheet(tester, c, (ctx, ref) => showTaskSheet(ctx, ref));
+
+      expect(find.text(zh.linkedTarget), findsOneWidget);
+      expect(find.text(zh.linkedGoal), findsNothing);
+      expect(find.byType(SegmentedButton<int>), findsNothing);
     });
 
     testWidgets('links a target through the semester picker', (tester) async {
@@ -110,7 +130,7 @@ void main() {
       await tester.tap(find.text('舊目標'));
       await tester.pumpAndSettle();
       await tester.enterText(
-          find.widgetWithText(TextField, zh.titleField), '連結的任務');
+          sheetField(zh.titleField), '連結的任務');
       await tester.tap(find.widgetWithText(FilledButton, zh.add));
       await tester.pumpAndSettle();
 
@@ -124,7 +144,7 @@ void main() {
     await openSheet(tester, c, (ctx, ref) => showAddInspirationSheet(ctx, ref));
 
     await tester.enterText(
-        find.widgetWithText(TextField, zh.titleField), '一個點子');
+        sheetField(zh.titleField), '一個點子');
     await tester.tap(find.widgetWithText(FilledButton, zh.add));
     await tester.pumpAndSettle();
 

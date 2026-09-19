@@ -123,13 +123,12 @@ WidgetSnapshot buildWidgetSnapshot({
   required DateTime now,
 }) {
   final targetParents = {for (final g in semesterGoals) g.id: g.parentId};
-  final goalParents = {for (final g in futureGoals) g.id: g.parentId};
 
   return WidgetSnapshot(
     views: {
       for (final period in WidgetPeriod.values)
-        WidgetSnapshot.viewKey(WidgetMode.tasks, period): _taskRows(tasks,
-            semesterGoals, futureGoals, categories, targetParents, goalParents, period, now),
+        WidgetSnapshot.viewKey(WidgetMode.tasks, period): _taskRows(
+            tasks, semesterGoals, categories, targetParents, period, now),
       WidgetSnapshot.viewKey(WidgetMode.targets): _targetRows(semesterGoals, categories, s),
       WidgetSnapshot.viewKey(WidgetMode.goals): _goalRows(futureGoals, categories, s),
       WidgetSnapshot.viewKey(WidgetMode.filterPicker): _filterPickerRows(
@@ -188,10 +187,8 @@ List<String> _withAncestors(String? id, Map<String, String?> parents) {
 List<WidgetRow> _taskRows(
   List<Task> tasks,
   List<SemesterGoal> semesterGoals,
-  List<FutureGoal> futureGoals,
   List<CategoryEntry> categories,
   Map<String, String?> targetParents,
-  Map<String, String?> goalParents,
   WidgetPeriod period,
   DateTime now,
 ) {
@@ -205,8 +202,6 @@ List<WidgetRow> _taskRows(
   final undated = <Task>[];
 
   for (final task in tasks) {
-    if (task.parentTaskId != null) continue;
-
     if (_isUndated(task)) {
       // Matches the app's "all tasks" view, which hides one once it is ticked
       // off for today
@@ -232,7 +227,7 @@ List<WidgetRow> _taskRows(
   undated.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
   WidgetRow rowFor(Task task, DateTime? day) {
-    final linkedCats = _taskCategories(task, semesterGoals, futureGoals);
+    final linkedCats = _taskCategories(task, semesterGoals);
     return WidgetRow(
       title: task.title,
       subtitle: _taskSubtitle(task, day, today),
@@ -242,10 +237,7 @@ List<WidgetRow> _taskRows(
       // A task with no day of its own is ticked off against today, the same
       // day the app's own list would tick it off against
       checkAction: WidgetAction.toggleDone(taskId: task.id, date: day ?? today),
-      filters: [
-        ..._withAncestors(task.linkedTargetId, targetParents),
-        ..._withAncestors(task.linkedGoalId, goalParents),
-      ],
+      filters: _withAncestors(task.linkedTargetId, targetParents),
     );
   }
 
@@ -258,21 +250,10 @@ List<WidgetRow> _taskRows(
 
 // The colour comes from whatever the task is linked to, matching the colour bar
 // the task list already draws in the app
-List<String> _taskCategories(
-  Task task,
-  List<SemesterGoal> semesterGoals,
-  List<FutureGoal> futureGoals,
-) {
-  if (task.linkedTargetId != null) {
-    final target =
-        semesterGoals.where((g) => g.id == task.linkedTargetId).firstOrNull;
-    if (target != null) return target.categories;
-  }
-  if (task.linkedGoalId != null) {
-    final goal = futureGoals.where((g) => g.id == task.linkedGoalId).firstOrNull;
-    if (goal != null) return goal.categories;
-  }
-  return const [];
+List<String> _taskCategories(Task task, List<SemesterGoal> semesterGoals) {
+  if (task.linkedTargetId == null) return const [];
+  final target = semesterGoals.where((g) => g.id == task.linkedTargetId).firstOrNull;
+  return target?.categories ?? const [];
 }
 
 // Null rather than an empty string when there is nothing to say, so the native
@@ -379,19 +360,6 @@ List<WidgetRow> _filterPickerRows(
         title: goal.title,
         colorArgb: _colorForCategories(categories, goal.categories),
         tapAction: WidgetAction.setFilter(kind: WidgetFilterKind.target, id: goal.id),
-      ));
-    }
-  }
-
-  final topGoals = futureGoals.where((g) => g.parentId == null).toList()
-    ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-  if (topGoals.isNotEmpty) {
-    rows.add(WidgetRow(title: s.goals, isHeader: true));
-    for (final goal in topGoals) {
-      rows.add(WidgetRow(
-        title: goal.title,
-        colorArgb: _colorForCategories(categories, goal.categories),
-        tapAction: WidgetAction.setFilter(kind: WidgetFilterKind.goal, id: goal.id),
       ));
     }
   }

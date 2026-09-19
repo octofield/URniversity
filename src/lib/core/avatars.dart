@@ -8,6 +8,9 @@ class AvatarPreset {
 }
 
 class AppAvatars {
+  // The first ten keep their place for good: avatar_index is stored per user,
+  // so reordering them would change everyone's avatar. Later ones use the app's
+  // own category palette rather than Material's brighter defaults.
   static const List<AvatarPreset> presets = [
     AvatarPreset(color: Color(0xFF6366F1), icon: Icons.auto_awesome),
     AvatarPreset(color: Color(0xFF8B5CF6), icon: Icons.favorite_border),
@@ -19,6 +22,24 @@ class AppAvatars {
     AvatarPreset(color: Color(0xFFEC4899), icon: Icons.music_note),
     AvatarPreset(color: Color(0xFF0EA5E9), icon: Icons.explore),
     AvatarPreset(color: Color(0xFF84CC16), icon: Icons.rocket_launch),
+    // Study
+    AvatarPreset(color: AppColors.categoryExchange, icon: Icons.menu_book),
+    AvatarPreset(color: AppColors.categoryCert, icon: Icons.school),
+    AvatarPreset(color: AppColors.categoryIntern, icon: Icons.science),
+    AvatarPreset(color: AppColors.primary, icon: Icons.edit_note),
+    // Making things
+    AvatarPreset(color: AppColors.categoryCompetition, icon: Icons.brush),
+    AvatarPreset(color: AppColors.categoryPerformance, icon: Icons.camera_alt),
+    AvatarPreset(color: Color(0xFF6B5CA5), icon: Icons.code),
+    AvatarPreset(color: Color(0xFF2E9E8E), icon: Icons.piano),
+    // Out and about
+    AvatarPreset(color: Color(0xFF3A6EA5), icon: Icons.directions_run),
+    AvatarPreset(color: Color(0xFF2B8C8C), icon: Icons.sports_basketball),
+    AvatarPreset(color: Color(0xFFC4622D), icon: Icons.flight_takeoff),
+    AvatarPreset(color: Color(0xFF3D7A3D), icon: Icons.terrain),
+    // Comforts
+    AvatarPreset(color: Color(0xFFD98BA8), icon: Icons.local_cafe),
+    AvatarPreset(color: AppColors.categoryOther, icon: Icons.pets),
   ];
 
   static Widget build({
