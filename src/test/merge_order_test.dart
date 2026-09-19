@@ -57,19 +57,9 @@ void main() {
     });
   });
 
+  // Tasks have no parents of their own any more, so ordering them is only about
+  // keeping every row
   group('TasksNotifier.mergeOrder', () {
-    test('a parent task is ordered before its subtask', () {
-      final n = container.read(tasksProvider.notifier);
-      n.add('Parent');
-      final parentId = container.read(tasksProvider).single.id;
-      n.add('Subtask', parentTaskId: parentId);
-
-      final ordered = [for (final t in n.mergeOrder()) t.id];
-      final subId =
-          container.read(tasksProvider).firstWhere((t) => t.parentTaskId != null).id;
-      expect(indexOfId(ordered, parentId), lessThan(indexOfId(ordered, subId)));
-    });
-
     test('flat lists keep every task', () {
       final n = container.read(tasksProvider.notifier);
       n.add('One');

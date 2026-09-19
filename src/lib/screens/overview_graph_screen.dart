@@ -6,10 +6,14 @@ import '../core/theme/app_colors.dart';
 import '../core/ui_symbols.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../l10n/app_strings.dart';
+import '../models/category.dart';
 import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
+import '../models/task.dart';
 import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
+import '../providers/home_tab_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
@@ -39,9 +43,17 @@ class OverviewGraphScreen extends ConsumerStatefulWidget {
       _OverviewGraphScreenState();
 }
 
+// What the graph is showing. "All" is everything; the rest answer a question
+// the user came with — what am I doing this semester, what is still open, what
+// have I not connected to anything yet
+enum _GraphFilter { all, currentSemester, unfinished, unlinked }
+
 class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
     with SingleTickerProviderStateMixin {
   bool _radial = false;
+  _GraphFilter _filter = _GraphFilter.all;
+  // The node whose summary card is open; tapping the canvas closes it
+  String? _selectedId;
   late final AnimationController _particleCtrl =
       AnimationController(vsync: this, duration: const Duration(seconds: 3))
         ..repeat();
@@ -55,18 +67,40 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
-    final futures = ref.watch(futureGoalsProvider);
-    final semesters = ref.watch(semesterGoalsProvider);
+    final allFutures = ref.watch(futureGoalsProvider);
+    final allSemesters = ref.watch(semesterGoalsProvider);
     final tasks = ref.watch(tasksProvider);
+    final semSettings = ref.watch(semesterSettingsProvider);
+    final cats = ref.watch(categoriesProvider);
+
+    // The filter narrows the semester goals; a vision stays as long as one of
+    // the remaining goals still hangs off it, so the tree never loses its roots
+    final thisSemester = currentSemester(semSettings);
+    final semesters = switch (_filter) {
+      _GraphFilter.currentSemester =>
+        allSemesters.where((g) => g.semester == thisSemester).toList(),
+      _GraphFilter.unfinished => allSemesters.where((g) => !g.isDone).toList(),
+      _GraphFilter.unlinked => allSemesters
+          .where((g) => g.parentId == null && g.futureGoalId == null)
+          .toList(),
+      _GraphFilter.all => allSemesters,
+    };
+    final keptVisionIds = {for (final g in semesters) g.futureGoalId};
+    final futures = switch (_filter) {
+      _GraphFilter.all => allFutures,
+      _GraphFilter.unlinked => const <FutureGoal>[],
+      _GraphFilter.unfinished => allFutures
+          .where((g) => !g.isDone || keptVisionIds.contains(g.id))
+          .toList(),
+      _GraphFilter.currentSemester =>
+        allFutures.where((g) => keptVisionIds.contains(g.id)).toList(),
+    };
 
     // Linked task counts shown as node badges
     final taskCounts = <String, int>{};
     for (final t in tasks) {
       if (t.linkedTargetId != null) {
         taskCounts[t.linkedTargetId!] = (taskCounts[t.linkedTargetId!] ?? 0) + 1;
-      }
-      if (t.linkedGoalId != null) {
-        taskCounts[t.linkedGoalId!] = (taskCounts[t.linkedGoalId!] ?? 0) + 1;
       }
     }
 
@@ -130,7 +164,20 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
           ),
         ],
       ),
-      body: nodes.isEmpty
+      body: Column(
+        children: [
+          _FilterChips(
+            current: _filter,
+            s: s,
+            onSelect: (f) => setState(() {
+              _filter = f;
+              _selectedId = null;
+            }),
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                nodes.isEmpty
           ? EmptyState(icon: Icons.hub_outlined, message: s.overviewEmpty)
           : LayoutBuilder(
               builder: (context, constraints) {
@@ -210,6 +257,9 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
                               child: _NodeCard(
                                 node: node,
                                 taskCount: taskCounts[node.id] ?? 0,
+                                selected: node.id == _selectedId,
+                                onTap: () => setState(() => _selectedId =
+                                    node.id == _selectedId ? null : node.id),
                               ),
                             ),
                         ],
@@ -219,6 +269,373 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
                 );
               },
             ),
+                if (nodes.isNotEmpty)
+                  Positioned(
+                    right: AppSpacing.md,
+                    top: AppSpacing.md,
+                    child: _Legend(s: s),
+                  ),
+              ],
+            ),
+          ),
+          if (_selectedId != null)
+            _SummaryCard(
+              key: ValueKey(_selectedId),
+              nodeId: _selectedId!,
+              futures: allFutures,
+              semesters: allSemesters,
+              tasks: tasks,
+              cats: cats,
+              settings: semSettings,
+              s: s,
+              onClose: () => setState(() => _selectedId = null),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Which slice of the graph to draw
+class _FilterChips extends StatelessWidget {
+  final _GraphFilter current;
+  final AppStrings s;
+  final ValueChanged<_GraphFilter> onSelect;
+
+  const _FilterChips({
+    required this.current,
+    required this.s,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = {
+      _GraphFilter.all: s.catAll,
+      _GraphFilter.currentSemester: s.backToCurrentSem,
+      _GraphFilter.unfinished: s.graphFilterUnfinished,
+      _GraphFilter.unlinked: s.unlinked,
+    };
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.pageHorizontal,
+        vertical: AppSpacing.xs,
+      ),
+      child: Row(
+        children: [
+          for (final entry in labels.entries) ...[
+            ChoiceChip(
+              label: Text(entry.value),
+              selected: current == entry.key,
+              onSelected: (_) => onSelect(entry.key),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// What the shapes on the canvas mean. Small enough to leave on screen: the
+// first question about this page was always "what is the number for?"
+class _Legend extends StatelessWidget {
+  final AppStrings s;
+
+  const _Legend({required this.s});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.textSecondary,
+        );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            s.graphLegend,
+            style: style?.copyWith(
+                fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(s.goals, style: style),
+              const SizedBox(width: 10),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: AppColors.border),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(s.targets, style: style),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(s.graphLegendTaskCount, style: style),
+          Text(s.graphLegendDimmed, style: style),
+        ],
+      ),
+    );
+  }
+}
+
+// What a tapped node actually amounts to: how far along it is, what hangs off
+// it, and when the next thing is due. Tapping a node used to leave the page
+// immediately, which made the graph something you passed through
+class _SummaryCard extends ConsumerWidget {
+  final String nodeId;
+  final List<FutureGoal> futures;
+  final List<SemesterGoal> semesters;
+  final List<Task> tasks;
+  final List<CategoryEntry> cats;
+  final SemesterSettings settings;
+  final AppStrings s;
+  final VoidCallback onClose;
+
+  const _SummaryCard({
+    super.key,
+    required this.nodeId,
+    required this.futures,
+    required this.semesters,
+    required this.tasks,
+    required this.cats,
+    required this.settings,
+    required this.s,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vision = futures.where((g) => g.id == nodeId).firstOrNull;
+    final target = semesters.where((g) => g.id == nodeId).firstOrNull;
+    if (vision == null && target == null) return const SizedBox.shrink();
+
+    final isVision = vision != null;
+    final title = isVision ? vision.title : target!.title;
+    final colour = resolveCatColor(
+        cats, primaryCategoryOf(isVision ? vision.categories : target!.categories));
+
+    // Children: sub-visions under a vision, milestones under a target
+    final children = isVision
+        ? futures.where((g) => g.parentId == nodeId).length
+        : semesters.where((g) => g.parentId == nodeId).length;
+    final childrenDone = isVision
+        ? futures.where((g) => g.parentId == nodeId && g.isDone).length
+        : semesters.where((g) => g.parentId == nodeId && g.isDone).length;
+
+    // Tasks hang off targets only; a vision counts the tasks of every target
+    // linked to it
+    final targetIds = isVision
+        ? semesters.where((g) => g.futureGoalId == nodeId).map((g) => g.id).toSet()
+        : {nodeId};
+    final linked = tasks.where((t) => targetIds.contains(t.linkedTargetId)).toList();
+    final open = linked.where((t) => !t.isCompleted).toList();
+    final nextDue = open
+        .where((t) => t.dueTime != null)
+        .map((t) => t.dueTime!)
+        .fold<DateTime?>(null, (soonest, due) =>
+            soonest == null || due.isBefore(soonest) ? due : soonest);
+
+    final parentVision = !isVision && target!.futureGoalId != null
+        ? futures.where((g) => g.id == target.futureGoalId).firstOrNull
+        : null;
+    final subtitle = [
+      if (!isVision) formatSemester(target!.semester, settings, s),
+      if (parentVision != null) '$kArrow ${parentVision.title}',
+    ].join(kDotSeparator);
+
+    final progress = children == 0 ? null : childrenDone / children;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0,
+          AppSpacing.pageHorizontal, AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colour,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle.isNotEmpty)
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              if (progress != null)
+                Text(
+                  s.percentSuffix((progress * 100).round()),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                visualDensity: VisualDensity.compact,
+                onPressed: onClose,
+              ),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                color: colour,
+                backgroundColor: AppColors.surfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              _MiniStat(
+                label: isVision ? s.targets : s.milestones,
+                value: children == 0
+                    ? kEmptyValue
+                    : s.goalProgress(childrenDone, children),
+              ),
+              _MiniStat(label: s.tasks, value: '${open.length}'),
+              _MiniStat(
+                label: s.graphNextDue,
+                value: nextDue == null
+                    ? kEmptyValue
+                    : '${nextDue.month}/${nextDue.day}',
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => isVision
+                          ? FutureGoalDetailScreen(goalId: nodeId)
+                          : SemesterGoalDetailScreen(goalId: nodeId),
+                    ),
+                  ),
+                  child: Text(s.graphOpen),
+                ),
+              ),
+              if (open.isNotEmpty) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // Land on the task list already filtered to this branch
+                      ref.read(taskTargetFilterProvider.notifier).state =
+                          targetIds.whereType<String>().toSet();
+                      ref.read(pendingTabProvider.notifier).state = 0;
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    },
+                    child: Text(s.graphViewTasks(open.length)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MiniStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -665,8 +1082,15 @@ class _EdgePainter extends CustomPainter {
 class _NodeCard extends ConsumerWidget {
   final _GraphNode node;
   final int taskCount;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _NodeCard({required this.node, required this.taskCount});
+  const _NodeCard({
+    required this.node,
+    required this.taskCount,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -699,23 +1123,18 @@ class _NodeCard extends ConsumerWidget {
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.md),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => node.isFuture
-                    ? FutureGoalDetailScreen(goalId: node.id)
-                    : SemesterGoalDetailScreen(goalId: node.id),
-              ),
-            ),
+            onTap: onTap,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(
-                  color: node.isFuture
-                      ? catC.withValues(alpha: 0.7)
-                      : AppColors.border,
-                  width: node.isFuture ? 1.5 : 1,
+                  color: selected
+                      ? AppColors.primary
+                      : node.isFuture
+                          ? catC.withValues(alpha: 0.7)
+                          : AppColors.border,
+                  width: selected ? 2 : (node.isFuture ? 1.5 : 1),
                 ),
               ),
               child: Row(

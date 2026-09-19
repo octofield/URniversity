@@ -116,20 +116,7 @@ void main() {
   });
 
   group('tasks', () {
-    // Tasks nest one level deep only, so remove() matches direct children
-    test('removing a task returns its subtasks too', () {
-      final notifier = c.read(tasksProvider.notifier);
-      notifier.add('parent');
-      final parent = c.read(tasksProvider).single.id;
-      notifier.add('sub', parentTaskId: parent);
-
-      final removed = notifier.remove(parent);
-
-      expect(removed, hasLength(2));
-      expect(c.read(tasksProvider), isEmpty);
-    });
-
-    test('removing a childless task returns only itself', () {
+    test('removing a task returns only itself', () {
       final notifier = c.read(tasksProvider.notifier);
       notifier.add('alone');
       final id = c.read(tasksProvider).single.id;

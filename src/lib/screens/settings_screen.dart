@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
+import '../core/app_version.dart';
 import '../l10n/app_strings.dart';
 import '../providers/guest_provider.dart';
 import '../providers/profile_provider.dart';
@@ -122,7 +123,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             behavior: HitTestBehavior.opaque,
             child: ListTile(
               title: Text(s.versionLabel),
-              subtitle: const Text('alpha-1.0'),
+              subtitle: const Text(kAppVersion),
               trailing: dev.enabled
                   ? const Icon(Icons.code, color: AppColors.primary)
                   : null,

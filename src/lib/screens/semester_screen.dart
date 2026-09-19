@@ -18,6 +18,8 @@ import '../widgets/link_color_bar.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
+import '../widgets/page_header.dart';
+import '../widgets/swipe_switcher.dart';
 import 'overview_graph_screen.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
@@ -58,6 +60,15 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
   DropZone _hoverZone = DropZone.before;
   final _rowCtxs = <String, BuildContext>{};
 
+  // One semester further along the list, for the swipe on the card list. The
+  // strip above follows through its own listener
+  void _stepSemester(int delta) {
+    final semesters = generateSemesters(ref.read(semesterSettingsProvider));
+    final index = semesters.indexOf(ref.read(selectedSemesterProvider)) + delta;
+    if (index < 0 || index >= semesters.length) return;
+    ref.read(selectedSemesterProvider.notifier).state = semesters[index];
+  }
+
   Widget _endGapZone(List<_SemGroup> groups) {
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => _draggingId != null,
@@ -71,22 +82,22 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
       builder: (ctx, candidates, _) {
         final hovered = candidates.isNotEmpty;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: hovered ? 36 : 8,
-          decoration: hovered
-              ? BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(color: AppColors.primary, width: 1.5),
-                )
-              : null,
-        );
-      },
-    );
-  }
+            duration: const Duration(milliseconds: 150),
+            height: hovered ? 36 : 8,
+            decoration: hovered
+                ? BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(color: AppColors.primary, width: 1.5),
+                  )
+                : null,
+          );
+        },
+      );
+    }
 
-  Widget _feedbackCard(SemesterGoal goal) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    Widget _feedbackCard(SemesterGoal goal) {
+      final screenWidth = MediaQuery.of(context).size.width;
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -319,49 +330,29 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageHorizontal,
-            AppSpacing.pageTop,
-            AppSpacing.pageHorizontal,
-            AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              if (!isDesktop) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-              ],
-              Text(s.targets,
-                  style:
-                      Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  )),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.hub_outlined),
-                tooltip: s.overview,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const OverviewGraphScreen()),
-                ),
+        PageHeader(
+          title: s.targets,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.hub_outlined),
+              tooltip: s.overview,
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OverviewGraphScreen()),
               ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+        const SizedBox(height: AppSpacing.xs),
         const _SemesterPicker(),
         const SizedBox(height: AppSpacing.sm),
         Expanded(
@@ -382,7 +373,11 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
                     ),
                   ],
                 )
-              : goalsList,
+              : SwipeSwitcher(
+                  onNext: () => _stepSemester(1),
+                  onPrevious: () => _stepSemester(-1),
+                  child: goalsList,
+                ),
         ),
       ],
     );
@@ -429,9 +424,9 @@ class _SemesterOverviewCard extends ConsumerWidget {
     }
 
     // One pill per category, summing the goals that carry it
-    final byCat = <String, ({int done, int total})>{};
+    final byCat = <String?, ({int done, int total})>{};
     for (final r in rows) {
-      final cat = r.goal.categories.isNotEmpty ? r.goal.categories.first : 'other';
+      final cat = primaryCategoryOf(r.goal.categories);
       final prev = byCat[cat] ?? (done: 0, total: 0);
       byCat[cat] = (done: prev.done + r.done, total: prev.total + r.total);
     }
@@ -623,6 +618,14 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
     final settings = ref.watch(semesterSettingsProvider);
     _semesters = generateSemesters(settings);
     final selected = ref.watch(selectedSemesterProvider);
+    // The card list below can be swiped too, so the strip follows whatever
+    // picked the semester rather than only its own page changes
+    ref.listen<String>(selectedSemesterProvider, (_, next) {
+      final idx = _semesters.indexOf(next);
+      if (idx < 0 || !_ctrl.hasClients || _ctrl.page?.round() == idx) return;
+      _ctrl.animateToPage(idx,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    });
     final curSem = currentSemester(settings);
     final s = ref.watch(stringsProvider);
     final isOnCurrentSem = selected == curSem;
@@ -650,18 +653,26 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 150),
-                        style: TextStyle(
-                          fontSize: isSelected ? 17 : 13,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textTertiary,
+                      // Flexible: a page is a fraction of the strip's width, and
+                      // a long semester name plus the caret overran it
+                      Flexible(
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 150),
+                          style: TextStyle(
+                            fontSize: isSelected ? 17 : 13,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textTertiary,
+                          ),
+                          child: Text(
+                            formatSemester(sem, settings, s),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        child: Text(formatSemester(sem, settings, s)),
                       ),
                       if (isSelected)
                         const Icon(Icons.arrow_drop_down,
@@ -704,7 +715,7 @@ class _SemGoalCardTile extends ConsumerWidget {
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
     final primaryCat =
-        goal.categories.isNotEmpty ? goal.categories.first : 'other';
+        primaryCategoryOf(goal.categories);
     final catC = resolveCatColor(cats, primaryCat);
     final linkedVision = goal.futureGoalId != null
         ? ref
@@ -716,9 +727,7 @@ class _SemGoalCardTile extends ConsumerWidget {
         ? AppColors.primary
         : resolveCatColor(
             cats,
-            linkedVision.categories.isNotEmpty
-                ? linkedVision.categories.first
-                : 'other');
+            primaryCategoryOf(linkedVision.categories));
 
     return InkWell(
       onTap: () => Navigator.push(
@@ -789,9 +798,9 @@ class _SemGoalCardTile extends ConsumerWidget {
                                 color:
                                     goal.isDone ? AppColors.textTertiary : null,
                               ),
-                              // Clamped like the vision card so a long title
-                              // can't make rows different heights
-                              maxLines: 1,
+                              // Two lines, then an ellipsis: cutting every
+                              // long title at one line hid what they were
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis),
                           if (linkedVision != null)
                             Row(

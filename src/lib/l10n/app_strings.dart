@@ -13,12 +13,7 @@ abstract class AppStrings {
   String get tasks;
   String get noTasks;
   String get addTask;
-  String get addSubtask;
   String get taskNotes;
-  String get priority;
-  String get priorityLow;
-  String get priorityMed;
-  String get priorityHigh;
   String get dueTime;
 
   // Task linking & recurrence
@@ -132,9 +127,26 @@ abstract class AppStrings {
   String get historyDaily;
   String get historyWeekly;
   String get historyMonthly;
-  String historyAverage(int percent);
   String get historyNoData;
   String get historyTapHint;
+  String get historyAverageLabel;
+  String historyVsPrevious(String delta);
+  String get historyStreak;
+  String get historyStreakSub;
+  String get historyCompletedTasks;
+  String get historyBestWeekday;
+  String get historyByCategory;
+  String historyCategoryBehind(String name, int left);
+  String get historyStale;
+  String historyOverdue(int days);
+  String get historyNothingStale;
+  String get graphLegend;
+  String get graphLegendTaskCount;
+  String get graphLegendDimmed;
+  String get graphFilterUnfinished;
+  String get graphOpen;
+  String graphViewTasks(int count);
+  String get graphNextDue;
 
   // Semester system settings
   String get semesterSettings;
@@ -165,6 +177,7 @@ abstract class AppStrings {
   String tasksWithCount(int count);
   String completedTasksWithCount(int count);
   String get noSemester;
+  String journalStreakDays(int days);
   String get completionEffect;
   String get effectOff;
   String get effectBasic;

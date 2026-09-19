@@ -6,6 +6,7 @@ import 'core/config.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/date_provider.dart';
 import 'providers/guest_provider.dart';
 import 'providers/future_goals_provider.dart';
 import 'providers/home_widget_provider.dart';
@@ -81,12 +82,43 @@ final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 // a context below the Navigator rather than App's own
 final _navigatorKey = GlobalKey<NavigatorState>();
 
-class App extends ConsumerWidget {
+class App extends ConsumerStatefulWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<App> createState() => _AppState();
+}
+
+class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+    // Being away for hours is the other way the day changes under the app; the
+    // midnight timer only covers the case where it stayed open
+    if (lifecycle == AppLifecycleState.resumed) {
+      ref.read(effectiveNowProvider.notifier).refresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(syncProvider);
+
+    // When the day rolls over, the date being shown follows it — unless the
+    // user has browsed to some other day, which rollOverTo() leaves alone
+    ref.listen<DateTime>(effectiveNowProvider,
+        (_, now) => ref.read(dateProvider.notifier).rollOverTo(now));
     ref.watch(authLinkWatcherProvider);
     // Keeps the device's pending reminders in step with the task and goal data
     ref.watch(notificationSyncProvider);

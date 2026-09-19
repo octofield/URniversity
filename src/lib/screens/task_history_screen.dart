@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/history_stats.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
+import '../l10n/app_strings.dart';
+import '../models/category.dart';
+import '../models/semester_goal.dart';
 import '../models/task.dart';
+import '../providers/categories_provider.dart';
+import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../utils/category_helpers.dart';
 import '../widgets/responsive_body.dart';
 
 // One point on the history chart. rate is null when no task applied that
@@ -99,12 +106,34 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
         : _Period(label, done / total, done, total);
   }
 
+  // How many days the current range covers, counting back from today. Used for
+  // the "vs the period before" line, which needs the same length twice
+  int get _windowDays => switch (_range) {
+        1 => 12 * 7,
+        2 => 183,
+        _ => 30,
+      };
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final now = ref.watch(effectiveNowProvider);
     final today = DateTime(now.year, now.month, now.day);
     final periods = _buildPeriods(today);
+    final tasks = ref.watch(tasksProvider);
+    final targets = ref.watch(semesterGoalsProvider);
+    final cats = ref.watch(categoriesProvider);
+
+    final windowStart = today.subtract(Duration(days: _windowDays - 1));
+    final previousEnd = windowStart.subtract(const Duration(days: 1));
+    final previousStart = previousEnd.subtract(Duration(days: _windowDays - 1));
+    final thisRate = rateBetween(tasks, windowStart, today);
+    final lastRate = rateBetween(tasks, previousStart, previousEnd);
+    final totals = totalsBetween(tasks, windowStart, today);
+    final streak = allDoneStreak(tasks, today);
+    final best = bestWeekday(tasks, windowStart, today);
+    final categories = categoryTotals(tasks, targets, windowStart, today);
+    final stale = stalestTasks(tasks, today);
 
     final withData = periods.where((p) => p.rate != null).toList();
     final avgPercent = withData.isEmpty
@@ -146,9 +175,15 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                 }),
               ),
               const SizedBox(height: AppSpacing.md),
-              if (avgPercent != null)
-                Text(s.historyAverage(avgPercent),
-                    style: Theme.of(context).textTheme.titleMedium),
+              _SummaryHead(
+                percent: avgPercent,
+                thisRate: thisRate,
+                lastRate: lastRate,
+                streak: streak,
+                completed: totals.done,
+                best: best,
+                s: s,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Container(
                 width: double.infinity,
@@ -191,9 +226,352 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                   ],
                 ),
               ),
+              if (categories.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _CategoryBreakdown(rows: categories, cats: cats, s: s),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              _StaleTasks(rows: stale, targets: targets, cats: cats, s: s),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// The card above the chart: where this period stands, and three numbers the
+// chart cannot show — the run of clear days, how much got done, and which
+// weekday goes best
+class _SummaryHead extends StatelessWidget {
+  final int? percent;
+  final double? thisRate;
+  final double? lastRate;
+  final int streak;
+  final int completed;
+  final ({int weekday, double rate})? best;
+  final AppStrings s;
+
+  const _SummaryHead({
+    required this.percent,
+    required this.thisRate,
+    required this.lastRate,
+    required this.streak,
+    required this.completed,
+    required this.best,
+    required this.s,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final delta = (thisRate != null && lastRate != null)
+        ? ((thisRate! - lastRate!) * 100).round()
+        : null;
+
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                percent == null ? kEmptyValue : s.percentSuffix(percent!),
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        s.historyAverageLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                      if (delta != null)
+                        Text(
+                          s.historyVsPrevious(
+                              '${delta >= 0 ? '+' : ''}${s.percentSuffix(delta)}'),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: delta >= 0 ? AppColors.success : AppColors.warning,
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Divider(height: 1),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Stat(
+                label: s.historyStreak,
+                value: '$streak',
+                sub: s.historyStreakSub,
+              ),
+              _Stat(
+                label: s.historyCompletedTasks,
+                value: '$completed',
+                sub: '',
+              ),
+              _Stat(
+                label: s.historyBestWeekday,
+                value: best == null ? kEmptyValue : s.weekdayShort(best!.weekday),
+                sub: best == null
+                    ? ''
+                    : s.percentSuffix((best!.rate * 100).round()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Which categories are keeping up and which are not. The order is "most left
+// undone first", so the line underneath always names the top row
+class _CategoryBreakdown extends StatelessWidget {
+  final List<({String category, int done, int total})> rows;
+  final List<CategoryEntry> cats;
+  final AppStrings s;
+
+  const _CategoryBreakdown({
+    required this.rows,
+    required this.cats,
+    required this.s,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final worst = rows.first;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.historyByCategory,
+              style: Theme.of(context).textTheme.titleSmall),
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: resolveCatColor(cats, row.category),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  SizedBox(
+                    width: 64,
+                    child: Text(
+                      catLabel(row.category, s),
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      child: LinearProgressIndicator(
+                        value: row.total == 0 ? 0 : row.done / row.total,
+                        minHeight: 6,
+                        color: resolveCatColor(cats, row.category),
+                        backgroundColor: AppColors.surfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    s.goalProgress(row.done, row.total),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          if (worst.total > worst.done) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(height: 1),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              s.historyCategoryBehind(
+                  catLabel(worst.category, s), worst.total - worst.done),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// What has been sitting undone the longest, with the target it belongs to
+class _StaleTasks extends StatelessWidget {
+  final List<({Task task, int daysLate})> rows;
+  final List<SemesterGoal> targets;
+  final List<CategoryEntry> cats;
+  final AppStrings s;
+
+  const _StaleTasks({
+    required this.rows,
+    required this.targets,
+    required this.cats,
+    required this.s,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.historyStale, style: Theme.of(context).textTheme.titleSmall),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                s.historyNothingStale,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+              ),
+            ),
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: taskLinkColor(
+                            cats,
+                            targets
+                                .where((g) => g.id == row.task.linkedTargetId)
+                                .firstOrNull,
+                          ) ??
+                          AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          row.task.title,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          s.historyOverdue(row.daysLate),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${row.daysLate}',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// The page's card shape, so the four cards cannot drift apart
+class _Card extends StatelessWidget {
+  final Widget child;
+
+  const _Card({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+
+  const _Stat({required this.label, required this.value, required this.sub});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+          ),
+          Text(
+            sub,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

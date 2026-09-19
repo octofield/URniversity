@@ -24,13 +24,18 @@ class SemesterGoal {
   });
 
   factory SemesterGoal.fromJson(Map<String, dynamic> j) {
+    // An empty list is a goal with no category, which is allowed. A bare
+    // string is a row from before categories became a list
     List<String> cats;
-    final raw = j['category'] as String? ?? 'other';
-    try {
-      final list = (jsonDecode(raw) as List).cast<String>();
-      cats = list.isEmpty ? ['other'] : list;
-    } catch (_) {
-      cats = [raw];
+    final raw = j['category'] as String?;
+    if (raw == null || raw.isEmpty) {
+      cats = const [];
+    } else {
+      try {
+        cats = (jsonDecode(raw) as List).cast<String>();
+      } catch (_) {
+        cats = [raw];
+      }
     }
     return SemesterGoal(
       id: j['id'] as String,
@@ -50,7 +55,7 @@ class SemesterGoal {
     'parent_id': parentId,
     'title': title,
     'semester': semester,
-    'category': jsonEncode(categories.isEmpty ? ['other'] : categories),
+    'category': jsonEncode(categories),
     'future_goal_id': futureGoalId,
     'notes': notes,
     'is_done': isDone,

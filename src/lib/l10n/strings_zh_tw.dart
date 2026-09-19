@@ -17,12 +17,7 @@ class StringsZhTw implements AppStrings {
   @override String get tasks => '任務';
   @override String get noTasks => '尚無任務';
   @override String get addTask => '新增任務';
-  @override String get addSubtask => '新增子任務';
   @override String get taskNotes => '備註（選填）';
-  @override String get priority => '優先度：';
-  @override String get priorityLow => '低';
-  @override String get priorityMed => '中';
-  @override String get priorityHigh => '高';
   @override String get dueTime => '截止時間';
 
   @override String get linkedTarget => '連結目標';
@@ -119,9 +114,27 @@ class StringsZhTw implements AppStrings {
   @override String get historyDaily => '每日';
   @override String get historyWeekly => '每週';
   @override String get historyMonthly => '每月';
-  @override String historyAverage(int percent) => '平均完成率 $percent%';
   @override String get historyNoData => '無資料';
   @override String get historyTapHint => '點擊長條查看詳情';
+  @override String get historyAverageLabel => '平均完成率';
+  @override String historyVsPrevious(String delta) => '較上一期 $delta';
+  @override String get historyStreak => '連續達成';
+  @override String get historyStreakSub => '全部做完的日子';
+  @override String get historyCompletedTasks => '完成任務';
+  @override String get historyBestWeekday => '最強的一天';
+  @override String get historyByCategory => '各分類的完成率';
+  @override String historyCategoryBehind(String name, int left) =>
+      '「$name」落後最多，還有 $left 件沒做';
+  @override String get historyStale => '拖最久的任務';
+  @override String historyOverdue(int days) => '逾期 $days 天';
+  @override String get historyNothingStale => '沒有逾期的任務';
+  @override String get graphLegend => '圖例';
+  @override String get graphLegendTaskCount => '數字＝底下的任務';
+  @override String get graphLegendDimmed => '淡色＝其他學期';
+  @override String get graphFilterUnfinished => '未完成';
+  @override String get graphOpen => '打開';
+  @override String graphViewTasks(int count) => '看 $count 個任務';
+  @override String get graphNextDue => '最近截止';
 
   @override String get semesterSettings => '學期設定';
   @override String get semesterCount => '學期制';
@@ -149,6 +162,7 @@ class StringsZhTw implements AppStrings {
   @override String tasksWithCount(int count) => '任務（$count）';
   @override String completedTasksWithCount(int count) => '已完成的任務（$count）';
   @override String get noSemester => '未設定學期';
+  @override String journalStreakDays(int days) => '連續 $days 天';
   @override String get completionEffect => '完成任務的動畫';
   @override String get effectOff => '關閉';
   @override String get effectBasic => '基本';

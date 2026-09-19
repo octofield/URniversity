@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_strings.dart';
@@ -147,12 +149,59 @@ final devModeProvider = StateNotifierProvider<DevModeNotifier, DevModeState>(
   (ref) => DevModeNotifier(),
 );
 
-// Effective "now" — returns customTime if dev mode is active, else real time
-final effectiveNowProvider = Provider<DateTime>((ref) {
-  final dev = ref.watch(devModeProvider);
-  if (dev.enabled && dev.customTime != null) return dev.customTime!;
-  return DateTime.now();
-});
+// Effective "now" — dev mode's custom time when it is on, else the real clock.
+//
+// A StateNotifier rather than a plain Provider: a Provider computes once and
+// caches, so an app left open past midnight went on insisting it was yesterday,
+// and every "is this today?" check went with it. This one re-reads the clock at
+// midnight and whenever the app comes back to the foreground.
+class EffectiveNowNotifier extends StateNotifier<DateTime> {
+  EffectiveNowNotifier(this._ref) : super(_read(_ref)) {
+    _ref.listen(devModeProvider, (_, _) => refresh());
+    if (autoRollOver) _scheduleRollOver();
+  }
+
+  // Off in widget tests: a test fails if any timer is still pending when it
+  // ends, and a timer counting down to midnight always is. Set by
+  // test/helpers/pump_app.dart; untilNextDay() is tested on its own
+  static bool autoRollOver = true;
+
+  final Ref _ref;
+  Timer? _rollOver;
+
+  static DateTime _read(Ref ref) {
+    final dev = ref.read(devModeProvider);
+    if (dev.enabled && dev.customTime != null) return dev.customTime!;
+    return DateTime.now();
+  }
+
+  void refresh() {
+    state = _read(_ref);
+    _scheduleRollOver();
+  }
+
+  void _scheduleRollOver() {
+    _rollOver?.cancel();
+    if (!autoRollOver) return;
+    _rollOver = Timer(untilNextDay(DateTime.now()), refresh);
+  }
+
+  @override
+  void dispose() {
+    _rollOver?.cancel();
+    super.dispose();
+  }
+}
+
+// How long until the next day starts, plus a second so the date has actually
+// changed by the time it fires
+Duration untilNextDay(DateTime now) {
+  final midnight = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+  return midnight.difference(now) + const Duration(seconds: 1);
+}
+
+final effectiveNowProvider =
+    StateNotifierProvider<EffectiveNowNotifier, DateTime>((ref) => EffectiveNowNotifier(ref));
 
 // The academic-year number for a given date (the calendar year of the last
 // semester-1 start before or on that date).

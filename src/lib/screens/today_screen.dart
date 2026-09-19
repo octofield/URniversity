@@ -9,7 +9,6 @@ import '../core/theme/app_spacing.dart';
 import '../core/recent_picks.dart';
 import '../core/ui_symbols.dart';
 import '../l10n/app_strings.dart';
-import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/tasks_provider.dart';
@@ -18,7 +17,6 @@ import '../providers/inspirations_provider.dart';
 import '../providers/date_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/semester_goals_provider.dart';
-import '../providers/future_goals_provider.dart';
 import '../providers/categories_provider.dart';
 import '../providers/recent_picks_provider.dart';
 import '../providers/profile_provider.dart';
@@ -32,6 +30,9 @@ import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/link_color_bar.dart';
+import '../widgets/page_header.dart';
+import '../widgets/swipe_switcher.dart';
+import '../widgets/sheet_fields.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 
@@ -89,10 +90,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final isDesktop = width >= AppBreakpoints.desktop;
     final isWide = width >= AppBreakpoints.wide;
 
-    // Active goal filters, shown as a banner chip across every view
+    // The task filter, shown as a banner chip across every view
     final targetFilter = ref.watch(taskTargetFilterProvider);
-    final goalFilter = ref.watch(taskGoalFilterProvider);
-    final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
+    final isFiltered = targetFilter.isNotEmpty;
 
     // Greeting header data
     final profile = ref.watch(profileProvider);
@@ -109,55 +109,25 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageHorizontal,
-            AppSpacing.pageTop,
-            AppSpacing.pageHorizontal,
-            0,
+        PageHeader(
+          title: greeting,
+          subtitle: Text(
+            '${formatDate(todayDate, dateFormat, s)}$kDotSeparator'
+            '${s.todayStatus(todayTasks.length, todayDone)}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (!isDesktop) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      greeting,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${formatDate(todayDate, dateFormat, s)}$kDotSeparator'
-                      '${s.todayStatus(todayTasks.length, todayDone)}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -218,7 +188,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       const Icon(Icons.filter_list, size: 14, color: AppColors.primary),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        '${s.filters}$kDotSeparator${targetFilter.length + goalFilter.length}',
+                        '${s.filters}$kDotSeparator${targetFilter.length}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: AppColors.primary,
@@ -228,7 +198,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       GestureDetector(
                         onTap: () {
                           ref.read(taskTargetFilterProvider.notifier).state = const {};
-                          ref.read(taskGoalFilterProvider.notifier).state = const {};
                         },
                         child: const Icon(Icons.close, size: 14, color: AppColors.primary),
                       ),
@@ -331,70 +300,80 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ),
           ),
         Expanded(
-          child: taskView == 2
-              ? _WeeklyGrid(weekStart: _weekStart)
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageHorizontal,
-                    12,
-                    AppSpacing.pageHorizontal,
-                    AppSpacing.xl,
-                  ),
-                  child: isDesktop
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Main block: task lists
-                            const Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _TasksSection(),
-                                  SizedBox(height: AppSpacing.lg),
-                                  _CompletedTasksSection(),
-                                ],
+          // Swiping the body moves between 全部 / 當日 / 當週, in the order the
+          // segmented button shows them
+          child: SwipeSwitcher(
+            onNext: taskView < 2
+                ? () => ref.read(taskViewProvider.notifier).state = taskView + 1
+                : null,
+            onPrevious: taskView > 0
+                ? () => ref.read(taskViewProvider.notifier).state = taskView - 1
+                : null,
+            child: taskView == 2
+                ? _WeeklyGrid(weekStart: _weekStart)
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageHorizontal,
+                      12,
+                      AppSpacing.pageHorizontal,
+                      AppSpacing.xl,
+                    ),
+                    child: isDesktop
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Main block: task lists
+                              const Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _TasksSection(),
+                                    SizedBox(height: AppSpacing.lg),
+                                    _CompletedTasksSection(),
+                                  ],
+                                ),
                               ),
-                            ),
-                            SizedBox(width: isWide ? AppSpacing.xl : AppSpacing.lg),
-                            // Secondary block: completion summary and inspirations
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Fixed-height header keeps this column's
-                                  // top edge aligned with the tasks column
-                                  SizedBox(
-                                    height: 40,
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        s.progressOverview,
-                                        style: Theme.of(context).textTheme.titleLarge,
+                              SizedBox(width: isWide ? AppSpacing.xl : AppSpacing.lg),
+                              // Secondary block: completion summary and inspirations
+                              Expanded(
+                                flex: 1,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Fixed-height header keeps this column's
+                                    // top edge aligned with the tasks column
+                                    SizedBox(
+                                      height: 40,
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          s.progressOverview,
+                                          style: Theme.of(context).textTheme.titleLarge,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  const _SummaryCard(),
-                                  const SizedBox(height: AppSpacing.lg),
-                                  const _InspirationsQuickList(),
-                                ],
+                                    const SizedBox(height: AppSpacing.sm),
+                                    const _SummaryCard(),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    const _InspirationsQuickList(),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        )
-                      : const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SummaryCard(),
-                            SizedBox(height: AppSpacing.lg),
-                            _TasksSection(),
-                            SizedBox(height: AppSpacing.lg),
-                            _CompletedTasksSection(),
-                          ],
-                        ),
-                ),
+                            ],
+                          )
+                        : const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SummaryCard(),
+                              SizedBox(height: AppSpacing.lg),
+                              _TasksSection(),
+                              SizedBox(height: AppSpacing.lg),
+                              _CompletedTasksSection(),
+                            ],
+                          ),
+                  ),
+          ),
         ),
       ],
     );
@@ -504,13 +483,9 @@ class _DayRow extends ConsumerWidget {
       ref.watch(taskTargetFilterProvider),
       ref.watch(semesterGoalsProvider),
     );
-    final expandedGoalFilter = expandFutureGoalIds(
-      ref.watch(taskGoalFilterProvider),
-      ref.watch(futureGoalsProvider),
-    );
     final tasks = ref
         .watch(tasksForDateProvider(normalDate))
-        .where((t) => passesTaskFilter(t, expandedTargetFilter, expandedGoalFilter))
+        .where((t) => passesTaskFilter(t, expandedTargetFilter))
         .toList();
     final selectedDate = ref.watch(dateProvider);
     final now = DateTime.now();
@@ -617,14 +592,8 @@ class _WeekTaskTile extends ConsumerWidget {
     final linkedTarget = task.linkedTargetId != null
         ? ref.watch(semesterGoalsProvider).where((g) => g.id == task.linkedTargetId).firstOrNull
         : null;
-    final linkedGoal = task.linkedGoalId != null
-        ? ref.watch(futureGoalsProvider).where((g) => g.id == task.linkedGoalId).firstOrNull
-        : null;
     // One bar, not the day list's split one: this row is too short to split
-    final linkedCategories = linkedTarget?.categories ?? linkedGoal?.categories;
-    final barColor = linkedCategories != null
-        ? resolveCatColor(cats, linkedCategories.isNotEmpty ? linkedCategories.first : 'other')
-        : Colors.transparent;
+    final barColor = taskLinkColor(cats, linkedTarget) ?? Colors.transparent;
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
     final meta = isRecurring
         ? _recurrenceShort(task.recurrence!, s, task.createdAt)
@@ -692,22 +661,6 @@ class _WeekTaskTile extends ConsumerWidget {
                 ],
               ),
             ),
-            if (task.priority > 1 && !isCompleted)
-              Container(
-                margin: const EdgeInsets.only(left: AppSpacing.xs),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                decoration: BoxDecoration(
-                  color: task.priority == 3 ? AppColors.errorLight : AppColors.warningLight,
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
-                child: Text(
-                  task.priority == 3 ? s.priorityHigh : s.priorityMed,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: task.priority == 3 ? AppColors.error : AppColors.warning,
-                      ),
-                ),
-              ),
           ],
         ),
       ),
@@ -737,98 +690,101 @@ class _SummaryCard extends ConsumerWidget {
     final allDone = total > 0 && completed == total;
     final progress = total > 0 ? completed / total : 0.0;
 
+    // The whole card opens the history, not just the ring: the ring was a
+    // 72px target nobody found
     return HoverLift(
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: AppColors.border, width: 1),
         ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 72,
-              height: 72,
-              child: Material(
-                color: Colors.transparent,
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
-                  ),
-                  child: Tooltip(
-                    message: s.taskHistory,
-                    waitDuration: const Duration(milliseconds: 400),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: progress),
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, _) => Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CircularProgressIndicator(
-                            value: value,
-                            strokeWidth: 7,
-                            strokeCap: StrokeCap.round,
-                            color: allDone ? AppColors.success : AppColors.primary,
-                            backgroundColor: AppColors.surfaceVariant,
-                          ),
-                          Center(
-                            child: Text(
-                              total == 0 ? kEmptyValue : '${(value * 100).round()}%',
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.cardPadding),
+              child: Row(
                 children: [
-                  Text(
-                    s.tasksCompleted(completed, total),
-                    style: Theme.of(context).textTheme.titleMedium,
+                  SizedBox(
+                    width: 72,
+                    height: 72,
+                    child: Tooltip(
+                      message: s.taskHistory,
+                      waitDuration: const Duration(milliseconds: 400),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: progress),
+                        duration: const Duration(milliseconds: 600),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, _) => Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CircularProgressIndicator(
+                              value: value,
+                              strokeWidth: 7,
+                              strokeCap: StrokeCap.round,
+                              color: allDone ? AppColors.success : AppColors.primary,
+                              backgroundColor: AppColors.surfaceVariant,
+                            ),
+                            Center(
+                              child: Text(
+                                total == 0 ? kEmptyValue : '${(value * 100).round()}%',
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  if (allDone) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.6, end: 1),
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.elasticOut,
-                      builder: (_, v, child) =>
-                          Transform.scale(scale: v, alignment: Alignment.centerLeft, child: child),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.celebration, size: 16, color: AppColors.warning),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            s.allDoneToday,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.success,
-                              fontWeight: FontWeight.w600,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.tasksCompleted(completed, total),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (allDone) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0.6, end: 1),
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.elasticOut,
+                            builder: (_, v, child) =>
+                                Transform.scale(scale: v, alignment: Alignment.centerLeft, child: child),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.celebration, size: 16, color: AppColors.warning),
+                                const SizedBox(width: AppSpacing.xs),
+                                Text(
+                                  s.allDoneToday,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.success,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -929,17 +885,15 @@ class _TasksSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final date = ref.watch(dateProvider);
     final targetFilter = ref.watch(taskTargetFilterProvider);
-    final goalFilter = ref.watch(taskGoalFilterProvider);
-    final isFiltered = targetFilter.isNotEmpty || goalFilter.isNotEmpty;
+    final isFiltered = targetFilter.isNotEmpty;
     final expandedTargetFilter = expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
-    final expandedGoalFilter = expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
     final tasks = ref
         .watch(filteredTasksProvider)
         .where(
           (t) =>
-              !t.isCompletedOn(date) && passesTaskFilter(t, expandedTargetFilter, expandedGoalFilter),
+              !t.isCompletedOn(ref.watch(taskRowDateProvider(t))) &&
+              passesTaskFilter(t, expandedTargetFilter),
         )
         .toList();
 
@@ -997,206 +951,71 @@ class _TasksSection extends ConsumerWidget {
   }
 }
 
-List<({SemesterGoal goal, int depth})> _buildTargetTree(List<SemesterGoal> all) {
-  final result = <({SemesterGoal goal, int depth})>[];
-  void add(String? parentId, int depth) {
-    for (final g in all.where((g) => g.parentId == parentId)) {
-      result.add((goal: g, depth: depth));
-      add(g.id, depth + 1);
-    }
-  }
-
-  add(null, 0);
-  return result;
-}
-
-List<({FutureGoal goal, int depth})> _buildGoalTree(List<FutureGoal> all) {
-  final result = <({FutureGoal goal, int depth})>[];
-  void add(String? parentId, int depth) {
-    for (final g in all.where((g) => g.parentId == parentId)) {
-      result.add((goal: g, depth: depth));
-      add(g.id, depth + 1);
-    }
-  }
-
-  add(null, 0);
-  return result;
-}
-
+// Filtering tasks by target, grouped by semester the same way the link picker
+// groups them — a flat list of every target ever set was unusable by the second
+// year. Multi-select, and picking a target implies its milestones.
 void _showTaskFilterDialog(BuildContext context, WidgetRef ref, AppStrings s) {
   showDialog(
     context: context,
-    builder: (dlgCtx) => DefaultTabController(
-      length: 2,
-      child: Consumer(
-        builder: (_, dlgRef, _) {
-          final allTargets = dlgRef.watch(semesterGoalsProvider);
-          final allGoals = dlgRef.watch(futureGoalsProvider);
-          final semSettings = dlgRef.watch(semesterSettingsProvider);
-          final targetTree = _buildTargetTree(allTargets);
-          final goalTree = _buildGoalTree(allGoals);
-          final targetFilter = dlgRef.watch(taskTargetFilterProvider);
-          final goalFilter = dlgRef.watch(taskGoalFilterProvider);
+    builder: (dlgCtx) => Consumer(
+      builder: (_, dlgRef, _) {
+        final allTargets = dlgRef.watch(semesterGoalsProvider);
+        final settings = dlgRef.watch(semesterSettingsProvider);
+        final selected = dlgRef.watch(taskTargetFilterProvider);
 
-          return AlertDialog(
-            titlePadding: EdgeInsets.zero,
-            title: TabBar(
-              labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.primary,
-              tabs: [
-                Tab(text: s.targets),
-                Tab(text: s.goals),
-              ],
-            ),
-            content: SizedBox(
-              height: 320,
-              width: 400,
-              child: TabBarView(
-                children: [
-                  // Targets tab
-                  targetTree.isEmpty
-                      ? Center(
-                          child: Text(
-                            s.noTargets,
-                            style: const TextStyle(color: AppColors.textTertiary),
-                          ),
-                        )
-                      : ListView(
-                          children: [
-                            for (final item in targetTree)
-                              CheckboxListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.only(left: 8.0 + item.depth * 20.0),
-                                value: targetFilter.contains(item.goal.id),
-                                title: Text(item.goal.title),
-                                subtitle: Text(
-                                  formatSemester(item.goal.semester, semSettings, s),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                onChanged: (v) {
-                                  final next = Set<String>.from(
-                                    dlgRef.read(taskTargetFilterProvider),
-                                  );
-                                  if (v == true) {
-                                    next.add(item.goal.id);
-                                    void addDesc(String pid) {
-                                      for (final g in allTargets.where((g) => g.parentId == pid)) {
-                                        next.add(g.id);
-                                        addDesc(g.id);
-                                      }
-                                    }
+        void toggle(SemesterGoal goal, bool on) {
+          final next = Set<String>.from(selected);
+          void withDescendants(String id, void Function(String) apply) {
+            apply(id);
+            for (final child in allTargets.where((g) => g.parentId == id)) {
+              withDescendants(child.id, apply);
+            }
+          }
 
-                                    addDesc(item.goal.id);
-                                  } else {
-                                    next.remove(item.goal.id);
-                                    void removeDesc(String pid) {
-                                      for (final g in allTargets.where((g) => g.parentId == pid)) {
-                                        next.remove(g.id);
-                                        removeDesc(g.id);
-                                      }
-                                    }
+          if (on) {
+            withDescendants(goal.id, next.add);
+          } else {
+            withDescendants(goal.id, next.remove);
+            // Unticking a milestone also unticks whatever it sat under, or the
+            // parent would still be pulling the milestone's tasks in
+            String? parentId = goal.parentId;
+            while (parentId != null) {
+              next.remove(parentId);
+              parentId = allTargets.where((g) => g.id == parentId).firstOrNull?.parentId;
+            }
+          }
+          dlgRef.read(taskTargetFilterProvider.notifier).state = next;
+        }
 
-                                    removeDesc(item.goal.id);
-                                    String? pid = item.goal.parentId;
-                                    while (pid != null) {
-                                      next.remove(pid);
-                                      pid = allTargets
-                                          .where((g) => g.id == pid)
-                                          .firstOrNull
-                                          ?.parentId;
-                                    }
-                                  }
-                                  dlgRef.read(taskTargetFilterProvider.notifier).state = next;
-                                },
-                              ),
-                          ],
-                        ),
-                  // Goals tab
-                  goalTree.isEmpty
-                      ? Center(
-                          child: Text(
-                            s.noGoals,
-                            style: const TextStyle(color: AppColors.textTertiary),
-                          ),
-                        )
-                      : ListView(
-                          children: [
-                            for (final item in goalTree)
-                              CheckboxListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.only(left: 8.0 + item.depth * 20.0),
-                                value: goalFilter.contains(item.goal.id),
-                                title: Text(item.goal.title),
-                                subtitle: item.goal.startSemester != null
-                                    ? Text(
-                                        formatSemester(item.goal.startSemester!, semSettings, s),
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                      )
-                                    : null,
-                                onChanged: (v) {
-                                  final next = Set<String>.from(
-                                    dlgRef.read(taskGoalFilterProvider),
-                                  );
-                                  if (v == true) {
-                                    next.add(item.goal.id);
-                                    void addDesc(String pid) {
-                                      for (final g in allGoals.where((g) => g.parentId == pid)) {
-                                        next.add(g.id);
-                                        addDesc(g.id);
-                                      }
-                                    }
-
-                                    addDesc(item.goal.id);
-                                  } else {
-                                    next.remove(item.goal.id);
-                                    void removeDesc(String pid) {
-                                      for (final g in allGoals.where((g) => g.parentId == pid)) {
-                                        next.remove(g.id);
-                                        removeDesc(g.id);
-                                      }
-                                    }
-
-                                    removeDesc(item.goal.id);
-                                    String? pid = item.goal.parentId;
-                                    while (pid != null) {
-                                      next.remove(pid);
-                                      pid = allGoals
-                                          .where((g) => g.id == pid)
-                                          .firstOrNull
-                                          ?.parentId;
-                                    }
-                                  }
-                                  dlgRef.read(taskGoalFilterProvider.notifier).state = next;
-                                },
-                              ),
-                          ],
-                        ),
-                ],
+        return SemesterGroupedFilterDialog(
+          title: s.targets,
+          emptyLabel: s.noTargets,
+          resetLabel: s.reset,
+          items: [
+            for (final g in allTargets)
+              SemesterPickerItem(
+                id: g.id,
+                title: g.title,
+                semester: g.semester,
+                parentId: g.parentId,
+                sortOrder: g.sortOrder,
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  dlgRef.read(taskTargetFilterProvider.notifier).state = const {};
-                  dlgRef.read(taskGoalFilterProvider.notifier).state = const {};
-                },
-                child: Text(s.reset),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dlgCtx),
-                child: Text(MaterialLocalizations.of(dlgCtx).okButtonLabel),
-              ),
-            ],
-          );
-        },
-      ),
+          ],
+          selectedIds: selected,
+          currentSemester: currentSemester(settings),
+          settings: settings,
+          s: s,
+          onToggle: (id, on) {
+            final goal = allTargets.where((g) => g.id == id).firstOrNull;
+            if (goal != null) toggle(goal, on);
+          },
+          onReset: () => dlgRef.read(taskTargetFilterProvider.notifier).state = const {},
+        );
+      },
     ),
   );
 }
 
-// Collapsed by default: finished work is worth keeping but not worth the room
-// the outstanding list needs. The state is per session, not stored
 class _CompletedTasksSection extends ConsumerStatefulWidget {
   const _CompletedTasksSection();
 
@@ -1210,16 +1029,16 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
-    final date = ref.watch(dateProvider);
-    final targetFilter = ref.watch(taskTargetFilterProvider);
-    final goalFilter = ref.watch(taskGoalFilterProvider);
-    final expandedTargetFilter = expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
-    final expandedGoalFilter = expandFutureGoalIds(goalFilter, ref.watch(futureGoalsProvider));
+    final expandedTargetFilter = expandSemGoalIds(
+      ref.watch(taskTargetFilterProvider),
+      ref.watch(semesterGoalsProvider),
+    );
     final completed = ref
         .watch(filteredTasksProvider)
         .where(
           (t) =>
-              t.isCompletedOn(date) && passesTaskFilter(t, expandedTargetFilter, expandedGoalFilter),
+              t.isCompletedOn(ref.watch(taskRowDateProvider(t))) &&
+              passesTaskFilter(t, expandedTargetFilter),
         )
         .toList();
 
@@ -1283,6 +1102,9 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
 // Left inset where a task tile's title starts: color bar + padding + checkbox + gap
 const double _taskTitleIndent = 62.0;
 
-// Task list with drag-to-reorder and one level of subtasks. Mirrors the goal
+// Width of the link colour bar down a task row's left edge
+const double _linkBarWidth = 6.0;
+
+// Task list with drag-to-reorder. Mirrors the goal
 // screens' Draggable/DragTarget pattern: dropping on a row's top edge inserts
 // before it, dropping on the body makes the task a subtask of that row

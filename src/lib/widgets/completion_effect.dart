@@ -51,6 +51,10 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
 
     if (effect != TaskCompletionEffect.off && ticking) {
       _pop.forward(from: 0);
+      // Also drawn over the page: ticking a task off usually takes the row out
+      // of the list on the very next frame, and the box's own animation goes
+      // with it. The overlay outlives the row, so the tick is always seen
+      showCompletionPop(context);
       if (effect == TaskCompletionEffect.celebrate &&
           (widget.isLastOutstanding?.call() ?? false)) {
         showCompletionConfetti(context);
@@ -81,6 +85,92 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
       ),
     );
   }
+}
+
+// A tick that plays where the box was, whether or not the row is still there.
+void showCompletionPop(BuildContext context) {
+  final overlay = Overlay.maybeOf(context);
+  final box = context.findRenderObject() as RenderBox?;
+  if (overlay == null || box == null || !box.hasSize) return;
+
+  final centre = box.localToGlobal(box.size.center(Offset.zero));
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => Positioned.fill(
+      child: IgnorePointer(
+        child: _PopMark(
+          centre: centre,
+          onDone: () {
+            if (entry.mounted) entry.remove();
+          },
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+}
+
+class _PopMark extends StatefulWidget {
+  final Offset centre;
+  final VoidCallback onDone;
+
+  const _PopMark({required this.centre, required this.onDone});
+
+  @override
+  State<_PopMark> createState() => _PopMarkState();
+}
+
+class _PopMarkState extends State<_PopMark> with SingleTickerProviderStateMixin {
+  late final AnimationController _run = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  )..forward();
+
+  @override
+  void initState() {
+    super.initState();
+    _run.addStatusListener((status) {
+      if (status == AnimationStatus.completed) widget.onDone();
+    });
+  }
+
+  @override
+  void dispose() {
+    _run.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _run,
+        builder: (_, _) {
+          final t = Curves.easeOut.transform(_run.value);
+          // Grows away from the row and fades, so it reads as "that one is done"
+          // rather than as something new appearing
+          final size = 26 + 22 * t;
+          return Stack(
+            children: [
+              Positioned(
+                left: widget.centre.dx - size / 2,
+                top: widget.centre.dy - size / 2 - 10 * t,
+                child: Opacity(
+                  opacity: (1 - t).clamp(0.0, 1.0),
+                  child: Container(
+                    width: size,
+                    height: size,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary,
+                    ),
+                    child: Icon(Icons.check,
+                        size: size * 0.62, color: AppColors.textOnPrimary),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
 }
 
 // A burst over whatever is on screen. An overlay entry rather than part of the

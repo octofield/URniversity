@@ -252,35 +252,6 @@ void _showTargetSelector(
   );
 }
 
-void _showGoalSelectorForTask(
-  BuildContext context,
-  WidgetRef ref,
-  AppStrings s,
-  String? currentId,
-  ValueChanged<String?> onSelect,
-) {
-  final semSettings = ref.read(semesterSettingsProvider);
-  showSemesterGroupedPicker(
-    context: context,
-    title: s.selectFutureGoal,
-    items: [
-      for (final g in ref.read(futureGoalsProvider))
-        SemesterPickerItem(
-          id: g.id,
-          title: g.title,
-          semester: g.startSemester,
-          parentId: g.parentId,
-          sortOrder: g.sortOrder,
-        ),
-    ],
-    currentId: currentId,
-    currentSemester: currentSemester(semSettings),
-    settings: semSettings,
-    s: s,
-    onSelect: onSelect,
-  );
-}
-
 // ─── Link row widget (due time / recurrence / links) ─────────────────────────
 
 Widget _linkRow({
@@ -289,6 +260,9 @@ Widget _linkRow({
   required bool active,
   required VoidCallback onTap,
   VoidCallback? onClear,
+  // The linked target's own colour, so the row reads as that target the same
+  // way the task's list row does
+  Color? accent,
 }) {
   return InkWell(
     borderRadius: BorderRadius.circular(AppRadius.md),
@@ -299,12 +273,15 @@ Widget _linkRow({
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md)),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: active ? AppColors.primary : AppColors.textTertiary),
+          Icon(icon,
+              size: 18,
+              color: active ? (accent ?? AppColors.primary) : AppColors.textTertiary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: active ? AppColors.primary : AppColors.textSecondary),
+              style: TextStyle(
+                  color: active ? (accent ?? AppColors.primary) : AppColors.textSecondary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -352,7 +329,6 @@ void showTaskSheet(
   BuildContext context,
   WidgetRef ref, {
   Task? existing,
-  String? parentTaskId,
 }) {
   final isEdit = existing != null;
   // When adding, the task does not exist yet, so the weekly/monthly fallback
@@ -365,11 +341,9 @@ void showTaskSheet(
   // Sheet state must outlive the modal route builder: Flutter re-invokes that
   // builder whenever MediaQuery changes (e.g. the keyboard hides when a picker
   // dialog opens), which would otherwise reset every field to its default
-  var priority = existing?.priority ?? 1;
   DateTime? dueTime = existing?.dueTime;
   RecurrenceRule? recurrence = existing?.recurrence;
   String? linkedTargetId = existing?.linkedTargetId;
-  String? linkedGoalId = existing?.linkedGoalId;
 
   showAppSheet(
     context,
@@ -377,7 +351,6 @@ void showTaskSheet(
       return StatefulBuilder(
         builder: (sheetCtx, setState) {
           final targets = ref.read(semesterGoalsProvider);
-          final goals = ref.read(futureGoalsProvider);
           final recent = ref.read(recentPicksProvider);
           final targetSuggestions = resolveRecent(
             recent.targetIds,
@@ -386,9 +359,6 @@ void showTaskSheet(
           ).where((g) => g.id != linkedTargetId).toList();
           final linkedTarget = linkedTargetId != null
               ? targets.where((g) => g.id == linkedTargetId).firstOrNull
-              : null;
-          final linkedGoal = linkedGoalId != null
-              ? goals.where((g) => g.id == linkedGoalId).firstOrNull
               : null;
 
           return SheetBody(
@@ -408,41 +378,28 @@ void showTaskSheet(
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                SheetTextField(
+                  label: s.titleField,
                   controller: titleController,
                   autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(labelText: s.titleField),
                   onSubmitted: isEdit
                       ? null
-                      : (_) => _submitTask(
+                      : () => _submitTask(
                             sheetCtx,
                             ref,
                             titleController,
                             contentController,
-                            priority,
                             dueTime,
                             recurrence,
                             linkedTargetId,
-                            linkedGoalId,
-                            parentTaskId: parentTaskId,
                           ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                TextField(
+                // One short line at rest, growing to three
+                SheetTextField(
+                  label: s.taskNotes,
                   controller: contentController,
-                  minLines: 1,
                   maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
-                  // One short line at rest, a little lower than the title field
-                  decoration: InputDecoration(
-                    labelText: s.taskNotes,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.inputPadding,
-                      vertical: AppSpacing.sm,
-                    ),
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 _linkRow(
@@ -475,6 +432,7 @@ void showTaskSheet(
                 ),
                 const SizedBox(height: 2),
                 _linkRow(
+                  accent: taskLinkColor(ref.read(categoriesProvider), linkedTarget),
                   icon: Icons.flag_outlined,
                   label: linkedTarget != null
                       ? '${linkedTarget.title}$kDotSeparator${formatSemester(linkedTarget.semester, semSettings, s)}'
@@ -493,55 +451,6 @@ void showTaskSheet(
                   for (final target in targetSuggestions)
                     (target.title, () => setState(() => linkedTargetId = target.id)),
                 ]),
-                const SizedBox(height: 2),
-                _linkRow(
-                  icon: Icons.stars_outlined,
-                  label: linkedGoal != null ? linkedGoal.title : s.linkedGoal,
-                  active: linkedGoal != null,
-                  onTap: () => _showGoalSelectorForTask(
-                    sheetCtx,
-                    ref,
-                    s,
-                    linkedGoalId,
-                    (id) => setState(() => linkedGoalId = id),
-                  ),
-                  onClear: () => setState(() => linkedGoalId = null),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    Text(s.priority, style: Theme.of(sheetCtx).textTheme.bodyMedium),
-                    const SizedBox(width: 12),
-                    SegmentedButton<int>(
-                      segments: [
-                        ButtonSegment(value: 1, label: Text(s.priorityLow)),
-                        ButtonSegment(value: 2, label: Text(s.priorityMed)),
-                        ButtonSegment(value: 3, label: Text(s.priorityHigh)),
-                      ],
-                      selected: {priority},
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity(horizontal: -2, vertical: -4),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onSelectionChanged: (v) => setState(() => priority = v.first),
-                    ),
-                  ],
-                ),
-                // Subtasks are one level deep, so only top-level tasks offer this
-                if (isEdit && existing.parentTaskId == null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      icon: const Icon(Icons.subdirectory_arrow_right, size: 18),
-                      label: Text(s.addSubtask),
-                      onPressed: () {
-                        Navigator.pop(sheetCtx);
-                        showTaskSheet(context, ref, parentTaskId: existing.id);
-                      },
-                    ),
-                  ),
-                ],
                 const SizedBox(height: AppSpacing.md),
                 SizedBox(
                   width: double.infinity,
@@ -553,12 +462,9 @@ void showTaskSheet(
                           ref,
                           titleController,
                           contentController,
-                          priority,
                           dueTime,
                           recurrence,
                           linkedTargetId,
-                          linkedGoalId,
-                          parentTaskId: parentTaskId,
                         );
                         return;
                       }
@@ -575,11 +481,9 @@ void showTaskSheet(
                               content: contentController.text.trim().isEmpty
                                   ? null
                                   : contentController.text.trim(),
-                              priority: priority,
                               dueTime: dueTime,
                               recurrence: recurrence,
                               linkedTargetId: linkedTargetId,
-                              linkedGoalId: linkedGoalId,
                             ),
                           );
                       _rememberPicks(ref, linkedTargetId, dueTime);
@@ -602,13 +506,10 @@ void _submitTask(
   WidgetRef ref,
   TextEditingController titleCtrl,
   TextEditingController contentCtrl,
-  int priority,
   DateTime? dueTime,
   RecurrenceRule? recurrence,
   String? linkedTargetId,
-  String? linkedGoalId, {
-  String? parentTaskId,
-}) {
+) {
   final title = titleCtrl.text.trim();
   if (title.isEmpty) return;
   ref
@@ -616,12 +517,9 @@ void _submitTask(
       .add(
         title,
         content: contentCtrl.text.trim().isEmpty ? null : contentCtrl.text.trim(),
-        priority: priority,
         dueTime: dueTime,
         recurrence: recurrence,
         linkedTargetId: linkedTargetId,
-        linkedGoalId: linkedGoalId,
-        parentTaskId: parentTaskId,
       );
   _rememberPicks(ref, linkedTargetId, dueTime);
   Navigator.pop(context);
@@ -648,18 +546,16 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
         children: [
           Text(s.addInspiration, style: Theme.of(sheetCtx).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
-          TextField(
+          SheetTextField(
+            label: s.titleField,
             controller: titleController,
             autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(labelText: s.titleField),
           ),
           const SizedBox(height: 12),
-          TextField(
+          SheetTextField(
+            label: s.inspirationDetails,
             controller: contentController,
             maxLines: 3,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(labelText: s.inspirationDetails),
           ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(

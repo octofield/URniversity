@@ -10,7 +10,6 @@ import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/tasks_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
@@ -37,18 +36,13 @@ class FutureGoalDetailScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final linkedTasks = ref.watch(tasksProvider)
-        .where((t) => t.linkedGoalId == goalId)
-        .toList();
     final linkedTargets = ref.watch(semesterGoalsProvider)
         .where((g) => g.futureGoalId == goalId && g.parentId == null)
         .toList();
 
     final cats = ref.watch(categoriesProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
-    final primaryCat = goal.categories.isNotEmpty
-        ? goal.categories.first
-        : FutureCategories.other;
+    final primaryCat = primaryCategoryOf(goal.categories);
     final catC = resolveCatColor(cats, primaryCat);
 
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
@@ -157,62 +151,6 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                 style: const TextStyle(color: AppColors.primary)),
             onTap: () =>
                 showFutureGoalSheet(context, ref, parentId: goalId),
-          ),
-
-          const Divider(),
-
-          // Linked tasks section
-          _SectionHeader(label: s.linkedTasks),
-          if (linkedTasks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(kEmptyValue,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textTertiary,
-                  )),
-            ),
-          for (final task in linkedTasks)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                task.isCompleted
-                    ? Icons.check_box
-                    : Icons.check_box_outline_blank,
-                color: task.isCompleted
-                    ? AppColors.primary
-                    : AppColors.textSecondary,
-              ),
-              title: Text(
-                task.title,
-                style: TextStyle(
-                  decoration:
-                      task.isCompleted ? TextDecoration.lineThrough : null,
-                  color: task.isCompleted ? AppColors.textTertiary : null,
-                ),
-              ),
-              subtitle: task.content != null
-                  ? Text(task.content!,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textTertiary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis)
-                  : null,
-              trailing: IconButton(
-                icon: const Icon(Icons.link_off, size: 18),
-                color: AppColors.textTertiary,
-                onPressed: () => ref.read(tasksProvider.notifier).update(
-                  task.copyWith(linkedGoalId: null),
-                ),
-              ),
-            ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.add_link, color: AppColors.primary),
-            title: Text(s.addLinkedTask,
-                style: const TextStyle(color: AppColors.primary)),
-            onTap: () => _showTaskSelectorForGoal(context, ref, goalId),
           ),
 
           const Divider(),
@@ -502,68 +440,6 @@ class _CategoryBadge extends ConsumerWidget {
       ),
     );
   }
-}
-
-void _showTaskSelectorForGoal(
-    BuildContext context, WidgetRef ref, String goalId) {
-  final s = ref.read(stringsProvider);
-  showDialog(
-    context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.selectTask),
-      content: SizedBox(
-        width: 400,
-        child: Consumer(
-          builder: (_, dlgRef, _) {
-            final tasks = dlgRef.watch(tasksProvider);
-            if (tasks.isEmpty) {
-              return Text(s.noTasks,
-                  style: const TextStyle(color: AppColors.textTertiary));
-            }
-            return ListView(
-              shrinkWrap: true,
-              children: [
-                for (final task in tasks)
-                  ListTile(
-                    dense: true,
-                    leading: Icon(
-                      task.linkedGoalId == goalId
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked,
-                      size: 20,
-                      color: task.linkedGoalId == goalId
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                    ),
-                    title: Text(task.title,
-                        style: TextStyle(
-                          color: task.linkedGoalId == goalId
-                              ? AppColors.textTertiary
-                              : null,
-                        )),
-                    enabled: task.linkedGoalId != goalId,
-                    onTap: task.linkedGoalId == goalId
-                        ? null
-                        : () {
-                            dlgRef.read(tasksProvider.notifier).update(
-                              task.copyWith(linkedGoalId: goalId),
-                            );
-                            Navigator.pop(dlgCtx);
-                          },
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-      ],
-    ),
-  );
 }
 
 void _showTargetSelectorForGoal(

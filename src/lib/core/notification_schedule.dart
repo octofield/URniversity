@@ -101,7 +101,7 @@ Iterable<ScheduledNotification> _taskReminders(
   final lead = Duration(minutes: settings.taskLeadMinutes);
 
   for (final task in tasks) {
-    if (task.dueTime == null || task.parentTaskId != null) continue;
+    if (task.dueTime == null) continue;
 
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
     if (!isRecurring) {
@@ -170,10 +170,7 @@ Iterable<ScheduledNotification> _dailySummaries(
     if (!fireAt.isAfter(now) || !fireAt.isBefore(horizon)) continue;
 
     final count = tasks
-        .where((t) =>
-            t.parentTaskId == null &&
-            taskAppliesTo(t, day) &&
-            !t.isCompletedOn(day))
+        .where((t) => taskAppliesTo(t, day) && !t.isCompletedOn(day))
         .length;
     if (count == 0) continue;
 

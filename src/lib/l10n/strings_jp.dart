@@ -17,12 +17,7 @@ class StringsJp implements AppStrings {
   @override String get tasks => 'タスク';
   @override String get noTasks => 'タスクがありません。＋ をタップして追加';
   @override String get addTask => 'タスクを追加';
-  @override String get addSubtask => 'サブタスクを追加';
   @override String get taskNotes => 'メモ（任意）';
-  @override String get priority => '優先度：';
-  @override String get priorityLow => '低';
-  @override String get priorityMed => '中';
-  @override String get priorityHigh => '高';
   @override String get dueTime => '期限';
 
   @override String get linkedTarget => '連結ターゲット';
@@ -119,9 +114,27 @@ class StringsJp implements AppStrings {
   @override String get historyDaily => '日別';
   @override String get historyWeekly => '週別';
   @override String get historyMonthly => '月別';
-  @override String historyAverage(int percent) => '平均完了率 $percent%';
   @override String get historyNoData => 'データなし';
   @override String get historyTapHint => 'バーをタップして詳細を表示';
+  @override String get historyAverageLabel => '平均完了率';
+  @override String historyVsPrevious(String delta) => '前期比 $delta';
+  @override String get historyStreak => '連続達成';
+  @override String get historyStreakSub => 'すべて終えた日';
+  @override String get historyCompletedTasks => '完了タスク';
+  @override String get historyBestWeekday => '一番強い曜日';
+  @override String get historyByCategory => 'カテゴリ別の完了率';
+  @override String historyCategoryBehind(String name, int left) =>
+      '「$name」が一番遅れています（あと $left 件）';
+  @override String get historyStale => '一番長く残っているタスク';
+  @override String historyOverdue(int days) => '$days 日遅れ';
+  @override String get historyNothingStale => '遅れているタスクはありません';
+  @override String get graphLegend => '凡例';
+  @override String get graphLegendTaskCount => '数字＝ぶら下がるタスク';
+  @override String get graphLegendDimmed => '薄い色＝ほかの学期';
+  @override String get graphFilterUnfinished => '未完了';
+  @override String get graphOpen => '開く';
+  @override String graphViewTasks(int count) => 'タスク $count 件を見る';
+  @override String get graphNextDue => '直近の締切';
 
   @override String get semesterSettings => '学期設定';
   @override String get semesterCount => '学期制';
@@ -149,6 +162,7 @@ class StringsJp implements AppStrings {
   @override String tasksWithCount(int count) => 'タスク（$count）';
   @override String completedTasksWithCount(int count) => '完了したタスク（$count）';
   @override String get noSemester => '学期未設定';
+  @override String journalStreakDays(int days) => '連続 $days 日';
   @override String get completionEffect => 'タスク完了の演出';
   @override String get effectOff => 'オフ';
   @override String get effectBasic => '基本';

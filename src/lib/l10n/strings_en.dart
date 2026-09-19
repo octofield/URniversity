@@ -17,12 +17,7 @@ class StringsEn implements AppStrings {
   @override String get tasks => 'Tasks';
   @override String get noTasks => 'No tasks yet';
   @override String get addTask => 'Add Task';
-  @override String get addSubtask => 'Add Subtask';
   @override String get taskNotes => 'Notes (optional)';
-  @override String get priority => 'Priority:';
-  @override String get priorityLow => 'Low';
-  @override String get priorityMed => 'Med';
-  @override String get priorityHigh => 'High';
   @override String get dueTime => 'Due time';
 
   @override String get linkedTarget => 'Linked Target';
@@ -119,9 +114,27 @@ class StringsEn implements AppStrings {
   @override String get historyDaily => 'Daily';
   @override String get historyWeekly => 'Weekly';
   @override String get historyMonthly => 'Monthly';
-  @override String historyAverage(int percent) => 'Average $percent%';
   @override String get historyNoData => 'No data';
   @override String get historyTapHint => 'Tap a bar for details';
+  @override String get historyAverageLabel => 'Average';
+  @override String historyVsPrevious(String delta) => '$delta vs last period';
+  @override String get historyStreak => 'Clear days';
+  @override String get historyStreakSub => 'everything done';
+  @override String get historyCompletedTasks => 'Tasks done';
+  @override String get historyBestWeekday => 'Best day';
+  @override String get historyByCategory => 'By category';
+  @override String historyCategoryBehind(String name, int left) =>
+      '"$name" is furthest behind, $left left';
+  @override String get historyStale => 'Waiting longest';
+  @override String historyOverdue(int days) => '$days days late';
+  @override String get historyNothingStale => 'Nothing overdue';
+  @override String get graphLegend => 'Legend';
+  @override String get graphLegendTaskCount => 'number = tasks under it';
+  @override String get graphLegendDimmed => 'faded = another semester';
+  @override String get graphFilterUnfinished => 'Unfinished';
+  @override String get graphOpen => 'Open';
+  @override String graphViewTasks(int count) => 'See $count tasks';
+  @override String get graphNextDue => 'Next due';
 
   @override String get semesterSettings => 'Semester Settings';
   @override String get semesterCount => 'Semester System';
@@ -149,6 +162,7 @@ class StringsEn implements AppStrings {
   @override String tasksWithCount(int count) => 'Tasks ($count)';
   @override String completedTasksWithCount(int count) => 'Completed Tasks ($count)';
   @override String get noSemester => 'No semester';
+  @override String journalStreakDays(int days) => '$days-day streak';
   @override String get completionEffect => 'Task completion effect';
   @override String get effectOff => 'Off';
   @override String get effectBasic => 'Basic';

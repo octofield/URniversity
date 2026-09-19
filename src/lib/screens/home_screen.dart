@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../widgets/draggable_fab.dart';
 import '../providers/settings_provider.dart';
 import '../providers/date_provider.dart';
+import '../providers/home_tab_provider.dart';
 import '../providers/synced_list_notifier.dart';
 import 'today_screen.dart' show TodayScreen, showTaskSheet, showAddInspirationSheet;
 
@@ -38,6 +40,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(dateProvider.notifier).goToToday(next);
     });
 
+    // Something outside the tab bar asked for a tab — the graph's "see the
+    // tasks" button, which sets the filter and then has to land the user on it
+    ref.listen<int?>(pendingTabProvider, (_, tab) {
+      if (tab == null) return;
+      setState(() => _index = tab);
+      ref.read(pendingTabProvider.notifier).state = null;
+    });
+
     // Surface writes that never reached Supabase. Without this the screen shows
     // the change as saved while the row was silently dropped
     ref.listen<Object?>(syncErrorProvider, (_, error) {
@@ -64,6 +74,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (icon: Icons.flag_outlined, selectedIcon: Icons.flag, label: s.goals),
       (icon: Icons.person_outlined, selectedIcon: Icons.person, label: s.me),
     ];
+
+    final addButton = switch (_index) {
+      1 => _VividFab(
+          color: AppColors.categoryIntern,
+          tooltip: s.addTarget,
+          onPressed: () => showSemesterGoalSheet(context, ref),
+          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
+      2 => _VividFab(
+          color: AppColors.categoryCert,
+          tooltip: s.addGoal,
+          onPressed: () => showFutureGoalSheet(context, ref),
+          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
+      3 => _VividFab(
+          color: AppColors.categoryPerformance,
+          tooltip: s.addJournal,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const JournalEditScreen()),
+          ),
+          child: const Icon(Icons.edit_note, color: AppColors.textOnPrimary, size: 30)),
+      _ => _VividFab(
+          color: AppColors.categoryCompetition,
+          tooltip: s.addTask,
+          onPressed: () => showTaskSheet(context, ref),
+          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
+    };
 
     final body = Stack(
       children: [
@@ -94,10 +130,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             MeScreen(),
           ],
         ),
+        // Both add buttons live in the page stack so they can be dragged
+        // anywhere on it; the Scaffold's own floatingActionButton slot is
+        // fixed to one corner
         if (_index < 3)
-          Positioned(
-            left: 16,
-            bottom: 16,
+          DraggableFab(
+            storageKey: 'inspiration',
             child: _VividFab(
               color: AppColors.categoryExchange,
               tooltip: s.addInspiration,
@@ -114,35 +152,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+        DraggableFab(storageKey: 'main', child: addButton),
       ],
     );
-
-    final floatingActionButton = switch (_index) {
-      0 => _VividFab(
-          color: AppColors.categoryCompetition,
-          tooltip: s.addTask,
-          onPressed: () => showTaskSheet(context, ref),
-          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
-      1 => _VividFab(
-          color: AppColors.categoryIntern,
-          tooltip: s.addTarget,
-          onPressed: () => showSemesterGoalSheet(context, ref),
-          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
-      2 => _VividFab(
-          color: AppColors.categoryCert,
-          tooltip: s.addGoal,
-          onPressed: () => showFutureGoalSheet(context, ref),
-          child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
-      3 => _VividFab(
-          color: AppColors.categoryPerformance,
-          tooltip: s.addJournal,
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const JournalEditScreen()),
-          ),
-          child: const Icon(Icons.edit_note, color: AppColors.textOnPrimary, size: 30)),
-      _ => null,
-    };
 
     if (isDesktop) {
       final extended = width >= AppBreakpoints.wide;
@@ -183,13 +195,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Expanded(child: body),
           ],
         ),
-        floatingActionButton: floatingActionButton,
       );
     }
 
     return Scaffold(
       body: body,
-      floatingActionButton: floatingActionButton,
       // Hamburger menu (opened from each screen's header) — houses the main
       // destinations today and leaves room to grow secondary features below
       // the divider later. Desktop already shows a permanent NavigationRail.

@@ -43,6 +43,30 @@ void main() {
     expect(ticked, isTrue);
   });
 
+  testWidgets('the tick is drawn over the page, so it outlives the row', (tester) async {
+    final c = testContainer();
+    await c.read(completionEffectProvider.notifier).set(TaskCompletionEffect.basic);
+
+    await pumpScreen(
+      tester,
+      Scaffold(
+        body: Center(child: TaskCheckbox(value: false, onToggle: () {})),
+      ),
+      container: c,
+    );
+
+    expect(find.byIcon(Icons.check), findsNothing);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    // An overlay, not part of the row: ticking a task off takes its row out of
+    // the list on the next frame
+    expect(find.byIcon(Icons.check), findsOneWidget);
+
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check), findsNothing, reason: 'and it cleans up');
+  });
+
   testWidgets('with the effect off the box never scales', (tester) async {
     final c = testContainer();
     await c.read(completionEffectProvider.notifier).set(TaskCompletionEffect.off);

@@ -4,6 +4,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../core/notification_cancel.dart';
 import '../core/notification_constants.dart';
 import '../core/notification_schedule.dart';
 import '../models/notification_settings.dart';
@@ -117,7 +118,12 @@ class NotificationService {
   // be far more code than simply re-registering them
   Future<void> apply(List<ScheduledNotification> scheduled) async {
     if (!await _ensureReady()) return;
-    await _plugin.cancelAll();
+    // Only what has not fired yet. cancelAll() also takes down the reminders
+    // already sitting in the shade, so any data change — including ticking off
+    // an unrelated task — made a reminder the user was looking at disappear
+    for (final pending in await _plugin.pendingNotificationRequests()) {
+      await _plugin.cancel(id: pending.id);
+    }
 
     for (final n in scheduled) {
       final when = tz.TZDateTime.from(n.when, tz.local);
@@ -149,6 +155,27 @@ class NotificationService {
     await _plugin.cancelAll();
   }
 
+  // Takes down a reminder that has already been shown, now that its task is
+  // done. Matched on the payload rather than the id: ids are handed out
+  // positionally when the schedule is built, so the one on screen cannot be
+  // recomputed from the task alone
+  Future<void> cancelForTask(String taskId) async {
+    if (!await _ensureReady()) return;
+    try {
+      final shown = await _plugin.getActiveNotifications();
+      for (final id in notificationIdsForTask(
+        [for (final n in shown) (id: n.id, payload: n.payload)],
+        taskId,
+      )) {
+        await _plugin.cancel(id: id);
+      }
+    } catch (e) {
+      // Reading active notifications is unsupported on older Androids; the
+      // reminder simply stays until the user swipes it
+      debugPrint('[notifications] could not take down the reminder: $e');
+    }
+  }
+
   NotificationDetails _detailsFor(NotificationKind kind) {
     final (id, name) = switch (kind) {
       NotificationKind.taskDue => (NotificationConstants.taskChannelId, 'Task reminders'),
@@ -168,6 +195,9 @@ class NotificationService {
         name,
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
+        // Tapping it opens the app but leaves the reminder in place: it stands
+        // for work still to do, so it goes away when the task does
+        autoCancel: false,
         actions: isTask
             ? [
                 AndroidNotificationAction(
@@ -185,7 +215,8 @@ class NotificationService {
                   rescheduleLabel,
                   // Must bring the app forward: it opens the task's edit sheet
                   showsUserInterface: true,
-                  cancelNotification: true,
+                  // Kept on screen: moving a task's time does not do the task
+                  cancelNotification: false,
                 ),
               ]
             : const <AndroidNotificationAction>[],

@@ -65,7 +65,7 @@ flowchart TD
     Home --> Future
     Home --> Me
 
-    Today -.->|環形進度點擊| History["TaskHistoryScreen\n完成度歷史"]
+    Today -.->|進度卡點擊| History["TaskHistoryScreen\n完成度歷史"]
     Semester -.->|頁首 icon| Graph["OverviewGraphScreen\n關聯圖"]
     Future -.->|頁首 icon| Graph
     Semester -.-> SemDetail["SemesterGoalDetailScreen"]
@@ -101,39 +101,41 @@ flowchart TD
 
 | 欄位 | 輸入元件 | 格式 | 必填 |
 |---|---|---|---|
-| 標題 | 文字輸入框 | 任意字串，前端 `trim()` 後不可為空 | ✓ |
-| 備註 | 文字輸入框（空白時一行，隨內容長到最多三行） | 任意字串 | ✗ |
+| 標題 | `SheetTextField`（標籤印在框內上方） | 任意字串，前端 `trim()` 後不可為空 | ✓ |
+| 備註 | `SheetTextField`（空白時一行，隨內容長到最多三行） | 任意字串 | ✗ |
 | 截止時間的建議 | 最多 3 個 `ActionChip`（最近用過的時間） | 套用到今天；**該時刻已過則改成明天** | ✗ |
 | 連結目標的建議 | 最多 3 個 `ActionChip`（最近用過的目標） | 學期目標 id，已刪除的不顯示 | ✗ |
-| 優先度 | `SegmentedButton` | 低/中/高（對應 1/2/3） | ✓（預設低） |
 | 截止時間 | 日期+時間選擇器 | `DateTime` | ✗ |
 | 循環規則 | `ChoiceChip` + 數字輸入（僅「每 N 天」時出現）+ 星期複選 `FilterChip`（僅「每週」時出現） | 不循環/每日/每週/每月/每 N 天 | ✗ |
 | 循環星期 | 7 個 `FilterChip`（一～日，可複選） | ISO 星期 1–7；不選＝沿用「與建立日同星期幾」 | ✗ |
-| 連結學期目標 | 清單選擇對話框 | 學期目標 id | ✗ |
-| 連結未來願景 | 清單選擇對話框 | 未來願景 id | ✗ |
-| 父任務 | 由「新增子任務」入口或拖曳決定，非表單欄位 | 任務 id（**限一層**） | ✗ |
+| 連結學期目標 | 依學期分組的清單選擇對話框（見 §3-C） | 學期目標 id | ✗ |
 
-輸出：任務卡片（含優先度標籤、截止時間倒數上色、循環圖示、連結目標/願景的箭頭文字），依
-§3-A 規則分組排序後呈現；環形進度卡顯示「已完成 / 總數」與百分比。
+輸出：任務卡片（含截止時間倒數上色、循環圖示、連結目標的箭頭文字），依
+§3-A 規則分組排序後呈現；環形進度卡顯示「已完成 / 總數」與百分比，**整張卡片都可以點**進完成度歷史（2026-09-20：先前只有 72px 的圓環可點）。
 
 **目標頁的進度總覽卡**（2026-09-18 改版，設計稿 A 版）：大字百分比 + 「已完成 / 總數」+ 一條
 整體進度條，下方每個分類一個小膠囊（分類色圓點 + 該分類的完成數／總數）。取代原本「每個目標
 一條進度條」的列表——目標一多就變成一整面長條。
 
-任務卡片版面：左緣 6px 色條顯示連結目標/願景的分類色（詳見 §3-J）；**沒有連結時色條仍保留
+任務卡片版面：左緣 6px 色條顯示連結目標的分類色（詳見 §3-J）；**沒有連結時色條仍保留
 寬度但為透明**，確保有連結與沒連結的任務左緣對齊。色條由 `widgets/link_color_bar.dart` 的
 `LinkColorBar` 統一畫：兩個連結顏色不同時上下分色、相同時合併成一條，**目標卡片共用同一個元件**
 （上半為目標自己的分類色，下半為連結願景的分類色）。卡片本身用 `ListTile` 但設
-`minTileHeight: 0` 解除 Material 預設的 72dp 兩行下限，並以
-`titleAlignment: ListTileTitleAlignment.center` 讓內容較少的任務垂直置中；分隔線縮排由
+`minTileHeight: 0` 解除 Material 預設的 72dp 兩行下限；色條改用 **`Stack` + `Positioned`**
+畫在左緣，**不可以**用 `IntrinsicHeight` + `Row` 把色條撐高——`ListTile` 是用**整個寬度**去量
+自己的 intrinsic height，標題在真實寬度下才換行時它仍回報一行的高度，副標就會被切掉。
+標題 `maxLines: 2` 後改用
+`titleAlignment: ListTileTitleAlignment.titleHeight` **頂端對齊**——置中會讓兩行標題把勾選框
+與刪除鈕推離第一行（2026-09-19 回報的「兩行時排版跑掉」）。目標／願景卡片同樣由 1 行放寬到
+**2 行**，卡片高度隨內容長。分隔線縮排由
 `_taskTitleIndent` 常數（62.0 = 色條 6 + 內距 8 + 核取方塊 40 + 間隙 8）統一控制，
 調整版面時必須同步更新這個常數。
 
 **每週檢視**（`_WeeklyGrid` / `_DayRow` / `_WeekTaskTile`，2026-09-15 改版，設計稿方向 B）：
 一整張卡片由上到下七列（週一到週日），每列**左側固定寬度日期欄**（手機 60、桌面 84）與右側
 該日任務以細線隔開；卡片最寬 760，寬螢幕置中。今天的日期欄底色 `primaryLight`、日期為主色實心；
-選取中但不是今天的日期加主色外框；沒有任務的日子只顯示「–」。任務列：3px 分類色條（連結目標優先，
-其次願景）、勾選框、標題（已完成加刪除線變淡，**留在原位**）、循環規則或截止時間、未完成才顯示的優先度。
+選取中但不是今天的日期加主色外框；沒有任務的日子只顯示「–」。任務列：3px 色條（連結目標的分類色，
+見 §3-J）、勾選框、標題（已完成加刪除線變淡，**留在原位**）、循環規則或截止時間。
 點日期欄設為選取日並捲動到該列；點任務開編輯 sheet；篩選與其他檢視共用。
 
 **已完成區塊**：標題可點，`AnimatedSize` 展開／收合，**預設收合**，狀態只存在記憶體。
@@ -143,13 +145,29 @@ flowchart TD
 那就是 2026-09-17 回報的「畫面上留下一個大框框」）；`celebrate` 再加上自繪彩帶，且**只在當天最後一筆
 未完成任務被勾掉時**放（每筆都放太吵）。動畫純粹是外觀，寫入照舊發生。
 
-**拖曳排序與子任務**：任務列表與兩個目標頁共用同一套命中判定（`widgets/drag_reorder.dart`
-的 `dropZoneFor()`）——詳見 §3-C。子任務**限一層**：子任務不能再有子任務，已經有子任務的任務
-也不能被拖成別人的子任務（`reorderTask()` 與 UI 命中判斷兩邊都有擋）。
-刪除父任務會連帶刪除其子任務，且**父任務與所有子任務都會各自寫入回收桶快照**
-（`remove()` 回傳被刪除的清單供呼叫端逐一快照）。
+⚠️ **動畫要畫在 `Overlay` 上**（`showCompletionPop()`）。勾選當下就寫入，那一列在下一個
+frame 就離開清單（進入已完成區或被篩掉），長在列身上的動畫等於沒播——這是 2026-09-19
+回報的「完成動畫消失了」。改成在原位置丟一個獨立的圓圈＋打勾疊層（約 420ms 後自行移除），
+列消失也照播完。
 
-新增與編輯共用同一個 `showTaskSheet(context, ref, {Task? existing, String? parentTaskId})`
+**拖曳排序**：任務列表與兩個目標頁共用同一套命中判定（`widgets/drag_reorder.dart`
+的 `dropZoneFor()`）——詳見 §3-C，但任務是**單層清單**，呼叫時帶 `canNest: false`，只認
+「插入到某列之前」。**子任務功能已於 2026-09-19 移除**（沒有人用；`tasks.parent_task_id`
+欄位保留但不再讀寫，見 DD.md D1）。
+
+**欄位元件（`widgets/sheet_fields.dart`，2026-09-20 設計稿）**：四張 sheet（任務／目標／願景／
+靈感）都用同一組欄位，不再各自拼 Material 元件——
+`SheetTextField`（標籤印在框內上方，不是浮動標籤：填寫時標籤要看得見）、
+`SheetPickerBox`（同樣的框，值由對話框挑，右側一個 `expand_more`）、
+`SheetCategoryChips`（每個分類帶自己的顏色圓點，選中＝主色邊框＋`primaryLight` 底）。
+加一種欄位只要做一次，四張 sheet 都拿得到。
+
+⚠️ **下拉可以關閉 sheet**（`SheetBody`）。拖曳把手在捲動區之外，所以**只有**把手關得掉；
+鍵盤升起時 sheet 幾乎滿版，那條 36px 的把手離拇指很遠。現在捲動區用
+`AlwaysScrollableScrollPhysics`，並監聽 `OverscrollNotification`：往下拉超過 90px 就先收鍵盤
+再 `maybePop()`。
+
+新增與編輯共用同一個 `showTaskSheet(context, ref, {Task? existing})`
 （`existing == null` 即新增）。編輯走 `copyWith`，不手動重建 `Task(...)`——model 的每個欄位
 都有預設值，手動重建會讓漏帶的欄位靜默重設。目標與願景同樣各自收斂成
 `showSemesterGoalSheet` / `showFutureGoalSheet`。
@@ -158,10 +176,14 @@ flowchart TD
 變動就會重跑該 `builder`（SDK
 `bottom_sheet.dart` 的 `buildPage` 透過 `MediaQuery.removePadding` 建立依賴），而表單標題欄
 `autofocus: true` 會讓「開啟選擇器對話框 → 鍵盤收起 → `viewInsets` 改變」必然觸發重跑。若把
-`priority` / `dueTime` / `recurrence` / `linkedTargetId` / `linkedGoalId` 宣告在閉包內，選擇器
+`dueTime` / `recurrence` / `linkedTargetId` 宣告在閉包內，選擇器
 的 callback 會寫進已失效的舊閉包變數，症狀是「點了沒反應、要按好幾次才成功」。
 
 ### 2-C 學期目標（Semester 頁）／未來願景（Future 頁）
+
+> **分類可以不選**（2026-09-20）。送出時不再把空的分類補成「其他」——那是一個使用者可能
+> 另有用途的真實分類。沒有分類的目標色條走中性色（`noCategoryColor`，見 §3-J）。
+> 學期改用 `SheetPickerBox`，**新增時也看得到**（先前只有編輯頂層目標才出現）。
 
 | 欄位 | 輸入元件 | 格式 | 必填 |
 |---|---|---|---|
@@ -185,8 +207,11 @@ flowchart TD
 
 ### 2-D 篩選（Today 頁）
 
-輸入：勾選學期目標／未來願景（樹狀複選對話框，勾選父節點會連動勾選所有子孫）。
-輸出：任務清單依 `linkedTargetId` / `linkedGoalId` 是否落在勾選集合（含子孫展開後的集合）內
+輸入：勾選學期目標（`SemesterGroupedFilterDialog`，與「任務連結目標」的挑選器共用
+`groupBySemester()` / `startGroupIndex()`：上方一排學期 chip、開啟時停在當前學期、項目為
+可複選的勾選列；勾選父節點會連動勾選所有子孫，取消子節點則一併取消其祖先，否則祖先仍會
+把它的任務拉進來）。**沒有願景分頁**——任務不再直接連結願景（見 §UC3-B）。
+輸出：任務清單依 `linkedTargetId` 是否落在勾選集合（含子孫展開後的集合）內
 過濾；畫面上以主色膠囊 Chip 顯示「篩選 · N」，N 為已選數量，可一鍵清除。
 
 ### 2-E App 設定（設定頁）
@@ -214,11 +239,35 @@ flowchart TD
 輸出：以學期目標／未來願景為節點、三種關聯為邊的可互動圖（詳見 §3-G、§5-F）；點節點導向對應
 詳細頁。
 
+> **2026-09-20 改版（設計稿 A）**：畫布上方多一排**篩選 chip**（全部／本學期／未完成／未連結），
+> 右上角一張常駐**圖例**卡（願景／目標的樣子、數字代表底下的任務、淡色代表其他學期）。
+> **點節點不再直接離開頁面**——改成在下方開一張摘要卡：進度（子項完成數）、未完成任務數、
+> 最近截止日，以及兩顆按鈕「打開」（進詳情頁）與「看 N 個任務」（把今日頁的目標篩選設成這一支，
+> 再回到首頁並切到任務分頁，見 `providers/home_tab_provider.dart`）。
+> 篩選只縮小**學期目標**；願景只要還有目標掛在上面就留著，樹才不會失去根。
+
 ### 2-H 任務完成度歷史（TaskHistoryScreen）
 
 輸入：日／週／月檢視切換（`SegmentedButton`）、點擊或滑鼠移到長條上選取該期間。
-輸出：長條圖（0–100% 完成率）+ 期間平均完成率文字 + 選取期間的「N / M 完成（P%）」明細，
-沒有任務的日期以底線刻度呈現而非 0% 長條（區分「沒事做」與「有事沒做」）。
+輸出（**2026-09-20 改版，設計稿 A**）：四張卡片，由上到下
+
+| 卡片 | 內容 | 來源 |
+|---|---|---|
+| 摘要 | 大字平均完成率 + **較上一期 ±X%** + 三個數字：連續達成天數、期間完成任務數、最強的星期幾 | `core/history_stats.dart` |
+| 長條圖 | 原本的圖（0–100%），沒有任務的日期以底線刻度呈現而非 0% 長條（區分「沒事做」與「有事沒做」）；下方是選取期間的「N / M 完成（P%）」明細 | — |
+| 各分類完成率 | 每個分類一條進度條，**沒做完的最多的排最前面**，最後一行點名落後最多的那個 | `categoryTotals()` |
+| 拖最久的任務 | 最多 3 筆，依逾期天數排序，帶連結目標的顏色 | `stalestTasks()` |
+
+**`core/history_stats.dart` 的規則**（純函式，全部有單元測試）：
+
+- `totalsBetween()` / `rateBetween()`：把區間內每天的 `taskCompletionStatsOn()` 相加，
+  沒有任務的日子不計入（與 §3-B 的理由相同）
+- `allDoneStreak()`：從今天往回數「當天的任務全部完成」的連續天數。
+  **今天還沒做完不算中斷**（這天還沒結束），昨天沒做完就中斷；沒有任務的日子既不延續也不中斷
+- `bestWeekday()`：區間內平均完成率最高的星期幾（不是最忙的那天）
+- `categoryTotals()`：任務的分類＝**它連結目標的分類**（§3-J）；沒有連結、或目標沒有分類的任務
+  不列入——這張表是要指出哪個分類落後，「沒有分類」不是一個分類
+- `stalestTasks()`：`currentOccurrence()` 在今天之前且還沒完成的任務，依逾期天數排序
 
 ### 2-I 分類設定（CategorySettingsScreen／「更多分類」對話框）
 
@@ -229,13 +278,36 @@ flowchart TD
 |---|---|---|
 | 新增分類 | 文字輸入框 + 送出鈕 | 任意字串，成為該分類的 id 與顯示名稱 |
 | 排序 | 拖曳單線把手（`Icons.horizontal_rule`，圖一改版前是雙線 `Icons.drag_handle`） | 拖放調整順序 |
-| 顏色 | 圓形色塊按鈕 → 彈出色票網格 | `categoryColorPresets`（12 色固定清單） |
+| 顏色 | 圓形色塊按鈕 → 彈出色票網格 | `categoryColorPresets`（24 色固定清單，可捲動） |
 | 圖示 | 圖示按鈕 → 彈出圖示網格 | `categoryIconPresets`（20 個固定圖示，見 §3 備註） |
 | 刪除 | 垃圾桶 icon（僅自訂分類） | 內建 6 分類無法刪除 |
 
 輸出：即時套用到所有顯示該分類的畫面（目標/願景卡片色條、關聯圖節點、任務左側連結色條等），
 非訪客模式非同步寫回 `user_categories.styles`（見 DD.md D7；需要先手動執行一次資料庫 migration
 才會生效）。
+
+### 2-J 我的頁（MeScreen）
+
+輸入：個人資料卡（暱稱／學校／系所／年級／頭像，寫回 D8-A）、靈感與日記兩區的入口。
+頭像可從 `AppAvatars.presets`（**24 個**內建圖示頭像）挑選，索引存進 `avatar_index`——
+**presets 的順序就是這個索引的意義，既有項目只能往後追加，不能調換或刪除**，否則所有人的
+頭像都會被換掉。
+
+輸出：個人資料卡下方三張**摘要卡**（`_SummaryTiles`，2026-09-19 改版，設計稿 A 的分區 +
+B 的數字卡）：
+
+| 數字 | 來源 | 備註 |
+|---|---|---|
+| 任務 | `tasksProvider` 中今天**尚未完成**的筆數 | 只算還開著的：一個永遠往上加的總數說不出這學期過得如何 |
+| 目標 | `semesterGoalsProvider` 中目前學期、**頂層、未完成**的筆數 | 不含里程碑；跟著目標頁目前選的學期走 |
+| 願景 | `futureGoalsProvider` 中**頂層、未完成**的筆數 | 不含子願景 |
+| 靈感 | `inspirationsProvider` 中**尚未完成**的筆數 | 已完成的不算 |
+
+連續寫日記天數（`journalStreak()`，`core/me_stats.dart`）**移到日記區塊的標題旁**（`_StreakChip`，
+只在大於 0 時出現）：那個數字只有在日記旁邊才說得通。計算方式不變——從今天往回數，
+**自動補齊的那天不算**（`JournalNotifier.isWrittenByUser`，見 §3-H），今天還沒寫則從昨天起算。
+
+手機版摘要卡接在個人資料卡下方，桌面雙欄版放在右側個人資料欄內（見 §3-F）。
 
 ---
 
@@ -258,6 +330,27 @@ flowchart TD
 - 完成狀態判斷完全獨立於「是否屬於當天」：非循環看 `isCompleted`，循環看
   `completedDates` 是否包含該日期字串（`Task.isCompletedOn()`）。
 
+**「全部任務」檢視裡，一個循環任務代表哪一次（`currentOccurrence(task, now)`）**：
+「全部任務」不綁日期，所以每一列要自己決定它講的是哪一天，否則每月 20 號的任務在 21 號
+也會以「今天」的身分出現、勾了也記錯日子（2026-09-19 回報）。規則：
+
+1. 今天符合循環規則 → 今天；
+2. 否則往前找**最近一次**符合規則的日子（最多回溯 366 天）——那一次還沒做完，就該一直留著；
+3. 都沒有（規則還沒開始）→ 往後找最近一次（最多 366 天）；
+4. 非循環任務 → `dueTime` 那天；兩者皆無 → `null`（沒有可歸屬的日期）。
+
+`taskRowDateProvider`（`Provider.family<DateTime, Task>`）把這個日期餵給每一列：只有
+「全部任務」用 `currentOccurrence()`，每日／每週檢視仍用選取日。勾選框因此是對**那一次**
+打勾——勾完該列進「已完成」區，直到下一個循環日到來才回到未完成。
+
+**「今天」什麼時候更新**：`effectiveNowProvider` 是 `StateNotifier`（`EffectiveNowNotifier`），
+內建一個跨午夜的 `Timer`（`untilNextDay()`），並在 App 回到前景（`AppLifecycleState.resumed`）
+時 `refresh()`。⚠️ 它**不能是 `Provider`**——`Provider` 只算一次 `DateTime.now()` 就快取，
+App 開著過午夜就整天停在昨天（2026-09-19 回報的「當天的日期有機會是錯的」）。
+換日時 `dateProvider.rollOverTo()` 只在「目前選的正是舊的今天」時把選取日跟著移過去，
+使用者自己翻到的日期不會被搶走。測試環境用 `EffectiveNowNotifier.autoRollOver = false`
+關掉計時器（未關會留下 pending timer 讓 widget 測試失敗），`untilNextDay()` 另有單元測試。
+
 **任務排序（`_applyManualOrder()`，`tasks_provider.dart`）**：先照原本的自動規則分組排序
 （循環 → 有截止時間 → 無截止時間），再以 `sortOrder` 為主鍵重新排序，自動順序當作同分時的
 次鍵。因為既有資料的 `sortOrder` 全是 `0`，在使用者第一次拖曳之前畫面順序完全不變；一旦拖曳，
@@ -274,12 +367,12 @@ flowchart TD
 ### 3-C 目標／願景樹狀結構操作（`semester_goals_provider.dart` / `future_goals_provider.dart`）
 
 兩份 Provider 各自獨立實作相同模式（未共用程式碼，修改一邊時記得檢查另一邊）：
-- **新增**：`sortOrder` 取「同一層（同 `parentId`；學期目標另加同 `semester`；任務為同
-  `parentTaskId`）現有**最小值 − 1000**」（同層沒有項目時為 −1000），讓**新項目排在最上面**，
+- **新增**：`sortOrder` 取「同一層（同 `parentId`；學期目標另加同 `semester`；任務只有
+  一層）現有**最小值 − 1000**」（同層沒有項目時為 −1000），讓**新項目排在最上面**，
   同時預留插入空間。拖曳過的項目保留 `orderBetween()` 算出的值，新增不會移動它們；
   2026-09-15 以前的資料不回溯重排。
-- **連結選擇器（`widgets/semester_grouped_picker.dart`）**：任務→學期目標、任務→願景、
-  學期目標→願景三個對話框共用。`groupBySemester()` 依學期（願景用 `startSemester`）
+- **連結選擇器（`widgets/semester_grouped_picker.dart`）**：任務→學期目標、學期目標→願景
+  兩個對話框，以及今日頁的**目標篩選**（`SemesterGroupedFilterDialog`，複選版）共用。`groupBySemester()` 依學期（願景用 `startSemester`）
   **由早到晚**分組、未設定學期的一組放最後；組內依 `sortOrder`（新的在上）並把子項縮排在父項下，
   父項在別的學期時子項在自己的組內當根。上方一排學期 chip（預設「全部」）可只看某學期。
   開啟時捲到 `startGroupIndex()`：當前學期 → 沒有則之後最近的學期 → 都在過去則最晚的學期。
@@ -288,7 +381,8 @@ flowchart TD
   子孫，避免產生循環參照；通過後更新 `parentId` 與 `sortOrder`。
 - **拖曳命中判定（三個列表共用，`widgets/drag_reorder.dart`）**：一列由上而下切成
   **上 1/4 =「插入這列之前」、中 1/2 =「成為這列的子項」、下 1/4 =「插入這列之後」**；
-  當該列不能收子項時（例如任務的子任務列），中間那半平分給前後兩區，讓整列都有作用。
+  當該列不能收子項時（`canNest: false`，例如單層的任務清單），中間那半平分給前後兩區，
+  讓整列都有作用。
   排序值一律走 `orderBetween(prev, next)`（取中點；一端為空則 ±1000）與
   `orderAfterLast()`（最大值 +1000）。
   ⚠️ **`DragTargetDetails.offset` 不是指標位置**，而是拖曳回饋 widget 的左上角；直接拿來
@@ -341,6 +435,15 @@ flowchart TD
 `computedGrade(baseGrade, gradeSetYear, effectiveNow, settings)`：以 `academicYear()`（依第 1
 學期起始月判斷「現在屬於哪個學年」）與使用者上次設定年級時的學年度相減，得出經過幾個學年，
 加回 `baseGrade` 並限制在 1～7 之間。使用者不需要每年手動改年級。
+
+### 3-E-B 四個主頁面的頁首（`widgets/page_header.dart`）
+
+今日／目標／願景／我的各自拼自己的頁首，於是它們慢慢長歪——目標頁的三條線按鈕比其他三頁高。
+現在四頁都用 `PageHeader(title:, subtitle:, actions:)`：**固定 44px 高的標題列**（放得下
+IconButton 的觸控範圍，也放得下 headlineSmall），三條線在左、動作按鈕在右，
+`AppSpacing.pageTop` 的上內距只寫一份。今日頁的「問候語＋日期狀態」走 `subtitle`。
+桌面（≥ `AppBreakpoints.desktop`）有常駐的 NavigationRail，所以不畫三條線——這個判斷也在
+元件裡，頁面不必各自重算。
 
 ### 3-F 響應式版面決策（`app_breakpoints.dart` + 各 `screens/*.dart`）
 
@@ -425,10 +528,18 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 - 圖示只能是 `categoryIconPresets`（固定 const 清單）裡的其中一個：因為 Flutter 的圖示
   tree-shaking 只認得「原始碼裡出現過的字面 `Icons.xxx`」，這份清單本身就會被圖示選擇器的
   網格 UI 字面引用，才能保證使用者選到的任何圖示都不會在正式建置時被砍掉。
-- 任務左側連結色條（`_linkColorBar()`，`today_screen.dart`）：依任務是否連結學期目標／未來願景
-  決定顯示內容——只連結一邊就顯示該分類的實心色條；兩邊都連結且分類顏色相同也顯示單一實心色；
-  兩邊都連結但分類顏色不同，色條上半用目標顏色、下半用願景顏色（`Column` + 兩個 `Expanded`）；
-  都沒連結則不顯示色條（寬度 0）。
+- **沒有分類**（2026-09-20）：`primaryCategoryOf(categories)` 回 `null`，
+  `resolveCatColor`／`resolveCatIcon` 看到 `null` 就給中性色 `noCategoryColor`
+  （`AppColors.textTertiary`）與 `noCategoryIcon`（`Icons.label_outline`）。
+  **不可以退回 `'other'`**——那是一個使用者可能另有用途的真實分類。
+- **任務的顏色一律來自它連結的目標**：`taskLinkColor(cats, linkedTarget)` 是唯一的來源，
+  今日頁任務列、每週檢視的 3px 色條、新增/編輯 sheet 的連結列都走它；小工具那邊
+  （`_taskCategories()` → `_colorForCategories()`）算的是同一件事，只是要把顏色轉成 ARGB 整數
+  交給原生端。
+- 連結色條（`widgets/link_color_bar.dart` 的 `LinkColorBar`）：任務列只有一個連結對象
+  （學期目標），所以傳 `top:` 一種顏色，畫成單一實心色條；沒連結時色條透明但**保留寬度**，
+  讓有無連結的列左緣對齊。目標卡片仍是兩段：上半為目標自己的分類色、下半為它所連結願景的
+  分類色（顏色相同則合併成一條）。
 
 ### 3-K 通知排程計算（`core/notification_schedule.dart`）
 
@@ -440,7 +551,7 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 
 | 種類 | 何時產生 | 刻意排除的情況 |
 |---|---|---|
-| 任務到期 | 有 `dueTime` 的任務，於 `dueTime − taskLeadMinutes` | **沒有 `dueTime` 的任務**（沒有可提醒的時刻，交給每日摘要）；**子任務**（避免父子重複響）；已完成的 |
+| 任務到期 | 有 `dueTime` 的任務，於 `dueTime − taskLeadMinutes` | **沒有 `dueTime` 的任務**（沒有可提醒的時刻，交給每日摘要）；已完成的 |
 | ↑ 內容 | **只有標題（任務名稱），沒有內文**——下方的空間留給兩顆動作按鈕 | — |
 | 每日摘要 | 每天 `summaryMinuteOfDay`，內容是當天適用且未完成的任務數 | **當天沒有任何任務時整則跳過**——每天都說「今天沒安排」會訓練使用者把整個頻道關掉 |
 | 學期目標截止 | `semesterEnd(學期) − goalLeadDays`，於摘要時間 | **子目標**（會與父目標重複計算同一件事）；已完成的；整學期都完成的則完全不發 |
@@ -454,7 +565,21 @@ SnackBar；debug 建置會一併顯示 PostgREST 的 `code`／`details`／`hint`
 排程在資料一有變動就整批重算，所以短的視野不會漏掉東西。
 
 **id 配置**：排序後才依序發號（`taskIdBase + i` 等）。不從資料列 id 雜湊而來，因為
-`apply()` 每次都先 `cancelAll()`，順序發號必不碰撞，雜湊則有機會碰撞。
+`apply()` 每次都會把**還沒觸發**的排程整批取消再重排，順序發號必不碰撞，雜湊則有機會碰撞。
+也因此 payload 才是「這則通知屬於哪個任務」的唯一依據（id 是位置性的，事後算不回來）。
+
+**通知要留到任務完成為止**（2026-09-19 回報「點進 App 通知就不見了」）。三件事一起：
+
+| 行為 | 作法 |
+|---|---|
+| 重算排程不動已經跳出來的通知 | `apply()` 只取消 `pendingNotificationRequests()`，**不呼叫 `cancelAll()`**——`cancelAll()` 連通知欄裡的也一起掃掉，等於「勾掉任一筆不相干的任務」就讓使用者眼前的提醒消失 |
+| 點一下不自動關掉 | `AndroidNotificationDetails(autoCancel: false)`；「重新安排時間」動作也帶 `cancelNotification: false`（改時間不等於做完） |
+| 完成時才收掉 | `toggleOnDate()` 完成該任務後呼叫 `NotificationService.cancelForTask(taskId)`，掃 `getActiveNotifications()` 比對 payload 的 taskId 再 `cancel(id:)`；「標示為已完成」動作維持 `cancelNotification: true` |
+| 小工具勾掉也要收 | 小工具的勾選走**背景 isolate**（`background_task_writer.dart`），那裡沒有 `NotificationService`，所以寫入成功且**該次變成已完成**時自己呼叫 `cancelShownReminder()`。比對規則只有一份：`core/notification_cancel.dart` 的 `notificationIdsForTask()`，兩個 isolate 共用 |
+
+`notification_service.dart` 碰 platform channel，`flutter test` 裡沒有通道可用，所以這三項
+由 `test/notification_persistence_source_test.dart` **讀原始碼**把關（與 `row_id_source_test`
+同一套做法）。
 
 **payload**：只有任務提醒帶，格式 `"{taskId}|{yyyy-MM-dd}"`
 （`core/notification_payload.dart`）。**日期是必要的**——循環任務的提醒是針對「那一天那一次」，
@@ -523,7 +648,7 @@ Supabase、也不該懂業務規則。所以 Dart 把「該顯示哪些列」算
 | `tasks` | 依期間與篩選選出的任務 | 勾選框 → 背景標記完成；列 → 開 App 進編輯 |
 | `targets` | 頂層學期目標 + 直屬子目標完成數 | 開 App 進詳情 |
 | `goals` | 頂層未來願景 + 直屬子願景完成數 | 開 App 進詳情 |
-| `filterPicker` | 清除篩選 ／ 目標（**依學期分組**） ／ 願景 | 設定篩選並回到 `tasks` |
+| `filterPicker` | 清除篩選 ／ 目標（**依學期分組**） | 設定篩選並回到 `tasks` |
 
 **期間語意**（用既有的 `taskAppliesTo()` 逐日展開，與今日頁同一個函式）：
 
@@ -537,7 +662,7 @@ Supabase、也不該懂業務規則。所以 Dart 把「該顯示哪些列」算
 ⚠️ **一個任務一列，不是一天一列**。每日循環的任務在「本月」會展開成三十次，
 中等尺寸的小工具放不下。副標顯示的是**最近一次仍未完成**的日期。
 
-**篩選**：每個任務列帶一份 `filters`＝它連結的目標／願景**加上所有祖先**的 id
+**篩選**：每個任務列帶一份 `filters`＝它連結的目標**加上所有祖先**的 id
 （`_withAncestors()`，遇到循環的 parent 會停）。原生端只做「`filters` 含不含選中的 id」
 這一個比對，規則仍只存在 Dart。選一個目標等於連它的子孫目標也算進去，
 否則掛在子目標下的工作會被靜默藏起來。
@@ -647,20 +772,22 @@ flowchart TD
 1. 今日頁按浮動新增鈕（amber 色）→ 開啟新增任務表單。
 2. 輸入標題，選擇循環規則「每週」→ 下方出現一～日七個星期 chip，**可複選多天**（例如一、三、五）；
    選「每月」則出現 1–31 加上「最後一天」的 chip，同樣可複選；
-   可選擇連結學期目標／未來願景 → 送出。
+   可選擇連結學期目標（依學期分組的挑選器）→ 送出。
 3. 該任務依 §3-A 規則，只在所選的日子出現。**若一個都沒選，標籤會直接把退回的那一天寫出來**
    （顯示成「每週四」「每月20號」），與有選擇時的寫法完全一致——使用者不需要理解「退回規則」
    這個概念，看到的就是實際會發生的行為。
 4. 勾選完成 → `toggleOnDate()` 把當天日期字串加進 `completedDates`（循環任務不影響
    `isCompleted`）。
 
-### UC3-B　建立子任務並調整任務順序
-1. 建立子任務有兩種入口：編輯某個頂層任務 →「新增子任務」；或直接把一個任務**拖到另一個
-   頂層任務的列身**上。
-2. 子任務以縮排顯示在父任務下方，**限一層**。
-3. 調整順序：拖到某列的**上緣**即插入該列之前；拖曳過程中列表尾端會出現放置區，拖到那裡可把
-   子任務移回頂層。
-4. 刪除父任務會**連帶刪除其所有子任務**。
+### UC3-B　調整任務順序
+1. 長按（行動裝置）或直接拖曳（Web）任務列。
+2. 拖到某列的**上緣**即插入該列之前——任務是單層清單，**拖到列身上不會變成子任務**
+   （`dropZoneFor(canNest: false)`）。
+3. 放開時寫入 `sortOrder`（`orderBetween()` 取前後兩列的中間值）。
+
+> 子任務功能與「任務連結未來願景」都在 2026-09-19 移除：前者沒有人用，後者與
+> `任務 → 學期目標 → 未來願景` 的路徑重複，同一件事有兩條連法反而讓關聯圖說不清楚。
+> 兩個資料庫欄位（`parent_task_id` / `linked_goal_id`）保留不動，只是不再讀寫。
 
 ### UC4　建立學期目標並連結未來願景
 1. 目標頁選擇學期分頁 → 按浮動新增鈕（紫色）。
@@ -705,27 +832,42 @@ flowchart TD
    |---|---|
    | `semester_goals.parent_id`／`future_goals.parent_id` | `*_parent_id_fkey ... ON DELETE CASCADE` |
    | `semester_goals.future_goal_id` | `... ON DELETE SET NULL` |
-   | `tasks.linked_target_id`／`tasks.linked_goal_id` | `... ON DELETE SET NULL` |
+   | `tasks.linked_target_id` | `... ON DELETE SET NULL` |
 
-   （`tasks.parent_task_id` **沒有**外鍵，那裡的重新掛回純粹是為了行為一致。
-   本文件先前就寫著「自動掛回頂層」，但程式碼一直沒實作，2026-08-25 才補上。）
+   （`tasks.linked_goal_id` 雖然也是真實外鍵，但 App 已不再寫入，`sanitizeForRestore()`
+   因此只清 `linked_target_id`。）
 4. 也可「清空回收桶」→ 全部永久刪除，無法復原。
 
+### UC6-B　左右滑動切換、拖曳新增鈕
+1. 今日頁的內容區左右**快滑**切換「全部／當日／當週」；目標頁的卡片區左右快滑切換學期
+   （上方那條學期 strip 會跟著捲過去，因為它 `ref.listen` 著 `selectedSemesterProvider`）。
+   判定在 `widgets/swipe_switcher.dart`：`onHorizontalDragEnd` 的速度要超過 250 px/s，
+   否則只是捲動時手歪掉；到頭了就不動（不繞回）。
+2. 兩顆浮動新增鈕（主鈕、靈感鈕）可以**拖到畫面上任何位置**（`widgets/draggable_fab.dart`）。
+   放開時把位置存成 0–1 的比例（D18），重開 App 還在原處。
+   ⚠️ 因此主鈕**不再放在 `Scaffold.floatingActionButton`**，兩顆都在頁面的 `Stack` 裡。
+
 ### UC7　篩選今日任務
-1. 今日頁點篩選 icon → 開啟樹狀複選對話框（分「學期目標」「未來願景」兩個分頁）。
-2. 勾選項目（勾選父節點自動連動子孫）→ 關閉對話框。
+1. 今日頁點篩選 icon → 開啟**依學期分組**的複選對話框（只有學期目標，見 §2-D）。
+2. 勾選項目（勾選父節點自動連動子孫）→ 按「確定」關閉；也可按「重置」一次清空。
 3. 三種檢視（全部／每日／每週）皆套用同一份篩選狀態，畫面出現「篩選 · N」提示 Chip。
 4. 點 Chip 上的 ✕ 一鍵清空篩選。
 
 ### UC8　查看關聯圖並切換佈局
 1. 目標頁或願景頁點頁首的關聯圖 icon → 進入全螢幕 `OverviewGraphScreen`。
 2. 預設「分層模式」；點右上角切換鈕改為「放射模式」，畫面即時重新計算座標（見 §3-G）。
-3. 用手勢縮放／平移畫布；點任一節點導向該目標／願景的詳細頁。
+3. 用手勢縮放／平移畫布。
+4. 上方 chip 可切成「本學期／未完成／未連結」只看其中一部分（見 §2-G）。
+5. 點任一節點 → **下方開出摘要卡**（進度、未完成任務數、最近截止）；
+   按「打開」才進詳細頁，按「看 N 個任務」會把今日頁篩選設成這一支並跳到任務分頁。
+   再點一次同一個節點或按 ✕ 收起摘要卡。
 
 ### UC9　查看任務完成度歷史
-1. 今日頁點摘要卡的環形進度 → 進入 `TaskHistoryScreen`。
+1. 今日頁點**摘要卡**（整張都可以點，不只中間的環形進度）→ 進入 `TaskHistoryScreen`。
 2. 預設顯示「每日」（近 30 天）長條圖；切換「每週」（近 12 週）／「每月」（近 6 個月）。
 3. 點擊或滑鼠移到長條上 → 下方顯示該期間「N / M 完成（P%）」；無資料的期間點擊顯示「無資料」。
+4. 圖表上方是摘要卡（平均、較上一期、連續達成、完成數、最強的星期幾），
+   下方是各分類完成率與拖最久的任務（見 §2-H）。
 
 ### UC10　訪客資料合併進帳號
 
@@ -744,7 +886,6 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 | 參照 | 被參照 |
 |---|---|
 | `tasks.linked_target_id` | `semester_goals.id` |
-| `tasks.linked_goal_id` | `future_goals.id` |
 | `semester_goals.future_goal_id` | `future_goals.id` |
 
 被參照的表沒先寫進去，參照它的那一列會被 23503 擋下**並且永久遺失**——
@@ -947,6 +1088,22 @@ flowchart TD
     Pack --> Render["CustomPainter 畫節點與邊\n(含流動粒子動畫)"]
     Bottom --> Render
 ```
+
+---
+
+## 5-Z 版本號
+
+`lib/core/app_version.dart` 的 `kAppVersion` 是唯一來源（設定頁的「版本」列讀它），
+`pubspec.yaml` 的 `version:` 帶同樣的數字加建置號。格式 `alpha-X.Y.Z`，目前 **alpha-1.0.0**。
+
+| 位數 | 什麼時候加 |
+|---|---|
+| Z（修補） | 一批只有修 bug、文案或版面微調的改動 |
+| Y（次版） | 一批新增或移除了功能 |
+| X（主版） | 資料儲存方式或核心流程改變 |
+
+`alpha-` 前綴**只有使用者說了才拿掉**，不會因為做完一批功能就自己升成正式版。
+`test/app_version_test.dart` 釘住格式與兩個檔案的一致性。
 
 ---
 

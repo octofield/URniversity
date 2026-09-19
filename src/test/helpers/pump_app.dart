@@ -8,6 +8,7 @@ import 'package:urniversity/core/config.dart';
 import 'package:urniversity/core/theme/app_theme.dart';
 import 'package:urniversity/main.dart';
 import 'package:urniversity/providers/guest_provider.dart';
+import 'package:urniversity/providers/settings_provider.dart';
 
 // Guest mode never reaches Supabase — SyncedListNotifier.upsert() returns right
 // after persistLocally() — so a widget test can drive the real screens with no
@@ -20,6 +21,9 @@ import 'package:urniversity/providers/guest_provider.dart';
 // so calling this from every setUp is safe
 Future<void> setUpTestSupabase({bool guest = true}) async {
   TestWidgetsFlutterBinding.ensureInitialized();
+  // The midnight roll-over timer would still be pending when a test ends, which
+  // fails the test. untilNextDay() is covered by its own unit test instead
+  EffectiveNowNotifier.autoRollOver = false;
   SharedPreferences.setMockInitialValues(guest ? {'is_guest_mode': true} : {});
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
@@ -62,6 +66,9 @@ Future<ProviderContainer> pumpScreen(
   Locale locale = const Locale('zh', 'TW'),
   List<Override> overrides = const [],
   ProviderContainer? container,
+  // The overview graph animates its edges forever, so nothing ever settles
+  // there; those tests pump a fixed number of frames instead
+  bool settle = true,
 }) async {
   setViewWidth(tester, width);
   final scope = container ?? testContainer(overrides: overrides);
@@ -85,7 +92,11 @@ Future<ProviderContainer> pumpScreen(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
   return scope;
 }
 

@@ -8,11 +8,20 @@ import 'package:urniversity/providers/semester_goals_provider.dart';
 import 'package:urniversity/screens/future_goal_detail_screen.dart';
 import 'package:urniversity/screens/semester_goal_detail_screen.dart';
 
+import 'package:urniversity/widgets/sheet_fields.dart';
+
 import '../helpers/pump_app.dart';
 
 // Only top-level semester goals carry a future_goal_id (CLAUDE.md §9 rule 7).
 // The rule shows up in three places and each used to disagree with the others.
 // Retires cases 20-25 and 28 of docs/test-plans/2026-08-23-known-issues.md.
+// The sheets label their fields above the box now (SheetTextField), so the
+// label is a sibling of the TextField rather than its decoration
+Finder sheetField(String label) => find.descendant(
+      of: find.widgetWithText(SheetTextField, label),
+      matching: find.byType(TextField),
+    );
+
 void main() {
   const zh = StringsZhTw();
   const semester = '114-1';
@@ -50,6 +59,18 @@ void main() {
         );
     return c.read(semesterGoalsProvider).last;
   }
+
+  testWidgets('a target saved without a category keeps none', (tester) async {
+    final c = testContainer();
+    await openSheet(tester, c, (ctx, ref) => showSemesterGoalSheet(ctx, ref));
+
+    await tester.enterText(sheetField(zh.titleField), '沒有分類的目標');
+    await tester.tap(find.widgetWithText(FilledButton, zh.add));
+    await tester.pumpAndSettle();
+
+    // It used to be saved as "其他", which is a category the user may be using
+    expect(c.read(semesterGoalsProvider).single.categories, isEmpty);
+  });
 
   group('the sheet shows the vision link only for top-level goals', () {
     testWidgets('adding a top-level goal', (tester) async {

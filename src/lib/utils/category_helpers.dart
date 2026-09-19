@@ -3,6 +3,7 @@ import '../core/theme/app_colors.dart';
 import '../l10n/app_strings.dart';
 import '../models/category.dart';
 import '../models/future_goal.dart';
+import '../models/semester_goal.dart';
 
 // Width of the category-color bar on the left edge of target/goal cards
 const double goalCatBarWidth = 6.0;
@@ -134,14 +135,34 @@ IconData defaultCatIcon(String cat) {
   return icons[cat] ?? Icons.label_outline;
 }
 
+// The colour a task takes from the target it is linked to, null when it is not
+// linked to one. The task list, the weekly grid and the widget snapshot all go
+// through here so they can never drift apart
+Color? taskLinkColor(List<CategoryEntry> cats, SemesterGoal? linkedTarget) =>
+    linkedTarget == null
+        ? null
+        : resolveCatColor(cats, primaryCategoryOf(linkedTarget.categories));
+
+// The category a row takes its colour and icon from, or null when it has none.
+// Picking a category is optional, so an empty list must not be dressed up as
+// "other" — that is a real category the user may be using for something else
+String? primaryCategoryOf(List<String> categories) =>
+    categories.isEmpty ? null : categories.first;
+
+// What an uncategorized row looks like: present, but saying nothing
+const Color noCategoryColor = AppColors.textTertiary;
+const IconData noCategoryIcon = Icons.label_outline;
+
 // Live color/icon for a category — checks the user's current customizations
 // first (including recolored/re-iconed built-ins), falling back to the
 // built-in default for a not-yet-customized or orphaned id.
-Color resolveCatColor(List<CategoryEntry> cats, String id) =>
-    cats.where((c) => c.id == id).firstOrNull?.color ?? defaultCatColor(id);
+Color resolveCatColor(List<CategoryEntry> cats, String? id) => id == null
+    ? noCategoryColor
+    : cats.where((c) => c.id == id).firstOrNull?.color ?? defaultCatColor(id);
 
-IconData resolveCatIcon(List<CategoryEntry> cats, String id) =>
-    cats.where((c) => c.id == id).firstOrNull?.icon ?? defaultCatIcon(id);
+IconData resolveCatIcon(List<CategoryEntry> cats, String? id) => id == null
+    ? noCategoryIcon
+    : cats.where((c) => c.id == id).firstOrNull?.icon ?? defaultCatIcon(id);
 
 String catLabel(String cat, AppStrings s) {
   switch (cat) {

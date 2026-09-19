@@ -144,18 +144,6 @@ void main() {
       expect(scheduled, isEmpty);
     });
 
-    test('a subtask does not buzz alongside its parent', () {
-      final scheduled = build(
-        tasks: [
-          task(id: 'p', dueTime: DateTime(2026, 9, 14, 15, 0)),
-          task(id: 'c', parentTaskId: 'p', dueTime: DateTime(2026, 9, 14, 15, 0)),
-        ],
-        settings: allOn.copyWith(
-            dailySummaryEnabled: false, goalDeadlineEnabled: false),
-      );
-      expect(scheduled, hasLength(1));
-    });
-
     test('a daily task is scheduled once per day in the horizon', () {
       final scheduled = build(
         tasks: [
