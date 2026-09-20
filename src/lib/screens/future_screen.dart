@@ -19,6 +19,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/category_manager.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/link_color_bar.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
@@ -487,6 +488,9 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       return semOk && catOk;
     }).toList()..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildFutGroups(filtered, allGoals);
+    final subVisions = [for (final g in groups) ...g.children];
+    final subTotal = subVisions.length;
+    final subDone = subVisions.where((g) => g.isDone).length;
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
@@ -521,6 +525,12 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
       children: [
         PageHeader(
           title: s.goals,
+          subtitle: Text(
+            s.visionsSummary(filtered.length, subDone, subTotal),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.hub_outlined),
@@ -704,6 +714,12 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
+// Design A (2026-09-16 canvas), matching the targets page: a 38px icon box and
+// sub-visions as a light checklist inside their parent's card
+const double _iconBoxSize = 38.0;
+const double _childIndent =
+    goalCatBarWidth + AppSpacing.sm + _iconBoxSize + AppSpacing.sm;
+
 class _FutureGoalCardRow extends ConsumerWidget {
   final FutureGoal goal;
   final int depth;
@@ -721,150 +737,239 @@ class _FutureGoalCardRow extends ConsumerWidget {
     final total = children.length;
     final progress = total > 0 ? done / total : 0.0;
     final primaryCat = primaryCategoryOf(goal.categories);
-    final catC = resolveCatColor(cats, primaryCat);
+    // A vision with no category shows no colour and no icon at all
+    final catC = categoryColorOrNull(cats, primaryCat);
+    final catIcon = categoryIconOrNull(cats, primaryCat);
+
+    void openDetail() => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => FutureGoalDetailScreen(goalId: goal.id)),
+        );
+
+    Future<void> deleteGoal() async {
+      // Confirm before deleting, matching the goal cards —
+      // this was deleting immediately with no prompt
+      if (await confirmDelete(context, s)) {
+        // Snapshot the whole subtree, not just the root
+        final removed = notifier.remove(goal.id);
+        final trash = ref.read(trashProvider.notifier);
+        for (final g in removed) {
+          trash.addFutureGoal(g);
+        }
+      }
+    }
+
+    final span = [
+      if (goal.startSemester != null)
+        formatSemester(goal.startSemester!, semSettings, s),
+      if (goal.startSemester != null && goal.endSemester != null) kArrow,
+      if (goal.endSemester != null)
+        formatSemester(goal.endSemester!, semSettings, s),
+    ].join(' ');
+
+    if (depth > 0) {
+      return InkWell(
+        onTap: openDetail,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              _childIndent + (depth - 1) * 16.0, 7, AppSpacing.sm, 7),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => notifier.toggleDone(goal.id),
+                behavior: HitTestBehavior.opaque,
+                child: Tooltip(
+                  message: goal.isDone ? s.markUndone : s.markDone,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: goal.isDone
+                          ? (catC ?? AppColors.primary)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
+                      border:
+                          Border.all(color: catC ?? AppColors.border, width: 2),
+                    ),
+                    child: goal.isDone
+                        ? const Icon(Icons.check,
+                            size: 12, color: AppColors.textOnPrimary)
+                        : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  goal.title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        decoration:
+                            goal.isDone ? TextDecoration.lineThrough : null,
+                        color: goal.isDone ? AppColors.textTertiary : null,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (total > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.xs),
+                  child: Text(
+                    s.goalProgress(done, total),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 16),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: deleteGoal,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => FutureGoalDetailScreen(goalId: goal.id)),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Category color bar; softer on child rows
-            Container(
-              width: goalCatBarWidth,
-              color: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
-            ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md - goalCatBarWidth + depth * 16.0,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () => notifier.toggleDone(goal.id),
-                      behavior: HitTestBehavior.opaque,
-                      child: Tooltip(
-                        message: goal.isDone ? s.markUndone : s.markDone,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: catC.withValues(alpha: goal.isDone ? 0.25 : 0.15),
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                          ),
-                          child: Icon(
-                            goal.isDone ? Icons.check : resolveCatIcon(cats, primaryCat),
-                            color: catC,
-                            size: 20,
-                          ),
-                        ),
+      onTap: openDetail,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                goalCatBarWidth + AppSpacing.sm, 12, AppSpacing.sm, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => notifier.toggleDone(goal.id),
+                  behavior: HitTestBehavior.opaque,
+                  child: Tooltip(
+                    message: goal.isDone ? s.markUndone : s.markDone,
+                    child: Container(
+                      width: _iconBoxSize,
+                      height: _iconBoxSize,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: (catC ?? AppColors.textTertiary)
+                            .withValues(alpha: goal.isDone ? 0.25 : 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
+                      child: goal.isDone || catIcon != null
+                          ? Icon(goal.isDone ? Icons.check : catIcon,
+                              color: catC ?? AppColors.textSecondary, size: 20)
+                          : null,
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            goal.title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              decoration: goal.isDone ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        goal.title,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              decoration: goal.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
                               color: goal.isDone ? AppColors.textTertiary : null,
                             ),
-                            // Two lines like the goal card, for the same reason
-                            maxLines: 2,
+                        // Two lines like the goal card, for the same reason
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (span.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            span,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
+                          ),
+                        ),
+                      if (goal.notes != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            goal.notes!,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (goal.startSemester != null || goal.endSemester != null)
-                            Text(
-                              [
-                                if (goal.startSemester != null)
-                                  formatSemester(goal.startSemester!, semSettings, s),
-                                if (goal.startSemester != null && goal.endSemester != null) kArrow,
-                                if (goal.endSemester != null)
-                                  formatSemester(goal.endSemester!, semSettings, s),
-                              ].join(' '),
-                              style: Theme.of(
-                                context,
-                              ).textTheme.bodySmall?.copyWith(color: AppColors.primary),
-                            ),
-                          if (goal.notes != null)
-                            Text(
-                              goal.notes!,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          if (total > 0) ...[
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              s.goalProgress(done, total),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(AppRadius.full),
-                              child: TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0, end: progress),
-                                duration: const Duration(milliseconds: 600),
-                                curve: Curves.easeOutCubic,
-                                builder: (_, v, _) => LinearProgressIndicator(
-                                  value: v,
-                                  minHeight: 4,
-                                  color: catC,
-                                  backgroundColor: AppColors.surfaceVariant,
-                                ),
+                        ),
+                      if (total > 0) ...[
+                        const SizedBox(height: 9),
+                        Text(
+                          s.goalProgress(done, total),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
                               ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: progress),
+                            duration: const Duration(milliseconds: 600),
+                            curve: Curves.easeOutCubic,
+                            builder: (_, v, _) => LinearProgressIndicator(
+                              value: v,
+                              minHeight: 4,
+                              color: catC ?? AppColors.primary,
+                              backgroundColor: AppColors.surfaceVariant,
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      onPressed: () => showFutureGoalSheet(context, ref, existing: goal),
+                      onPressed: () =>
+                          showFutureGoalSheet(context, ref, existing: goal),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 18),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      onPressed: () async {
-                        // Confirm before deleting, matching the goal cards —
-                        // this was deleting immediately with no prompt
-                        if (await confirmDelete(context, s)) {
-                          // Snapshot the whole subtree, not just the root
-                          final removed = notifier.remove(goal.id);
-                          final trash = ref.read(trashProvider.notifier);
-                          for (final g in removed) {
-                            trash.addFutureGoal(g);
-                          }
-                        }
-                      },
+                      onPressed: deleteGoal,
                     ),
-                    const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textTertiary),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppColors.textTertiary),
                   ],
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            child: LinkColorBar(width: goalCatBarWidth, top: catC),
+          ),
+        ],
       ),
     );
   }
 }
+
 
 Widget _semesterDropdown({
   required String? value,

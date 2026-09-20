@@ -432,7 +432,12 @@ void showTaskSheet(
                 ),
                 const SizedBox(height: 2),
                 _linkRow(
-                  accent: taskLinkColor(ref.read(categoriesProvider), linkedTarget),
+                  accent: taskLinkColor(
+                    ref.read(categoriesProvider),
+                    linkedTarget,
+                    targetVision:
+                        visionOf(linkedTarget, ref.read(futureGoalsProvider)),
+                  ),
                   icon: Icons.flag_outlined,
                   label: linkedTarget != null
                       ? '${linkedTarget.title}$kDotSeparator${formatSemester(linkedTarget.semester, semSettings, s)}'

@@ -43,10 +43,20 @@ void main() {
     expect(find.text(zh.addTask), findsNothing);
   });
 
-  testWidgets('a small pull leaves it open', (tester) async {
+  testWidgets('a flick of the thumb is enough', (tester) async {
     await openTaskSheet(tester);
 
-    await tester.drag(find.text(zh.addTask), const Offset(0, 40));
+    // 60px: the threshold came down from 90 to 40 on 2026-09-21
+    await tester.drag(find.text(zh.addTask), const Offset(0, 60));
+    await tester.pumpAndSettle();
+
+    expect(find.text(zh.addTask), findsNothing);
+  });
+
+  testWidgets('a nudge leaves it open', (tester) async {
+    await openTaskSheet(tester);
+
+    await tester.drag(find.text(zh.addTask), const Offset(0, 15));
     await tester.pumpAndSettle();
 
     expect(find.text(zh.addTask), findsOneWidget);

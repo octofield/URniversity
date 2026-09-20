@@ -136,12 +136,18 @@ IconData defaultCatIcon(String cat) {
 }
 
 // The colour a task takes from the target it is linked to, null when it is not
-// linked to one. The task list, the weekly grid and the widget snapshot all go
-// through here so they can never drift apart
-Color? taskLinkColor(List<CategoryEntry> cats, SemesterGoal? linkedTarget) =>
+// linked to one, or when that target has no colour of its own to give. The task
+// list, the weekly grid and the widget snapshot all go through here so they can
+// never drift apart
+Color? taskLinkColor(
+  List<CategoryEntry> cats,
+  SemesterGoal? linkedTarget, {
+  FutureGoal? targetVision,
+}) =>
     linkedTarget == null
         ? null
-        : resolveCatColor(cats, primaryCategoryOf(linkedTarget.categories));
+        : goalEffectiveColor(cats, linkedTarget.categories,
+            linkedVision: targetVision);
 
 // The category a row takes its colour and icon from, or null when it has none.
 // Picking a category is optional, so an empty list must not be dressed up as
@@ -149,20 +155,48 @@ Color? taskLinkColor(List<CategoryEntry> cats, SemesterGoal? linkedTarget) =>
 String? primaryCategoryOf(List<String> categories) =>
     categories.isEmpty ? null : categories.first;
 
-// What an uncategorized row looks like: present, but saying nothing
-const Color noCategoryColor = AppColors.textTertiary;
-const IconData noCategoryIcon = Icons.label_outline;
+// The vision a target hangs off, when it has one. Callers need it to work out
+// the colour a target with no category of its own borrows
+FutureGoal? visionOf(SemesterGoal? target, List<FutureGoal> visions) =>
+    target?.futureGoalId == null
+        ? null
+        : visions.where((g) => g.id == target!.futureGoalId).firstOrNull;
+
+// What colour a target or vision actually shows: its own category, else the
+// category of the vision it is linked to, else none at all.
+//
+// None means NONE — no bar, no icon (2026-09-21). An uncategorized row used to
+// get a neutral tint, which read as "some category you do not recognize"
+Color? goalEffectiveColor(
+  List<CategoryEntry> cats,
+  List<String> categories, {
+  FutureGoal? linkedVision,
+}) {
+  final own = categoryColorOrNull(cats, primaryCategoryOf(categories));
+  if (own != null) return own;
+  if (linkedVision == null) return null;
+  return categoryColorOrNull(cats, primaryCategoryOf(linkedVision.categories));
+}
 
 // Live color/icon for a category — checks the user's current customizations
 // first (including recolored/re-iconed built-ins), falling back to the
 // built-in default for a not-yet-customized or orphaned id.
-Color resolveCatColor(List<CategoryEntry> cats, String? id) => id == null
-    ? noCategoryColor
+//
+// The nullable pair is the one to reach for on a row that may have no category:
+// there is nothing to draw, rather than something neutral to draw.
+Color? categoryColorOrNull(List<CategoryEntry> cats, String? id) => id == null
+    ? null
     : cats.where((c) => c.id == id).firstOrNull?.color ?? defaultCatColor(id);
 
-IconData resolveCatIcon(List<CategoryEntry> cats, String? id) => id == null
-    ? noCategoryIcon
+IconData? categoryIconOrNull(List<CategoryEntry> cats, String? id) => id == null
+    ? null
     : cats.where((c) => c.id == id).firstOrNull?.icon ?? defaultCatIcon(id);
+
+Color resolveCatColor(List<CategoryEntry> cats, String id) =>
+    categoryColorOrNull(cats, id) ?? defaultCatColor(id);
+
+IconData resolveCatIcon(List<CategoryEntry> cats, String id) =>
+    categoryIconOrNull(cats, id) ?? defaultCatIcon(id);
 
 String catLabel(String cat, AppStrings s) {
   switch (cat) {

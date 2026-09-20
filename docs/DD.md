@@ -91,7 +91,7 @@
 | `parent_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 子目標的父節點；`null` 代表頂層目標 |
 | `title` | text | ✓ | — | 目標標題 |
 | `semester` | text | ✓ | — | 學期字串，格式 `"{民國年}-{學期序}"`，例如 `"114-1"`；產生規則見 `semester_goals_provider.dart` 的 `currentSemester()` |
-| `category` | text（**JSON 字串**，內容是 `List<String>`） | ✓ | `'[]'` | ⚠️ **欄位名為單數，實際存的是分類「陣列」的 JSON 字串**（用 `jsonEncode`/`jsonDecode` 手動轉換），與 D3 `future_goals.categories` 的存法不同，修改時請特別留意，勿混用。**空陣列＝沒有分類**（2026-09-20 起；在那之前空的會被寫成 `["other"]`），畫面用中性色顯示。舊的單一字串值（例如 `'intern'`）仍能讀，會被當成一個元素 |
+| `category` | text（**JSON 字串**，內容是 `List<String>`） | ✓ | `'[]'` | ⚠️ **欄位名為單數，實際存的是分類「陣列」的 JSON 字串**（用 `jsonEncode`/`jsonDecode` 手動轉換），與 D3 `future_goals.categories` 的存法不同，修改時請特別留意，勿混用。**空陣列＝沒有分類**（2026-09-20 起；在那之前空的會被寫成 `["other"]`）。畫面上**不畫任何顏色與圖示**；若該目標連結了有分類的願景，就顯示那個願景的顏色（見 system_design.md §3-J）。舊的單一字串值（例如 `'intern'`）仍能讀，會被當成一個元素 |
 | `future_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景（跨層關聯，也是關聯圖頁面畫虛線箭頭的資料來源）。⚠️ 這是**真實的外鍵** `semester_goals_future_goal_id_fkey → future_goals(id) ON DELETE SET NULL`（不是邏輯關聯），指向不存在的願景會被資料庫拒絕。另外 **僅頂層目標（`parent_id IS NULL`）可有值**；`linkFutureGoal()` 會擋下對子目標的連結，`reparent()` 把目標拖成子目標時會清成 `null` |
 | `notes` | text | ✗ | `null` | 備註 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |

@@ -127,8 +127,8 @@ WidgetSnapshot buildWidgetSnapshot({
   return WidgetSnapshot(
     views: {
       for (final period in WidgetPeriod.values)
-        WidgetSnapshot.viewKey(WidgetMode.tasks, period): _taskRows(
-            tasks, semesterGoals, categories, targetParents, period, now),
+        WidgetSnapshot.viewKey(WidgetMode.tasks, period): _taskRows(tasks,
+            semesterGoals, futureGoals, categories, targetParents, period, now),
       WidgetSnapshot.viewKey(WidgetMode.targets): _targetRows(semesterGoals, categories, s),
       WidgetSnapshot.viewKey(WidgetMode.goals): _goalRows(futureGoals, categories, s),
       WidgetSnapshot.viewKey(WidgetMode.filterPicker): _filterPickerRows(
@@ -187,6 +187,7 @@ List<String> _withAncestors(String? id, Map<String, String?> parents) {
 List<WidgetRow> _taskRows(
   List<Task> tasks,
   List<SemesterGoal> semesterGoals,
+  List<FutureGoal> futureGoals,
   List<CategoryEntry> categories,
   Map<String, String?> targetParents,
   WidgetPeriod period,
@@ -227,11 +228,17 @@ List<WidgetRow> _taskRows(
   undated.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
   WidgetRow rowFor(Task task, DateTime? day) {
-    final linkedCats = _taskCategories(task, semesterGoals);
+    final target = semesterGoals
+        .where((g) => g.id == task.linkedTargetId)
+        .firstOrNull;
+    // The same rule the app's own rows follow: the target's category, or the
+    // category of the vision it hangs off when it has none of its own
+    final colour = taskLinkColor(categories, target,
+        targetVision: visionOf(target, futureGoals));
     return WidgetRow(
       title: task.title,
       subtitle: _taskSubtitle(task, day, today),
-      colorArgb: _colorForCategories(categories, linkedCats),
+      colorArgb: colour?.toARGB32() ?? 0,
       check: WidgetCheck.unchecked,
       tapAction: WidgetAction.openItem(kind: 'task', id: task.id),
       // A task with no day of its own is ticked off against today, the same
@@ -246,14 +253,6 @@ List<WidgetRow> _taskRows(
     // Tasks with no date sit after the dated ones rather than at the top
     for (final task in undated) rowFor(task, null),
   ];
-}
-
-// The colour comes from whatever the task is linked to, matching the colour bar
-// the task list already draws in the app
-List<String> _taskCategories(Task task, List<SemesterGoal> semesterGoals) {
-  if (task.linkedTargetId == null) return const [];
-  final target = semesterGoals.where((g) => g.id == task.linkedTargetId).firstOrNull;
-  return target?.categories ?? const [];
 }
 
 // Null rather than an empty string when there is nothing to say, so the native

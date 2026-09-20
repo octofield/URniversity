@@ -7,9 +7,11 @@ import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
 import '../l10n/app_strings.dart';
 import '../models/category.dart';
+import '../models/future_goal.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/categories_provider.dart';
+import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
@@ -158,7 +160,13 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
       ),
       body: ResponsiveBody(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.pageHorizontal),
+          // The last card sat under the Android navigation bar without this
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.pageHorizontal,
+            AppSpacing.pageHorizontal,
+            AppSpacing.pageHorizontal + MediaQuery.viewPaddingOf(context).bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -231,7 +239,13 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                 _CategoryBreakdown(rows: categories, cats: cats, s: s),
               ],
               const SizedBox(height: AppSpacing.sm),
-              _StaleTasks(rows: stale, targets: targets, cats: cats, s: s),
+              _StaleTasks(
+                rows: stale,
+                targets: targets,
+                visions: ref.watch(futureGoalsProvider),
+                cats: cats,
+                s: s,
+              ),
             ],
           ),
         ),
@@ -430,12 +444,14 @@ class _CategoryBreakdown extends StatelessWidget {
 class _StaleTasks extends StatelessWidget {
   final List<({Task task, int daysLate})> rows;
   final List<SemesterGoal> targets;
+  final List<FutureGoal> visions;
   final List<CategoryEntry> cats;
   final AppStrings s;
 
   const _StaleTasks({
     required this.rows,
     required this.targets,
+    required this.visions,
     required this.cats,
     required this.s,
   });
@@ -467,12 +483,18 @@ class _StaleTasks extends StatelessWidget {
                     height: 30,
                     decoration: BoxDecoration(
                       color: taskLinkColor(
-                            cats,
+                          cats,
+                          targets
+                              .where((g) => g.id == row.task.linkedTargetId)
+                              .firstOrNull,
+                          targetVision: visionOf(
                             targets
                                 .where((g) => g.id == row.task.linkedTargetId)
                                 .firstOrNull,
-                          ) ??
-                          AppColors.border,
+                            visions,
+                          ),
+                        ) ??
+                        AppColors.border,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -610,7 +632,8 @@ class _HistoryChart extends StatelessWidget {
         onExit: (_) {},
         child: SizedBox(
           width: width,
-          height: _chartHeight + 24,
+          // Room for one line of labels under the plot, with a little slack
+          height: _chartHeight + 28,
           child: CustomPaint(
             painter: _HistoryChartPainter(
               periods: periods,
@@ -691,20 +714,36 @@ class _HistoryChartPainter extends CustomPainter {
       }
 
       if (i % labelStride == 0 || i == periods.length - 1) {
-        _paintText(canvas, p.label, Offset(x, _chartHeight + 6),
-            AppColors.textTertiary, 10, maxWidth: barWidth + _barGap);
+        // Centred on its bar and never wrapped: constrained to the bar's own
+        // width, "8/31" folded onto a second line that fell outside the box
+        // and was cut off. Only every labelStride-th bar is labelled, so the
+        // text has the neighbouring gaps to spread into
+        _paintCenteredText(canvas, p.label, x + barWidth / 2,
+            _chartHeight + 6, AppColors.textTertiary, 10);
       }
     }
   }
 
   void _paintText(Canvas canvas, String text, Offset offset, Color color,
       double fontSize, {double? maxWidth}) {
-    final painter = TextPainter(
+    _layoutText(text, color, fontSize, maxWidth).paint(canvas, offset);
+  }
+
+  // Around a point rather than from it, for labels that belong to a bar
+  void _paintCenteredText(Canvas canvas, String text, double centerX,
+      double top, Color color, double fontSize) {
+    final painter = _layoutText(text, color, fontSize, null);
+    painter.paint(canvas, Offset(centerX - painter.width / 2, top));
+  }
+
+  TextPainter _layoutText(
+      String text, Color color, double fontSize, double? maxWidth) {
+    return TextPainter(
       text: TextSpan(
           text: text, style: TextStyle(color: color, fontSize: fontSize)),
       textDirection: textDirection,
+      maxLines: 1,
     )..layout(maxWidth: maxWidth ?? double.infinity);
-    painter.paint(canvas, offset);
   }
 
   @override

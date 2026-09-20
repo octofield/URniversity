@@ -14,9 +14,30 @@ void main() {
     expect(primaryCategoryOf(const ['intern', 'exchange']), 'intern');
   });
 
-  test('an uncategorized row still gets a colour and an icon', () {
-    expect(resolveCatColor(cats, null), noCategoryColor);
-    expect(resolveCatIcon(cats, null), noCategoryIcon);
+  test('an uncategorized row gets nothing to draw', () {
+    // Not a neutral tint: that reads as a category the user cannot place
+    expect(categoryColorOrNull(cats, null), isNull);
+    expect(categoryIconOrNull(cats, null), isNull);
+  });
+
+  test('a goal with no category of its own borrows its vision colour', () {
+    const vision = FutureGoal(
+      id: 'v',
+      title: '出國交換',
+      categories: [FutureCategories.exchange],
+    );
+
+    expect(goalEffectiveColor(cats, const []), isNull);
+    expect(
+      goalEffectiveColor(cats, const [], linkedVision: vision),
+      defaultCatColor(FutureCategories.exchange),
+    );
+    // Its own category wins over the vision's
+    expect(
+      goalEffectiveColor(cats, const [FutureCategories.intern],
+          linkedVision: vision),
+      defaultCatColor(FutureCategories.intern),
+    );
   });
 
   test('a categorized row is unaffected', () {
@@ -24,6 +45,7 @@ void main() {
       resolveCatColor(cats, FutureCategories.intern),
       defaultCatColor(FutureCategories.intern),
     );
-    expect(resolveCatColor(cats, null), isNot(defaultCatColor(FutureCategories.other)));
+    expect(categoryColorOrNull(cats, FutureCategories.other),
+        defaultCatColor(FutureCategories.other));
   });
 }
