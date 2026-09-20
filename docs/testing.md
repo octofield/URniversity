@@ -87,6 +87,7 @@
 | `test/notification_persistence_source_test.dart` | 防呆：通知要留到任務完成（§3-K）。`apply()` 只取消 pending、原始碼裡不得再出現 `cancelAll()`；`autoCancel: false`；`cancelForTask()` 走 `getActiveNotifications()`。`notification_service.dart` 碰 platform channel，測試環境沒有通道，只能讀原始碼把關 |
 | `test/history_stats_test.dart` | 完成度頁的數字（§2-H）：連續達成的三種邊界（今天未完成、昨天未完成、空白日）、區間加總、最強星期幾取平均而非最忙、分類排序與排除無分類、逾期排序含循環任務 |
 | `test/sign_in_failure_test.dart` | 登入錯誤的分類（§2-A）：帳號不存在與密碼錯誤同屬一種說法、信箱未驗證、嘗試過多、連線失敗、其他；有碼與只有訊息兩種來源都涵蓋 |
+| `test/account_delete_auth_test.dart` | 刪除帳號要哪一種身分證明（UC12）：有密碼就輸入密碼（即使也連結了 Google）、只有 Google 才跳出去重新登入 |
 | `test/task_sort_test.dart` | 任務排序（§3-A）：五種順序、沒有截止時間／沒有連結目標排最後、已刪除的目標視為未連結、同鍵值時退回自動順序 |
 | `test/goal_category_test.dart` | 沒有分類的目標（§2-C、§3-J）：`primaryCategoryOf()` 回 null、中性色與中性圖示、有分類時不受影響 |
 | `test/notification_cancel_test.dart` | 完成時該收掉哪幾則通知（§3-K）：只收該任務的、沒有 payload 的摘要不動、沒有 id 的跳過 |

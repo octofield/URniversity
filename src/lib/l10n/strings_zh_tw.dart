@@ -238,7 +238,7 @@ class StringsZhTw implements AppStrings {
   @override String get orDivider => '或';
   @override String get signInWithGoogle => '使用 Google 登入';
   @override String get signUpWithGoogle => '使用 Google 註冊';
-  @override String get appTagline => '把大學生活放在同一個地方';
+  @override String get appTagline => '一站管理你的大學生活';
   @override String get registerTagline => '之後每一台裝置都看得到同樣的進度';
   @override String get authBulletTasks => '今天要做的事，一眼看完';
   @override String get authBulletTargets => '每個學期的目標與里程碑';
