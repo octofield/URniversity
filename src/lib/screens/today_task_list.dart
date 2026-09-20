@@ -161,7 +161,8 @@ class _TaskTile extends ConsumerWidget {
         ? targets.where((g) => g.id == task.linkedTargetId).firstOrNull
         : null;
 
-    final targetColor = taskLinkColor(cats, linkedTarget);
+    final targetColor = taskLinkColor(cats, linkedTarget,
+        targetVision: visionOf(linkedTarget, ref.watch(futureGoalsProvider)));
 
     final hasSubtitle =
         task.content != null ||

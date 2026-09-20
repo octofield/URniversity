@@ -5,6 +5,7 @@ import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/ui_symbols.dart';
 import '../models/semester_goal.dart';
 import '../providers/categories_provider.dart';
 import '../providers/future_goals_provider.dart';
@@ -299,6 +300,11 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final groups = _buildSemGroups(topLevel, allGoals);
+    final semSettings = ref.watch(semesterSettingsProvider);
+    // The header's own line: how much of this semester's plan is done
+    final milestones = [for (final g in groups) ...g.children];
+    final milestonesTotal = milestones.length;
+    final milestonesDone = milestones.where((g) => g.isDone).length;
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= AppBreakpoints.desktop;
@@ -332,6 +338,13 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
       children: [
         PageHeader(
           title: s.targets,
+          subtitle: Text(
+            '${formatSemester(selectedSem, semSettings, s)}$kDotSeparator'
+            '${s.targetsSummary(topLevel.length, milestonesDone, milestonesTotal)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.hub_outlined),
@@ -514,7 +527,11 @@ class _SemesterOverviewCard extends ConsumerWidget {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: resolveCatColor(cats, entry.key),
+                            // The "no category" bucket has no colour to show
+                            color: categoryColorOrNull(cats, entry.key),
+                            border: categoryColorOrNull(cats, entry.key) == null
+                                ? Border.all(color: AppColors.border)
+                                : null,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -699,6 +716,13 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
   }
 }
 
+// Design A (2026-09-16 canvas): 38px icon box, milestones as a light
+// checklist inside the card
+const double _iconBoxSize = 38.0;
+
+// Where a milestone row starts: bar + padding + icon box + gap
+const double _childIndent = goalCatBarWidth + AppSpacing.sm + _iconBoxSize + AppSpacing.sm;
+
 class _SemGoalCardTile extends ConsumerWidget {
   final SemesterGoal goal;
   final int depth;
@@ -714,190 +738,265 @@ class _SemGoalCardTile extends ConsumerWidget {
     final notifier = ref.read(semesterGoalsProvider.notifier);
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
-    final primaryCat =
-        primaryCategoryOf(goal.categories);
-    final catC = resolveCatColor(cats, primaryCat);
+    final primaryCat = primaryCategoryOf(goal.categories);
     final linkedVision = goal.futureGoalId != null
         ? ref
             .watch(futureGoalsProvider)
             .where((g) => g.id == goal.futureGoalId)
             .firstOrNull
         : null;
+    // A goal with no category of its own borrows the colour of the vision it
+    // is linked to; with neither there is simply no colour to show
+    final catC = goalEffectiveColor(cats, goal.categories,
+        linkedVision: linkedVision);
+    final catIcon = categoryIconOrNull(cats, primaryCat);
     final visionC = linkedVision == null
-        ? AppColors.primary
-        : resolveCatColor(
-            cats,
-            primaryCategoryOf(linkedVision.categories));
+        ? null
+        : categoryColorOrNull(cats, primaryCategoryOf(linkedVision.categories));
 
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SemesterGoalDetailScreen(goalId: goal.id),
-        ),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Category colour bar; softer on child rows. When the goal is
-            // linked to a vision the lower half carries that vision's colour,
-            // the same way a task row shows both of its links
-            LinkColorBar(
-              width: goalCatBarWidth,
-              top: catC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
-              bottom: linkedVision == null
-                  ? null
-                  : visionC.withValues(alpha: depth == 0 ? 1.0 : 0.45),
-            ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    AppSpacing.md - goalCatBarWidth + depth * 16.0,
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    AppSpacing.sm),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () => notifier.toggleDone(goal.id),
-                      behavior: HitTestBehavior.opaque,
-                      child: Tooltip(
-                        message: goal.isDone ? s.markUndone : s.markDone,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: catC.withValues(
-                                alpha: goal.isDone ? 0.25 : 0.15),
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                          ),
-                          child: Icon(
-                              goal.isDone
-                                  ? Icons.check
-                                  : resolveCatIcon(cats, primaryCat),
-                              color: catC,
-                              size: 20),
-                        ),
+    void openDetail() => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SemesterGoalDetailScreen(goalId: goal.id),
+          ),
+        );
+
+    Future<void> deleteGoal() async {
+      if (await confirmDelete(context, s)) {
+        // Snapshot the whole subtree, not just the root
+        final removed = notifier.remove(goal.id);
+        final trash = ref.read(trashProvider.notifier);
+        for (final g in removed) {
+          trash.addSemesterGoal(g);
+        }
+      }
+    }
+
+    // Milestones are a light checklist inside their parent's card (design A,
+    // 2026-09-16): the full card treatment for every level buried the goal
+    if (depth > 0) {
+      return InkWell(
+        onTap: openDetail,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              _childIndent + (depth - 1) * 16.0, 7, AppSpacing.sm, 7),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => notifier.toggleDone(goal.id),
+                behavior: HitTestBehavior.opaque,
+                child: Tooltip(
+                  message: goal.isDone ? s.markUndone : s.markDone,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: goal.isDone
+                          ? (catC ?? AppColors.primary)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppRadius.xs),
+                      border: Border.all(
+                        color: catC ?? AppColors.border,
+                        width: 2,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(goal.title,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
+                    child: goal.isDone
+                        ? const Icon(Icons.check,
+                            size: 12, color: AppColors.textOnPrimary)
+                        : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  goal.title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        decoration:
+                            goal.isDone ? TextDecoration.lineThrough : null,
+                        color: goal.isDone ? AppColors.textTertiary : null,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (total > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.xs),
+                  child: Text(
+                    s.goalProgress(done, total),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 16),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: deleteGoal,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: openDetail,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                goalCatBarWidth + AppSpacing.sm, 12, AppSpacing.sm, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => notifier.toggleDone(goal.id),
+                  behavior: HitTestBehavior.opaque,
+                  child: Tooltip(
+                    message: goal.isDone ? s.markUndone : s.markDone,
+                    child: Container(
+                      width: _iconBoxSize,
+                      height: _iconBoxSize,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: (catC ?? AppColors.textTertiary).withValues(
+                            alpha: goal.isDone ? 0.25 : 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      // No category means no icon at all — a stand-in glyph
+                      // reads as a category the user cannot place
+                      child: goal.isDone || catIcon != null
+                          ? Icon(goal.isDone ? Icons.check : catIcon,
+                              color: catC ?? AppColors.textSecondary, size: 20)
+                          : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(goal.title,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
                                 decoration: goal.isDone
                                     ? TextDecoration.lineThrough
                                     : null,
                                 color:
                                     goal.isDone ? AppColors.textTertiary : null,
                               ),
-                              // Two lines, then an ellipsis: cutting every
-                              // long title at one line hid what they were
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis),
-                          if (linkedVision != null)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // The vision's own colour, not the goal's: the
-                                // two differing is what shows they are linked
-                                // rather than the same thing
-                                Icon(Icons.stars,
-                                    size: 12, color: visionC),
-                                const SizedBox(width: 2),
-                                Flexible(
-                                  child: Text(
-                                    linkedVision.title,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(color: visionC),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          if (goal.notes != null)
-                            Text(
-                              goal.notes!,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          if (total > 0) ...[
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(s.goalProgress(done, total),
-                                style: Theme.of(context).textTheme.bodySmall),
-                            const SizedBox(height: AppSpacing.xs),
-                            ClipRRect(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.full),
-                              child: TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0, end: done / total),
-                                duration: const Duration(milliseconds: 600),
-                                curve: Curves.easeOutCubic,
-                                builder: (_, v, _) => LinearProgressIndicator(
-                                  value: v,
-                                  minHeight: 4,
-                                  color: catC,
-                                  backgroundColor: AppColors.surfaceVariant,
+                          // Two lines, then an ellipsis: cutting every
+                          // long title at one line hid what they were
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                      if (linkedVision != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // The vision's own colour, not the goal's: the
+                              // two differing is what shows they are linked
+                              // rather than the same thing
+                              Icon(Icons.stars,
+                                  size: 12,
+                                  color: visionC ?? AppColors.textTertiary),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  linkedVision.title,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color:
+                                            visionC ?? AppColors.textSecondary,
+                                      ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                      if (goal.notes != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            goal.notes!,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      if (total > 0) ...[
+                        const SizedBox(height: 9),
+                        Text(s.goalProgress(done, total),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                )),
+                        const SizedBox(height: AppSpacing.xs),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: done / total),
+                            duration: const Duration(milliseconds: 600),
+                            curve: Curves.easeOutCubic,
+                            builder: (_, v, _) => LinearProgressIndicator(
+                              value: v,
+                              minHeight: 4,
+                              color: catC ?? AppColors.primary,
+                              backgroundColor: AppColors.surfaceVariant,
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          onPressed: () =>
-                              showSemesterGoalSheet(context, ref, existing: goal),
+                          ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          onPressed: () async {
-                            if (await confirmDelete(context, s)) {
-                              // Snapshot the whole subtree, not just the root
-                              final removed = notifier.remove(goal.id);
-                              final trash = ref.read(trashProvider.notifier);
-                              for (final g in removed) {
-                                trash.addSemesterGoal(g);
-                              }
-                            }
-                          },
-                        ),
-                        const Icon(Icons.arrow_forward_ios,
-                            size: 14, color: AppColors.textTertiary),
                       ],
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      onPressed: () =>
+                          showSemesterGoalSheet(context, ref, existing: goal),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      onPressed: deleteGoal,
+                    ),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppColors.textTertiary),
                   ],
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // The colour bar is painted over the left edge rather than being a
+          // Row child: a ListTile-free column still measures itself correctly,
+          // and there is no IntrinsicHeight to get the height wrong
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            child: LinkColorBar(width: goalCatBarWidth, top: catC),
+          ),
+        ],
       ),
     );
   }
 }
-

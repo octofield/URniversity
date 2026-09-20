@@ -45,6 +45,23 @@ void main() {
       expect(find.text('昨天就該做的'), findsOneWidget);
     });
 
+    testWidgets('the last card clears the system navigation bar', (tester) async {
+      // A three-button navigation bar covered the bottom card on Android
+      tester.view.viewPadding = const FakeViewPadding(bottom: 96);
+      addTearDown(tester.view.reset);
+
+      await pumpScreen(tester, const TaskHistoryScreen());
+      await tester.pumpAndSettle();
+
+      final scroller = tester.widget<SingleChildScrollView>(
+          find.byType(SingleChildScrollView).first);
+      expect(
+        (scroller.padding as EdgeInsets).bottom,
+        greaterThanOrEqualTo(96),
+        reason: 'the inset has to be added to the page padding',
+      );
+    });
+
     testWidgets('an empty history says nothing is overdue', (tester) async {
       await pumpScreen(tester, const TaskHistoryScreen());
       await tester.pumpAndSettle();

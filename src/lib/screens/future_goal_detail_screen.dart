@@ -43,7 +43,10 @@ class FutureGoalDetailScreen extends ConsumerWidget {
     final cats = ref.watch(categoriesProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
     final primaryCat = primaryCategoryOf(goal.categories);
-    final catC = resolveCatColor(cats, primaryCat);
+    // No category leaves the header with no colour of its own; the app's own
+    // accent stands in there, but the icon is simply absent
+    final catC = categoryColorOrNull(cats, primaryCat) ?? AppColors.primary;
+    final catIcon = categoryIconOrNull(cats, primaryCat);
 
     // Layout follows screen width, not platform, so narrow web windows get the mobile UI
 
@@ -69,12 +72,10 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                       color: catC.withValues(alpha: goal.isDone ? 0.25 : 0.15),
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    child: Icon(
-                        goal.isDone
-                            ? Icons.check
-                            : resolveCatIcon(cats, primaryCat),
-                        color: catC,
-                        size: 26),
+                    child: goal.isDone || catIcon != null
+                        ? Icon(goal.isDone ? Icons.check : catIcon,
+                            color: catC, size: 26)
+                        : const SizedBox(width: 26, height: 26),
                   ),
                 ),
               ),

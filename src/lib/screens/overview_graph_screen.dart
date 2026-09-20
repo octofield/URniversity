@@ -441,8 +441,14 @@ class _SummaryCard extends ConsumerWidget {
 
     final isVision = vision != null;
     final title = isVision ? vision.title : target!.title;
-    final colour = resolveCatColor(
-        cats, primaryCategoryOf(isVision ? vision.categories : target!.categories));
+    final colour = goalEffectiveColor(
+          cats,
+          isVision ? vision.categories : target!.categories,
+          linkedVision: isVision
+              ? null
+              : futures.where((g) => g.id == target!.futureGoalId).firstOrNull,
+        ) ??
+        AppColors.border;
 
     // Children: sub-visions under a vision, milestones under a target
     final children = isVision
@@ -477,8 +483,10 @@ class _SummaryCard extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0,
-          AppSpacing.pageHorizontal, AppSpacing.md),
+      // Clears the Android navigation bar, which this card sits right above
+      margin: EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0,
+          AppSpacing.pageHorizontal,
+          AppSpacing.md + MediaQuery.viewPaddingOf(context).bottom),
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
         color: AppColors.surface,

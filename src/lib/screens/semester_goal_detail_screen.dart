@@ -48,7 +48,8 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
     final cats = ref.watch(categoriesProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
     final primaryCat = primaryCategoryOf(goal.categories);
-    final catC = resolveCatColor(cats, primaryCat);
+    final catC = categoryColorOrNull(cats, primaryCat) ?? AppColors.primary;
+    final catIcon = categoryIconOrNull(cats, primaryCat);
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
 
@@ -77,11 +78,10 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                     color: catC.withValues(alpha: goal.isDone ? 0.25 : 0.15),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  child: Icon(
-                    goal.isDone ? Icons.check : resolveCatIcon(cats, primaryCat),
-                    color: catC,
-                    size: 26,
-                  ),
+                  child: goal.isDone || catIcon != null
+                      ? Icon(goal.isDone ? Icons.check : catIcon,
+                          color: catC, size: 26)
+                      : const SizedBox(width: 26, height: 26),
                 ),
               ),
             ),
@@ -245,10 +245,9 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
               contentPadding: EdgeInsets.zero,
               leading: Icon(
                 Icons.stars,
-                color: resolveCatColor(
-                  cats,
-                  primaryCategoryOf(linkedGoal.categories),
-                ),
+                color: categoryColorOrNull(
+                        cats, primaryCategoryOf(linkedGoal.categories)) ??
+                    AppColors.primary,
               ),
               title: Text(linkedGoal.title),
               trailing: Row(
@@ -321,7 +320,8 @@ class _SemMilestoneTile extends ConsumerWidget {
     final done = children.where((c) => c.isDone).length;
     final total = children.length;
     final primaryCat = primaryCategoryOf(milestone.categories);
-    final catC = resolveCatColor(cats, primaryCat);
+    final catC = categoryColorOrNull(cats, primaryCat) ?? AppColors.primary;
+    final catIcon = categoryIconOrNull(cats, primaryCat);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,11 +353,10 @@ class _SemMilestoneTile extends ConsumerWidget {
                         color: catC.withValues(alpha: milestone.isDone ? 0.25 : 0.15),
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      child: Icon(
-                        milestone.isDone ? Icons.check : resolveCatIcon(cats, primaryCat),
-                        color: catC,
-                        size: 16,
-                      ),
+                      child: milestone.isDone || catIcon != null
+                          ? Icon(milestone.isDone ? Icons.check : catIcon,
+                              color: catC, size: 16)
+                          : const SizedBox(width: 16, height: 16),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -875,9 +874,9 @@ void showSemesterGoalSheet(
                   linked,
                   linked == null
                       ? AppColors.primary
-                      : resolveCatColor(
-                          ref.read(categoriesProvider),
-                          primaryCategoryOf(linked.categories)),
+                      : categoryColorOrNull(ref.read(categoriesProvider),
+                              primaryCategoryOf(linked.categories)) ??
+                          AppColors.primary,
                   () => _showFutureGoalSelectorForSheet(
                     context,
                     futureGoals,

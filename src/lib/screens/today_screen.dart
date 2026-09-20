@@ -18,6 +18,7 @@ import '../providers/date_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/categories_provider.dart';
+import '../providers/future_goals_provider.dart';
 import '../providers/recent_picks_provider.dart';
 import '../providers/profile_provider.dart';
 import '../utils/category_helpers.dart';
@@ -593,7 +594,9 @@ class _WeekTaskTile extends ConsumerWidget {
         ? ref.watch(semesterGoalsProvider).where((g) => g.id == task.linkedTargetId).firstOrNull
         : null;
     // One bar, not the day list's split one: this row is too short to split
-    final barColor = taskLinkColor(cats, linkedTarget) ?? Colors.transparent;
+    final barColor = taskLinkColor(cats, linkedTarget,
+            targetVision: visionOf(linkedTarget, ref.watch(futureGoalsProvider))) ??
+        Colors.transparent;
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
     final meta = isRecurring
         ? _recurrenceShort(task.recurrence!, s, task.createdAt)

@@ -118,6 +118,8 @@ abstract class AppStrings {
   String get overview;
   String get unlinked;
   String get overviewEmpty;
+  String targetsSummary(int count, int done, int total);
+  String visionsSummary(int count, int done, int total);
 
   // Me page desktop column header
   String get profile;

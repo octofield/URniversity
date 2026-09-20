@@ -109,6 +109,10 @@ class StringsJp implements AppStrings {
   @override String get overview => '関連マップ';
   @override String get unlinked => '未リンク';
   @override String get overviewEmpty => '目標も長期目標もまだありません';
+  @override String targetsSummary(int count, int done, int total) =>
+      '目標 $count 件、マイルストーン $done/$total 完了';
+  @override String visionsSummary(int count, int done, int total) =>
+      'ビジョン $count 件、サブ $done/$total 完了';
   @override String get profile => 'プロフィール';
   @override String get taskHistory => '完了率の履歴';
   @override String get historyDaily => '日別';

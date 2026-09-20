@@ -7,13 +7,12 @@ import '../l10n/app_strings.dart';
 import '../models/category.dart';
 import '../utils/category_helpers.dart';
 
-// The fields the three add/edit sheets are built from (task, target, vision).
+// The fields the four add/edit sheets are built from (task, target, vision,
+// inspiration).
 //
-// From the 2026-09-18 design canvas: every field is a bordered box with its
-// name printed above the value, instead of Material's floating label. The label
-// stays readable while the field is being filled in, which is what the sheets
-// needed — three of them side by side made the floating labels look like three
-// different forms.
+// Text fields use Material's floating label; the pickers and the category chips
+// come from the 2026-09-18 design canvas. Having them all here is the point:
+// a new kind of field is added once and every sheet gets it.
 
 // Box padding and border, shared so the fields line up with each other
 const EdgeInsets _boxPadding = EdgeInsets.symmetric(horizontal: 14, vertical: 10);
@@ -32,7 +31,7 @@ Widget _boxLabel(BuildContext context, String label) => Text(
           ),
     );
 
-// A text field with its name above it
+// A plain text field, so every sheet spells its fields the same way
 class SheetTextField extends StatelessWidget {
   final String label;
   final String? hint;
@@ -55,33 +54,28 @@ class SheetTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: _boxPadding,
-      decoration: _boxDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _boxLabel(context, label),
-          const SizedBox(height: 2),
-          TextField(
-            controller: controller,
-            autofocus: autofocus,
-            minLines: minLines,
-            maxLines: maxLines,
-            textCapitalization: TextCapitalization.sentences,
-            style: Theme.of(context).textTheme.bodyLarge,
-            // Collapsed: the box around it is the decoration
-            decoration: InputDecoration.collapsed(
-              hintText: hint,
-              hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-            ),
-            onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
-          ),
-        ],
+    // Material's floating label, not a label printed above the box: the
+    // printed-label version shipped on 2026-09-20 and was asked back the next
+    // day. The widget stays, so the four sheets keep one field to call
+    return TextField(
+      controller: controller,
+      autofocus: autofocus,
+      minLines: minLines,
+      maxLines: maxLines,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        // A multi-line field sits a little lower than the title field
+        isDense: maxLines > 1,
+        contentPadding: maxLines > 1
+            ? const EdgeInsets.symmetric(
+                horizontal: AppSpacing.inputPadding,
+                vertical: AppSpacing.sm,
+              )
+            : null,
       ),
+      onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
     );
   }
 }

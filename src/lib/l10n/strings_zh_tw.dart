@@ -109,6 +109,10 @@ class StringsZhTw implements AppStrings {
   @override String get overview => '關聯圖';
   @override String get unlinked => '未連結';
   @override String get overviewEmpty => '還沒有任何目標或願景';
+  @override String targetsSummary(int count, int done, int total) =>
+      '$count 個目標，$done/$total 個里程碑完成';
+  @override String visionsSummary(int count, int done, int total) =>
+      '$count 個願景，$done/$total 個子願景完成';
   @override String get profile => '個人資料';
   @override String get taskHistory => '完成度歷史';
   @override String get historyDaily => '每日';

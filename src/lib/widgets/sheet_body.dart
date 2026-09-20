@@ -42,8 +42,9 @@ class _SheetBodyState extends State<SheetBody> {
   // How far past the top the current drag has pulled
   double _pulled = 0;
 
-  // Far enough that it cannot be a scroll that overshot
-  static const double _closeAfter = 90;
+  // Far enough that it cannot be a scroll that overshot, close enough that a
+  // flick of the thumb does it (90 was asked to be made more sensitive)
+  static const double _closeAfter = 40;
 
   bool _onScroll(ScrollNotification notification) {
     if (notification is ScrollStartNotification ||

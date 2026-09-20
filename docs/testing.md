@@ -160,6 +160,7 @@
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
 | `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
 | `test/widget/completion_effect_test.dart` | 完成動畫：勾選後放大**再回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放；勾選會在 `Overlay` 上留下獨立的疊層，那一列離開清單也照播完 |
+| `test/widget/goal_card_test.dart` | 目標卡的顏色（§2-C、§3-J）：沒有分類＝色條無色、圖示方塊空著；有分類＝自己的顏色與圖示；沒有分類但連了願景＝願景的顏色 |
 | `test/widget/stats_pages_test.dart` | 兩張改版頁面（§2-G、§2-H）：完成度頁出現摘要／分類／逾期三區且逾期天數正確、空資料時說「沒有逾期」；關聯圖有圖例與篩選 chip、點節點開摘要卡而不離開頁面、「未連結」只留沒連願景的目標 |
 | `test/widget/task_row_layout_test.dart` | 兩行標題的任務列（§2-B）：連結目標那行仍在自己的列內，不被下一列蓋掉。舊的 `IntrinsicHeight` 量錯高度就會轉紅 |
 | `test/widget/page_header_test.dart` | 四個主頁面的三條線按鈕在同一個位置（§3-E-B） |

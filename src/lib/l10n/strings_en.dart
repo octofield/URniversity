@@ -109,6 +109,10 @@ class StringsEn implements AppStrings {
   @override String get overview => 'Relation map';
   @override String get unlinked => 'Not linked';
   @override String get overviewEmpty => 'No targets or goals yet';
+  @override String targetsSummary(int count, int done, int total) =>
+      '$count targets, $done/$total milestones done';
+  @override String visionsSummary(int count, int done, int total) =>
+      '$count visions, $done/$total sub-visions done';
   @override String get profile => 'Profile';
   @override String get taskHistory => 'Completion history';
   @override String get historyDaily => 'Daily';
