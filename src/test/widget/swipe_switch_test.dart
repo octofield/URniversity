@@ -29,10 +29,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(c.read(taskViewProvider), 0, reason: 'right goes back');
 
-    // Already at the first view, so there is nowhere further back
+    // Already at the first view, so that swipe opens the drawer instead
     await tester.fling(body, const Offset(300, 0), 1000);
     await tester.pumpAndSettle();
     expect(c.read(taskViewProvider), 0);
+    expect(find.byType(Drawer), findsOneWidget);
   });
 
   testWidgets('a slow sideways drag is not a switch', (tester) async {

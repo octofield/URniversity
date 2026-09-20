@@ -37,6 +37,11 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
   Widget _buildRow(Task task, List<Task> siblings, int index) {
     final isHovered = _hoveredId == task.id;
     final tile = _TaskTile(task: task);
+    // Dragging writes the manual order, which is invisible while the list is
+    // sorted by something else — so it is switched off there rather than
+    // quietly rearranging a list the user cannot see
+    final canDrag = ref.watch(taskSortProvider) == TaskSort.manual;
+    if (!canDrag) return tile;
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) => details.data != task.id,

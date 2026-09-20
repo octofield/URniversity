@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/providers/inspirations_provider.dart';
+import 'package:urniversity/providers/recent_picks_provider.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart';
 import 'package:urniversity/providers/settings_provider.dart';
 import 'package:urniversity/providers/tasks_provider.dart';
@@ -108,6 +109,41 @@ void main() {
       expect(find.text(zh.linkedTarget), findsOneWidget);
       expect(find.text(zh.linkedGoal), findsNothing);
       expect(find.byType(SegmentedButton<int>), findsNothing);
+    });
+
+    // "In five minutes" is what a task being written down right now usually
+    // means; the remembered clock times come after it
+    testWidgets('offers the relative times before the remembered ones',
+        (tester) async {
+      final c = testContainer();
+      await c.read(recentPicksProvider.notifier).rememberTime(
+            DateTime(2026, 9, 20, 23, 59),
+          );
+
+      await openSheet(tester, c, (ctx, ref) => showTaskSheet(ctx, ref));
+
+      final relative = tester.getRect(find.text(zh.minutesLater(5)));
+      expect(find.text(zh.minutesLater(30)), findsOneWidget);
+      expect(find.text(zh.hoursLater(1)), findsOneWidget);
+      // Earlier in reading order: the chips wrap, so it can be the row above
+      final remembered = tester.getRect(find.text('23:59'));
+      expect(
+        relative.top < remembered.top ||
+            (relative.top == remembered.top && relative.left < remembered.left),
+        isTrue,
+        reason: 'the relative chips come first',
+      );
+
+      // Tapping it lands five minutes from now, not at some remembered clock
+      final before = DateTime.now();
+      await tester.tap(find.text(zh.minutesLater(5)));
+      await tester.pumpAndSettle();
+      await tester.enterText(sheetField(zh.titleField), '五分鐘後的事');
+      await tester.tap(find.widgetWithText(FilledButton, zh.add));
+      await tester.pumpAndSettle();
+
+      final due = c.read(tasksProvider).single.dueTime!;
+      expect(due.difference(before).inMinutes, inInclusiveRange(4, 6));
     });
 
     testWidgets('links a target through the semester picker', (tester) async {

@@ -31,6 +31,8 @@ class _Period {
 const _barGap = 3.0;
 const _chartHeight = 160.0;
 const _axisLabelW = 34.0;
+// The last bar's label is centred on it, so half of it hangs off the end
+const _labelOverhang = 20.0;
 
 class TaskHistoryScreen extends ConsumerStatefulWidget {
   const TaskHistoryScreen({super.key});
@@ -621,7 +623,8 @@ class _HistoryChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = _axisLabelW + periods.length * (_barWidth + _barGap);
+    final width =
+        _axisLabelW + periods.length * (_barWidth + _barGap) + _labelOverhang;
     // Show every Nth label so dense ranges (30 daily bars) stay readable
     final labelStride = periods.length > 20 ? 5 : 1;
 

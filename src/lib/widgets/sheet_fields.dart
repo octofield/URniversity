@@ -15,7 +15,7 @@ import '../utils/category_helpers.dart';
 // a new kind of field is added once and every sheet gets it.
 
 // Box padding and border, shared so the fields line up with each other
-const EdgeInsets _boxPadding = EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+const EdgeInsets _boxPadding = EdgeInsets.symmetric(horizontal: 12, vertical: 6);
 
 BoxDecoration _boxDecoration({bool focused = false}) => BoxDecoration(
       color: AppColors.surface,
@@ -106,7 +106,6 @@ class SheetPickerBox extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _boxLabel(context, label),
-            const SizedBox(height: 2),
             Row(
               children: [
                 Expanded(

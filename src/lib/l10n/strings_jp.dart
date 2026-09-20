@@ -101,6 +101,15 @@ class StringsJp implements AppStrings {
   @override String get autumnBreak => '秋休み';
   @override String get progressOverview => '進捗まとめ';
   @override String get filters => '絞り込み';
+  @override String get anySemester => '学期を問わない';
+  @override String get sortBy => '並び替え';
+  @override String minutesLater(int minutes) => '$minutes 分後';
+  @override String hoursLater(int hours) => '$hours 時間後';
+  @override String get sortManual => '手動（ドラッグ）';
+  @override String get sortCreated => '追加日時';
+  @override String get sortTitle => 'A–Z';
+  @override String get sortTarget => '目標ごと';
+  @override String get sortDue => '締切順';
   @override String greetingMorning(String name) => name.isEmpty ? 'おはよう 👋' : 'おはよう、$name 👋';
   @override String greetingAfternoon(String name) => name.isEmpty ? 'こんにちは 👋' : 'こんにちは、$name 👋';
   @override String greetingEvening(String name) => name.isEmpty ? 'こんばんは 👋' : 'こんばんは、$name 👋';

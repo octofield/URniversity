@@ -307,9 +307,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             onNext: taskView < 2
                 ? () => ref.read(taskViewProvider.notifier).state = taskView + 1
                 : null,
+            // Nothing before the first view, so that swipe pulls out the
+            // drawer instead — the same direction as dragging from the edge
             onPrevious: taskView > 0
                 ? () => ref.read(taskViewProvider.notifier).state = taskView - 1
-                : null,
+                : () => Scaffold.of(context).openDrawer(),
             child: taskView == 2
                 ? _WeeklyGrid(weekStart: _weekStart)
                 : SingleChildScrollView(
@@ -891,6 +893,7 @@ class _TasksSection extends ConsumerWidget {
     final targetFilter = ref.watch(taskTargetFilterProvider);
     final isFiltered = targetFilter.isNotEmpty;
     final expandedTargetFilter = expandSemGoalIds(targetFilter, ref.watch(semesterGoalsProvider));
+    final sort = ref.watch(taskSortProvider);
     final tasks = ref
         .watch(filteredTasksProvider)
         .where(
@@ -909,6 +912,20 @@ class _TasksSection extends ConsumerWidget {
             children: [
               Text(s.tasksWithCount(tasks.length), style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
+              IconButton(
+                icon: Icon(
+                  Icons.sort,
+                  color: sort == TaskSort.manual
+                      ? AppColors.textTertiary
+                      : AppColors.primary,
+                  size: 20,
+                ),
+                tooltip: s.sortBy,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: () => _showSortMenu(context, ref, s),
+              ),
+              const SizedBox(width: AppSpacing.xs),
               IconButton(
                 icon: Icon(
                   isFiltered ? Icons.filter_list : Icons.filter_list_outlined,
@@ -952,6 +969,62 @@ class _TasksSection extends ConsumerWidget {
       ],
     );
   }
+}
+
+// Which order the list is in. A sheet rather than a popup menu: the same
+// control has to be reachable on a phone held one-handed
+void _showSortMenu(BuildContext context, WidgetRef ref, AppStrings s) {
+  final labels = {
+    TaskSort.manual: s.sortManual,
+    TaskSort.created: s.sortCreated,
+    TaskSort.title: s.sortTitle,
+    TaskSort.target: s.sortTarget,
+    TaskSort.due: s.sortDue,
+  };
+
+  showAppSheet(
+    context,
+    builder: (sheetCtx) => Consumer(
+      builder: (_, sheetRef, _) {
+        final current = sheetRef.watch(taskSortProvider);
+        return SheetBody(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.sortBy, style: Theme.of(sheetCtx).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.sm),
+              // The sheet's own background is a DecoratedBox, so the tiles need
+              // a Material of their own to paint their ink on
+              Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final entry in labels.entries)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(entry.value),
+                        trailing: entry.key == current
+                            ? const Icon(Icons.check, color: AppColors.primary)
+                            : null,
+                        selected: entry.key == current,
+                        selectedColor: AppColors.primary,
+                        onTap: () {
+                          sheetRef.read(taskSortProvider.notifier).set(entry.key);
+                          Navigator.pop(sheetCtx);
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }
 
 // Filtering tasks by target, grouped by semester the same way the link picker

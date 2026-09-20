@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../services/notification_service.dart';
@@ -206,6 +207,90 @@ final taskRowDateProvider = Provider.family<DateTime, Task>((ref, task) {
 // Manual drag order wins, with the automatic grouping above as the tiebreaker.
 // Tasks that have never been dragged all share sortOrder 0, so the automatic
 // order is what shows until the user actually reorders something
+// How the task list is ordered. Manual is the drag order the user set
+// themselves; the rest answer a question ("what is due next?", "what belongs to
+// this target?") and switch dragging off while they are on, because a drag
+// would write an order nothing on screen reflects.
+enum TaskSort { manual, created, title, target, due }
+
+class TaskSortNotifier extends StateNotifier<TaskSort> {
+  TaskSortNotifier() : super(TaskSort.manual) {
+    _restore();
+  }
+
+  static const prefsKey = 'task_sort';
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(prefsKey);
+    if (stored == null) return;
+    // A value this build does not know falls back to the manual order
+    state = TaskSort.values.where((e) => e.name == stored).firstOrNull ??
+        TaskSort.manual;
+  }
+
+  Future<void> set(TaskSort sort) async {
+    state = sort;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(prefsKey, sort.name);
+  }
+}
+
+final taskSortProvider = StateNotifierProvider<TaskSortNotifier, TaskSort>(
+  (ref) => TaskSortNotifier(),
+);
+
+// Orders a list that is already in the app's automatic order (recurring first,
+// then by due time), which is what decides ties: two tasks created in the same
+// minute, or both linked to the same target, keep the order the list already
+// had rather than swapping about on every rebuild.
+List<Task> applyTaskSort(
+  List<Task> autoOrdered,
+  TaskSort sort, {
+  Map<String, String> targetTitles = const {},
+}) {
+  if (sort == TaskSort.manual) return _applyManualOrder(autoOrdered);
+
+  final autoIndex = {
+    for (var i = 0; i < autoOrdered.length; i++) autoOrdered[i].id: i,
+  };
+
+  int compare(Task a, Task b) {
+    switch (sort) {
+      case TaskSort.created:
+        // Newest first, the same way the lists put new items on top
+        return b.createdAt.compareTo(a.createdAt);
+      case TaskSort.title:
+        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      case TaskSort.target:
+        // Grouped by the target's name; anything unlinked goes last
+        final at = targetTitles[a.linkedTargetId];
+        final bt = targetTitles[b.linkedTargetId];
+        if (at == null || bt == null) {
+          if (at == null && bt == null) return 0;
+          return at == null ? 1 : -1;
+        }
+        return at.toLowerCase().compareTo(bt.toLowerCase());
+      case TaskSort.due:
+        // Soonest first; no due time at all goes last
+        final ad = a.dueTime;
+        final bd = b.dueTime;
+        if (ad == null || bd == null) {
+          if (ad == null && bd == null) return 0;
+          return ad == null ? 1 : -1;
+        }
+        return ad.compareTo(bd);
+      case TaskSort.manual:
+        return 0;
+    }
+  }
+
+  return [...autoOrdered]..sort((a, b) {
+      final byKey = compare(a, b);
+      return byKey != 0 ? byKey : autoIndex[a.id]!.compareTo(autoIndex[b.id]!);
+    });
+}
+
 List<Task> _applyManualOrder(List<Task> autoOrdered) {
   final autoIndex = {
     for (var i = 0; i < autoOrdered.length; i++) autoOrdered[i].id: i,
@@ -220,6 +305,8 @@ List<Task> _applyManualOrder(List<Task> autoOrdered) {
 final filteredTasksProvider = Provider<List<Task>>((ref) {
   final all = ref.watch(tasksProvider);
   final taskView = ref.watch(taskViewProvider);
+  final sort = ref.watch(taskSortProvider);
+  final targetTitles = ref.watch(taskTargetTitlesProvider);
 
   if (taskView == 1) {
     final date = ref.watch(dateProvider);
@@ -228,7 +315,8 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     final nonRecurring = matching.where((t) => !_isRecurring(t)).toList()
       ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
-    return _applyManualOrder([...recurring, ...nonRecurring]);
+    return applyTaskSort([...recurring, ...nonRecurring], sort,
+        targetTitles: targetTitles);
   }
 
   // All tasks: recurring first, then with dueTime, then without dueTime
@@ -238,8 +326,15 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
     ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
   final withoutDue = all.where((t) => !_isRecurring(t) && t.dueTime == null).toList()
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-  return _applyManualOrder([...recurring, ...withDue, ...withoutDue]);
+  return applyTaskSort([...recurring, ...withDue, ...withoutDue], sort,
+      targetTitles: targetTitles);
 });
+
+// Target titles by id, for the "by target" sort. Its own provider so the sort
+// does not have to know where targets come from
+final taskTargetTitlesProvider = Provider<Map<String, String>>((ref) => {
+      for (final goal in ref.watch(semesterGoalsProvider)) goal.id: goal.title,
+    });
 
 // Goal-link filtering. Public and living here rather than inside today_screen
 // because the home screen widget applies the same rule, and the widget's copy

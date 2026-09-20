@@ -411,35 +411,6 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
           Text(s.filters, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            s.semester,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _FilterChip(
-                label: s.catAll,
-                selected: _semFilter == null,
-                onTap: () => setState(() => _semFilter = null),
-              ),
-              for (final sem in semChips)
-                _FilterChip(
-                  label: formatSemester(sem, settings, s),
-                  selected: _semFilter == sem,
-                  onTap: () => setState(() => _semFilter = _semFilter == sem ? null : sem),
-                ),
-              ActionChip(
-                avatar: const Icon(Icons.expand_more, size: 16),
-                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
-                onPressed: () => _showMoreSemesters(context, settings),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
             s.category,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
@@ -464,6 +435,35 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 avatar: const Icon(Icons.tune, size: 16),
                 label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
                 onPressed: () => _showMoreCategories(context),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            s.semester,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _FilterChip(
+                label: s.anySemester,
+                selected: _semFilter == null,
+                onTap: () => setState(() => _semFilter = null),
+              ),
+              for (final sem in semChips)
+                _FilterChip(
+                  label: formatSemester(sem, settings, s),
+                  selected: _semFilter == sem,
+                  onTap: () => setState(() => _semFilter = _semFilter == sem ? null : sem),
+                ),
+              ActionChip(
+                avatar: const Icon(Icons.expand_more, size: 16),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
+                onPressed: () => _showMoreSemesters(context, settings),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ],
@@ -559,30 +559,6 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             child: _AdaptiveChipRow(
               allChip: _FilterChip(
                 label: s.catAll,
-                selected: _semFilter == null,
-                onTap: () => setState(() => _semFilter = null),
-              ),
-              chips: [
-                for (final sem in semChips)
-                  _FilterChip(
-                    label: formatSemester(sem, settings, s),
-                    selected: _semFilter == sem,
-                    onTap: () => setState(() => _semFilter = _semFilter == sem ? null : sem),
-                  ),
-              ],
-              trailing: ActionChip(
-                avatar: const Icon(Icons.expand_more, size: 16),
-                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
-                onPressed: () => _showMoreSemesters(context, settings),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: 4),
-            child: _AdaptiveChipRow(
-              allChip: _FilterChip(
-                label: s.catAll,
                 selected: _catFilter == null,
                 onTap: () => setState(() => _catFilter = null),
               ),
@@ -599,6 +575,30 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 avatar: const Icon(Icons.tune, size: 16),
                 label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
                 onPressed: () => _showMoreCategories(context),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: 4),
+            child: _AdaptiveChipRow(
+              allChip: _FilterChip(
+                label: s.anySemester,
+                selected: _semFilter == null,
+                onTap: () => setState(() => _semFilter = null),
+              ),
+              chips: [
+                for (final sem in semChips)
+                  _FilterChip(
+                    label: formatSemester(sem, settings, s),
+                    selected: _semFilter == sem,
+                    onTap: () => setState(() => _semFilter = _semFilter == sem ? null : sem),
+                  ),
+              ],
+              trailing: ActionChip(
+                avatar: const Icon(Icons.expand_more, size: 16),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.more)),
+                onPressed: () => _showMoreSemesters(context, settings),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
@@ -702,14 +702,28 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilterChip(
-      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      backgroundColor: color?.withValues(alpha: 0.08),
-      selectedColor: color?.withValues(alpha: 0.25),
-      checkmarkColor: color,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    // The canvas's pill: an outline that fills with the app's own tint when it
+    // is the one in force. A category's own colour would compete with the
+    // cards' colour bars, which is what actually tells them apart
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.full),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryLight : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+          maxLines: 1,
+        ),
+      ),
     );
   }
 }
@@ -759,6 +773,11 @@ class _FutureGoalCardRow extends ConsumerWidget {
         }
       }
     }
+
+    final hasSubContent = goal.startSemester != null ||
+        goal.endSemester != null ||
+        goal.notes != null ||
+        total > 0;
 
     final span = [
       if (goal.startSemester != null)
@@ -843,7 +862,11 @@ class _FutureGoalCardRow extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(
                 goalCatBarWidth + AppSpacing.sm, 12, AppSpacing.sm, 12),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              // Same as the targets card: nothing under the title means the
+              // icon box and the title share a centre line
+              crossAxisAlignment: hasSubContent
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
               children: [
                 GestureDetector(
                   onTap: () => notifier.toggleDone(goal.id),

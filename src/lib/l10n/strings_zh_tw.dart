@@ -101,6 +101,15 @@ class StringsZhTw implements AppStrings {
   @override String get autumnBreak => '秋假';
   @override String get progressOverview => '進度總覽';
   @override String get filters => '篩選';
+  @override String get anySemester => '不限學期';
+  @override String get sortBy => '排序';
+  @override String minutesLater(int minutes) => '$minutes 分鐘後';
+  @override String hoursLater(int hours) => '$hours 小時後';
+  @override String get sortManual => '手動（可拖曳）';
+  @override String get sortCreated => '新增時間';
+  @override String get sortTitle => 'A–Z';
+  @override String get sortTarget => '依目標';
+  @override String get sortDue => '依截止時間';
   @override String greetingMorning(String name) => name.isEmpty ? '早安 👋' : '早安，$name 👋';
   @override String greetingAfternoon(String name) => name.isEmpty ? '午安 👋' : '午安，$name 👋';
   @override String greetingEvening(String name) => name.isEmpty ? '晚安 👋' : '晚安，$name 👋';
@@ -110,9 +119,9 @@ class StringsZhTw implements AppStrings {
   @override String get unlinked => '未連結';
   @override String get overviewEmpty => '還沒有任何目標或願景';
   @override String targetsSummary(int count, int done, int total) =>
-      '$count 個目標，$done/$total 個里程碑完成';
+      '$count 個目標 · $done/$total 個里程碑完成';
   @override String visionsSummary(int count, int done, int total) =>
-      '$count 個願景，$done/$total 個子願景完成';
+      '$count 個願景 · $done/$total 個子願景完成';
   @override String get profile => '個人資料';
   @override String get taskHistory => '完成度歷史';
   @override String get historyDaily => '每日';

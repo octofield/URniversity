@@ -101,6 +101,15 @@ class StringsEn implements AppStrings {
   @override String get autumnBreak => 'Autumn break';
   @override String get progressOverview => 'Progress overview';
   @override String get filters => 'Filters';
+  @override String get anySemester => 'Any semester';
+  @override String get sortBy => 'Sort';
+  @override String minutesLater(int minutes) => 'in $minutes min';
+  @override String hoursLater(int hours) => 'in $hours h';
+  @override String get sortManual => 'Manual (drag)';
+  @override String get sortCreated => 'Date added';
+  @override String get sortTitle => 'A–Z';
+  @override String get sortTarget => 'By target';
+  @override String get sortDue => 'By due time';
   @override String greetingMorning(String name) => name.isEmpty ? 'Good morning 👋' : 'Good morning, $name 👋';
   @override String greetingAfternoon(String name) => name.isEmpty ? 'Good afternoon 👋' : 'Good afternoon, $name 👋';
   @override String greetingEvening(String name) => name.isEmpty ? 'Good evening 👋' : 'Good evening, $name 👋';

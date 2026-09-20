@@ -403,3 +403,4 @@ flowchart LR
 | D16 | `recent_picks` | 裝置本機 SharedPreferences（任務表單的建議：最近用過的目標與時間，推導自使用者操作） |
 | D17 | `task_completion_effect` | 裝置本機 SharedPreferences（完成動畫強度，每台裝置各自設定） |
 | D18 | `fab_pos_*` | 裝置本機 SharedPreferences（兩顆浮動新增鈕被拖到哪裡，存 0–1 的比例） |
+| D19 | `task_sort` | 裝置本機 SharedPreferences（任務清單的排序方式） |
