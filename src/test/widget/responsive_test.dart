@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/providers/future_goals_provider.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart';
+import 'package:urniversity/l10n/strings_zh_tw.dart';
+import 'package:urniversity/screens/auth/auth_layout.dart';
 import 'package:urniversity/screens/auth/login_screen.dart';
 import 'package:urniversity/screens/auth/register_screen.dart';
 import 'package:urniversity/screens/auth/reset_password_screen.dart';
@@ -56,10 +58,30 @@ void main() {
     expect(capOf(maxWidth), findsOneWidget, reason: 'capped at 768');
   }
 
+  // Sign-in and register do not use ResponsiveBody: from 2026-09-23 they have
+  // their own two-column desktop layout (AuthLayout), with the brand panel on
+  // the left and a fixed-width card on the right
+  group('the sign-in pages switch to two columns at 768', () {
+    Future<void> expectTwoColumns(WidgetTester tester, Widget screen) async {
+      const zh = StringsZhTw();
+
+      await pumpScreen(tester, screen, width: 767);
+      expect(find.byType(AuthLayout), findsOneWidget);
+      // The bullets are what the wide layout has room for; the phone hero
+      // shows the mark, the title and one line
+      expect(find.text(zh.authBulletTasks), findsNothing);
+
+      setViewWidth(tester, 1000);
+      await tester.pumpAndSettle();
+      expect(find.text(zh.authBulletTasks), findsOneWidget);
+      expect(find.text(zh.authBulletVisions), findsOneWidget);
+    }
+
+    testWidgets('login', (t) => expectTwoColumns(t, const LoginScreen()));
+    testWidgets('register', (t) => expectTwoColumns(t, const RegisterScreen()));
+  });
+
   group('form screens cap at 420', () {
-    testWidgets('login', (t) => expectCappedAt(t, const LoginScreen(), 420));
-    testWidgets('register',
-        (t) => expectCappedAt(t, const RegisterScreen(), 420));
     testWidgets('reset password',
         (t) => expectCappedAt(t, const ResetPasswordScreen(), 420));
     testWidgets('setup profile',

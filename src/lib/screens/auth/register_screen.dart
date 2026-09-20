@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/sign_in_failure.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/settings_provider.dart';
-import '../../widgets/responsive_body.dart';
+import 'auth_layout.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -25,6 +27,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
+  }
+
+  // The same account either way, so registering with Google is the call the
+  // sign-in page already makes — Supabase creates the user on first sign-in
+  Future<void> _googleRegister() async {
+    setState(() => _loading = true);
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb
+            ? Uri.base.origin
+            : 'com.octofield.urniversity://login-callback',
+      );
+    } catch (e) {
+      if (mounted) {
+        final s = ref.read(stringsProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(signInFailureMessage(signInFailureFrom(e), s))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _register() async {
@@ -75,90 +100,84 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
-    return Scaffold(
-      appBar: AppBar(title: Text(s.createAccount)),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pageHorizontal,
-            vertical: AppSpacing.lg,
+
+    final card = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          s.createAccount,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        TextField(
+          controller: _emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: s.emailLabel,
+            prefixIcon: const Icon(Icons.email_outlined),
           ),
-          child: ResponsiveBody(
-            maxWidth: ResponsiveBody.formWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  s.registerHeadline,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                TextField(
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: s.emailLabel,
-                    prefixIcon: const Icon(Icons.email_outlined),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: _passwordCtrl,
-                  obscureText: !_showPassword,
-                  decoration: InputDecoration(
-                    labelText: s.passwordLabelWithHint,
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    suffixIcon: IconButton(
-                      icon: Icon(_showPassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined),
-                      onPressed: () =>
-                          setState(() => _showPassword = !_showPassword),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: _confirmCtrl,
-                  obscureText: !_showPassword,
-                  decoration: InputDecoration(
-                    labelText: s.confirmPasswordLabel,
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                  ),
-                  onSubmitted: (_) => _register(),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _loading ? null : _register,
-                    child: _loading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(s.register),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(s.haveAccountAlready),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(s.login),
-                    ),
-                  ],
-                ),
-              ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _passwordCtrl,
+          obscureText: !_showPassword,
+          decoration: InputDecoration(
+            labelText: s.passwordLabelWithHint,
+            prefixIcon: const Icon(Icons.lock_outlined),
+            suffixIcon: IconButton(
+              icon: Icon(_showPassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined),
+              onPressed: () => setState(() => _showPassword = !_showPassword),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          controller: _confirmCtrl,
+          obscureText: !_showPassword,
+          decoration: InputDecoration(
+            labelText: s.confirmPasswordLabel,
+            prefixIcon: const Icon(Icons.lock_outlined),
+          ),
+          onSubmitted: (_) => _register(),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _loading ? null : _register,
+            child: _loading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(s.register),
+          ),
+        ),
+        AuthDivider(s: s),
+        GoogleAuthButton(
+          label: s.signUpWithGoogle,
+          onPressed: _loading ? null : _googleRegister,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AuthSwitchLine(
+          question: s.haveAccountAlready,
+          action: s.login,
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+
+    return AuthLayout(
+      title: s.createAccount,
+      subtitle: s.registerTagline,
+      bullets: [s.authBulletTasks, s.authBulletTargets, s.authBulletVisions],
+      card: card,
     );
   }
 }

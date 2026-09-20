@@ -102,6 +102,17 @@ class StringsJp implements AppStrings {
   @override String get progressOverview => '進捗まとめ';
   @override String get filters => '絞り込み';
   @override String get anySemester => '学期を問わない';
+  @override String get deleteAccountWhatGoes => '次のデータもすべて削除されます：';
+  @override String get deleteAccountReauthHint =>
+      '誤操作を防ぐため、削除の前に Google でもう一度ログインします。';
+  @override String get deleteAccountReauthGoogle => 'Google で再認証';
+  @override String get deleteAccountVerified =>
+      '認証が完了しました。削除するとアカウントと上記のデータは元に戻せません。';
+  @override String get signInBadCredentials => 'メールアドレスまたはパスワードが違います';
+  @override String get signInEmailNotConfirmed => 'このメールはまだ確認されていません。届いたリンクを開いてください';
+  @override String get signInTooManyTries => '試行回数が多すぎます。数分おいてからお試しください';
+  @override String get signInNetwork => 'サーバーに接続できません。通信環境をご確認ください';
+  @override String get signInUnknown => 'ログインできませんでした。しばらくしてからお試しください';
   @override String get sortBy => '並び替え';
   @override String minutesLater(int minutes) => '$minutes 分後';
   @override String hoursLater(int hours) => '$hours 時間後';
@@ -226,6 +237,12 @@ class StringsJp implements AppStrings {
   @override String get confirmPasswordLabel => 'パスワード（確認）';
   @override String get orDivider => 'または';
   @override String get signInWithGoogle => 'Google でログイン';
+  @override String get signUpWithGoogle => 'Google で登録';
+  @override String get appTagline => '大学生活をひとつの場所に';
+  @override String get registerTagline => 'どの端末でも同じ進み具合が見られます';
+  @override String get authBulletTasks => '今日やることが一目で分かる';
+  @override String get authBulletTargets => '学期ごとの目標とマイルストーン';
+  @override String get authBulletVisions => '行きたい場所を、見えるかたちに';
   @override String get noAccountYet => 'アカウントをお持ちでない方';
   @override String get haveAccountAlready => 'すでにアカウントをお持ちの方';
   @override String get backToGuestMode => 'ゲストモードに戻る';
@@ -255,11 +272,8 @@ class StringsJp implements AppStrings {
   @override String get exitGuestConfirm => 'ゲストモードを終了するとゲストデータはすべて削除され、元に戻せません。続行しますか？';
   @override String get exitAction => '終了';
   @override String get logoutConfirm => 'ログアウトしますか？';
-  @override String deleteAccountConfirmEmail(String email) =>
-      'この操作は取り消せません。すべてのデータが完全に削除されます。\n確認のためメールアドレス「$email」を入力してください。';
   @override String get deleteAccountConfirmPassword =>
       'この操作は取り消せません。すべてのデータが完全に削除されます。\n確認のためパスワードを入力してください。';
-  @override String get emailMismatch => 'メールアドレスが一致しません';
   @override String get confirmDeleteAction => '削除を確認';
 
   @override String get emptyTrashConfirm => 'すべての項目が完全に削除され、元に戻せません。';

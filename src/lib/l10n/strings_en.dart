@@ -102,6 +102,17 @@ class StringsEn implements AppStrings {
   @override String get progressOverview => 'Progress overview';
   @override String get filters => 'Filters';
   @override String get anySemester => 'Any semester';
+  @override String get deleteAccountWhatGoes => 'All of this goes with it:';
+  @override String get deleteAccountReauthHint =>
+      'Sign in with Google once more first, so this cannot happen by accident.';
+  @override String get deleteAccountReauthGoogle => 'Verify with Google';
+  @override String get deleteAccountVerified =>
+      'Verified. Deleting now removes the account and everything above, for good.';
+  @override String get signInBadCredentials => 'Wrong email or password';
+  @override String get signInEmailNotConfirmed => 'This email is not verified yet — open the link we sent you';
+  @override String get signInTooManyTries => 'Too many tries. Wait a few minutes and try again';
+  @override String get signInNetwork => 'Cannot reach the server. Check your connection';
+  @override String get signInUnknown => 'Sign-in did not go through. Try again in a moment';
   @override String get sortBy => 'Sort';
   @override String minutesLater(int minutes) => 'in $minutes min';
   @override String hoursLater(int hours) => 'in $hours h';
@@ -226,6 +237,12 @@ class StringsEn implements AppStrings {
   @override String get confirmPasswordLabel => 'Confirm password';
   @override String get orDivider => 'or';
   @override String get signInWithGoogle => 'Sign in with Google';
+  @override String get signUpWithGoogle => 'Sign up with Google';
+  @override String get appTagline => 'Your whole university life in one place';
+  @override String get registerTagline => 'Your progress follows you to every device';
+  @override String get authBulletTasks => 'Everything due today, at a glance';
+  @override String get authBulletTargets => 'Targets and milestones, semester by semester';
+  @override String get authBulletVisions => 'The places you want to get to, written down';
   @override String get noAccountYet => 'Don\'t have an account?';
   @override String get haveAccountAlready => 'Already have an account?';
   @override String get backToGuestMode => 'Back to guest mode';
@@ -255,11 +272,8 @@ class StringsEn implements AppStrings {
   @override String get exitGuestConfirm => 'Leaving guest mode erases all guest data. This cannot be undone. Continue?';
   @override String get exitAction => 'Exit';
   @override String get logoutConfirm => 'Log out of your account?';
-  @override String deleteAccountConfirmEmail(String email) =>
-      'This cannot be undone. All of your data will be permanently deleted.\nType your email "$email" to confirm.';
   @override String get deleteAccountConfirmPassword =>
       'This cannot be undone. All of your data will be permanently deleted.\nEnter your password to confirm.';
-  @override String get emailMismatch => 'The email does not match';
   @override String get confirmDeleteAction => 'Delete permanently';
 
   @override String get emptyTrashConfirm => 'Every item will be permanently deleted. This cannot be undone.';

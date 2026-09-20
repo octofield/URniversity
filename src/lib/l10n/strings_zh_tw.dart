@@ -102,6 +102,17 @@ class StringsZhTw implements AppStrings {
   @override String get progressOverview => '進度總覽';
   @override String get filters => '篩選';
   @override String get anySemester => '不限學期';
+  @override String get deleteAccountWhatGoes => '以下資料會一起永久刪除：';
+  @override String get deleteAccountReauthHint =>
+      '為了避免誤刪，刪除前需要再用 Google 登入一次。';
+  @override String get deleteAccountReauthGoogle => '用 Google 重新驗證';
+  @override String get deleteAccountVerified =>
+      '已完成驗證。按下刪除後，帳號與上面所有資料都會永久消失，無法復原。';
+  @override String get signInBadCredentials => '帳號或密碼錯誤，請再確認一次';
+  @override String get signInEmailNotConfirmed => '這個信箱還沒完成驗證，請先收信點開驗證連結';
+  @override String get signInTooManyTries => '嘗試太多次了，請等幾分鐘再試';
+  @override String get signInNetwork => '連不上伺服器，請檢查網路後再試';
+  @override String get signInUnknown => '登入沒有成功，請稍後再試一次';
   @override String get sortBy => '排序';
   @override String minutesLater(int minutes) => '$minutes 分鐘後';
   @override String hoursLater(int hours) => '$hours 小時後';
@@ -226,6 +237,12 @@ class StringsZhTw implements AppStrings {
   @override String get confirmPasswordLabel => '確認密碼';
   @override String get orDivider => '或';
   @override String get signInWithGoogle => '使用 Google 登入';
+  @override String get signUpWithGoogle => '使用 Google 註冊';
+  @override String get appTagline => '把大學生活放在同一個地方';
+  @override String get registerTagline => '之後每一台裝置都看得到同樣的進度';
+  @override String get authBulletTasks => '今天要做的事，一眼看完';
+  @override String get authBulletTargets => '每個學期的目標與里程碑';
+  @override String get authBulletVisions => '想去的地方，寫成看得見的願景';
   @override String get noAccountYet => '還沒有帳號？';
   @override String get haveAccountAlready => '已有帳號？';
   @override String get backToGuestMode => '返回訪客模式';
@@ -259,11 +276,8 @@ class StringsZhTw implements AppStrings {
   @override String get exitGuestConfirm => '退出後所有訪客資料將會清除，無法復原。確定繼續？';
   @override String get exitAction => '退出';
   @override String get logoutConfirm => '確定要登出嗎？';
-  @override String deleteAccountConfirmEmail(String email) =>
-      '此操作無法還原，所有資料將永久刪除。\n請輸入你的信箱「$email」以確認。';
   @override String get deleteAccountConfirmPassword =>
       '此操作無法還原，所有資料將永久刪除。\n請輸入密碼以確認。';
-  @override String get emailMismatch => '信箱不相符';
   @override String get confirmDeleteAction => '確認刪除';
 
   @override String get emptyTrashConfirm => '所有項目將被永久刪除，無法復原。';

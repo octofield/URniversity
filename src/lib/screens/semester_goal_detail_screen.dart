@@ -21,6 +21,7 @@ import '../widgets/responsive_body.dart';
 import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/sheet_fields.dart';
+import '../widgets/semester_list_dialog.dart';
 import 'future_goal_detail_screen.dart';
 
 class SemesterGoalDetailScreen extends ConsumerWidget {
@@ -617,33 +618,14 @@ void _showSemesterPicker(
 ) {
   showDialog(
     context: context,
-    builder: (dlgCtx) => AlertDialog(
-      title: Text(s.semester),
-      content: SizedBox(
-        width: 400,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final sem in semesters)
-              ListTile(
-                dense: true,
-                title: Text(formatSemester(sem, settings, s)),
-                selected: sem == current,
-                selectedColor: AppColors.primary,
-                onTap: () {
-                  onSelect(sem);
-                  Navigator.pop(dlgCtx);
-                },
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dlgCtx),
-          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-        ),
-      ],
+    builder: (_) => SemesterListDialog(
+      title: s.semester,
+      semesters: semesters,
+      selected: current,
+      openAt: currentSemester(settings),
+      settings: settings,
+      s: s,
+      onSelect: (sem) => onSelect(sem!),
     ),
   );
 }

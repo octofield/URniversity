@@ -21,6 +21,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
 import '../widgets/swipe_switcher.dart';
+import '../widgets/semester_list_dialog.dart';
 import 'overview_graph_screen.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
@@ -576,36 +577,16 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
   void _pickSemester(BuildContext ctx) {
     final s = ref.read(stringsProvider);
     final settings = ref.read(semesterSettingsProvider);
-    final currentSem = ref.read(selectedSemesterProvider);
     showDialog(
       context: ctx,
-      builder: (dlgCtx) => AlertDialog(
-        title: Text(s.semester),
-        content: SizedBox(
-          width: 400,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _semesters.length,
-            itemBuilder: (_, i) {
-              final sem = _semesters[i];
-              return ListTile(
-                title: Text(formatSemester(sem, settings, s)),
-                selected: sem == currentSem,
-                selectedColor: AppColors.primary,
-                onTap: () {
-                  _jumpTo(sem);
-                  Navigator.pop(dlgCtx);
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dlgCtx),
-            child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-          ),
-        ],
+      builder: (_) => SemesterListDialog(
+        title: s.semester,
+        semesters: _semesters,
+        selected: ref.read(selectedSemesterProvider),
+        openAt: currentSemester(settings),
+        settings: settings,
+        s: s,
+        onSelect: (sem) => _jumpTo(sem!),
       ),
     );
   }

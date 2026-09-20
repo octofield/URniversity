@@ -914,7 +914,7 @@ class _TasksSection extends ConsumerWidget {
               const Spacer(),
               IconButton(
                 icon: Icon(
-                  Icons.sort,
+                  Icons.arrow_downward,
                   color: sort == TaskSort.manual
                       ? AppColors.textTertiary
                       : AppColors.primary,
