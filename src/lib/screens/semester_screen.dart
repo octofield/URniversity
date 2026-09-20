@@ -561,36 +561,16 @@ class _SemesterPicker extends ConsumerStatefulWidget {
 }
 
 class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
-  late final PageController _ctrl;
   List<String> _semesters = [];
 
-  @override
-  void initState() {
-    super.initState();
-    final settings = ref.read(semesterSettingsProvider);
-    _semesters = generateSemesters(settings);
-    final cur = ref.read(selectedSemesterProvider);
-    final idx = _semesters.indexOf(cur);
-    _ctrl = PageController(
-      viewportFraction: 0.28,
-      initialPage: idx >= 0 ? idx : _semesters.length ~/ 2,
-    );
-  }
+  void _jumpTo(String sem) =>
+      ref.read(selectedSemesterProvider.notifier).state = sem;
 
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _jumpTo(String sem) {
-    final idx = _semesters.indexOf(sem);
-    if (idx >= 0) {
-      _ctrl.animateToPage(idx,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut);
-    }
-    ref.read(selectedSemesterProvider.notifier).state = sem;
+  // One step along the list, or nothing at all at either end
+  void _step(int delta) {
+    final idx = _semesters.indexOf(ref.read(selectedSemesterProvider)) + delta;
+    if (idx < 0 || idx >= _semesters.length) return;
+    _jumpTo(_semesters[idx]);
   }
 
   void _pickSemester(BuildContext ctx) {
@@ -635,83 +615,69 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
     final settings = ref.watch(semesterSettingsProvider);
     _semesters = generateSemesters(settings);
     final selected = ref.watch(selectedSemesterProvider);
-    // The card list below can be swiped too, so the strip follows whatever
-    // picked the semester rather than only its own page changes
-    ref.listen<String>(selectedSemesterProvider, (_, next) {
-      final idx = _semesters.indexOf(next);
-      if (idx < 0 || !_ctrl.hasClients || _ctrl.page?.round() == idx) return;
-      _ctrl.animateToPage(idx,
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-    });
     final curSem = currentSemester(settings);
     final s = ref.watch(stringsProvider);
     final isOnCurrentSem = selected == curSem;
+    final index = _semesters.indexOf(selected);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 44,
-          child: PageView.builder(
-            controller: _ctrl,
-            itemCount: _semesters.length,
-            onPageChanged: (i) =>
-                ref.read(selectedSemesterProvider.notifier).state =
-                    _semesters[i],
-            itemBuilder: (ctx, i) {
-              final sem = _semesters[i];
-              final isSelected = sem == selected;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: isSelected
-                    ? () => _pickSemester(ctx)
-                    : () => _jumpTo(sem),
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Flexible: a page is a fraction of the strip's width, and
-                      // a long semester name plus the caret overran it
-                      Flexible(
-                        child: AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 150),
-                          style: TextStyle(
-                            fontSize: isSelected ? 17 : 13,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textTertiary,
-                          ),
-                          child: Text(
-                            formatSemester(sem, settings, s),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+    // The design's switcher (2026-09-16 canvas): a step either way, the
+    // semester itself in the middle opening the full list, and a way back to
+    // the current one. The list below still swipes between semesters
+    return SizedBox(
+      height: 44,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            visualDensity: VisualDensity.compact,
+            color: AppColors.textSecondary,
+            onPressed: index > 0 ? () => _step(-1) : null,
+          ),
+          InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            onTap: () => _pickSemester(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    formatSemester(selected, settings, s),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
                         ),
-                      ),
-                      if (isSelected)
-                        const Icon(Icons.arrow_drop_down,
-                            size: 16, color: AppColors.primary),
-                    ],
                   ),
-                ),
-              );
-            },
-          ),
-        ),
-        if (!isOnCurrentSem)
-          TextButton(
-            onPressed: () => _jumpTo(curSem),
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                  const Icon(Icons.arrow_drop_down,
+                      size: 18, color: AppColors.primary),
+                ],
+              ),
             ),
-            child: Text(s.backToCurrentSem),
           ),
-      ],
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            visualDensity: VisualDensity.compact,
+            color: AppColors.textSecondary,
+            onPressed:
+                index >= 0 && index < _semesters.length - 1 ? () => _step(1) : null,
+          ),
+          if (!isOnCurrentSem)
+            TextButton(
+              onPressed: () => _jumpTo(curSem),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              ),
+              child: Text(s.backToCurrentSem),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -721,7 +687,8 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
 const double _iconBoxSize = 38.0;
 
 // Where a milestone row starts: bar + padding + icon box + gap
-const double _childIndent = goalCatBarWidth + AppSpacing.sm + _iconBoxSize + AppSpacing.sm;
+const double _childIndent =
+    goalCatBarWidth + AppSpacing.sm + _iconBoxSize + AppSpacing.sm;
 
 class _SemGoalCardTile extends ConsumerWidget {
   final SemesterGoal goal;
@@ -753,6 +720,10 @@ class _SemGoalCardTile extends ConsumerWidget {
     final visionC = linkedVision == null
         ? null
         : categoryColorOrNull(cats, primaryCategoryOf(linkedVision.categories));
+
+    // A card that is only a title has nothing to align the icon box against,
+    // so the two sit on the same centre line instead of hanging from the top
+    final hasSubContent = linkedVision != null || goal.notes != null || total > 0;
 
     void openDetail() => Navigator.push(
           context,
@@ -851,7 +822,9 @@ class _SemGoalCardTile extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(
                 goalCatBarWidth + AppSpacing.sm, 12, AppSpacing.sm, 12),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: hasSubContent
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
               children: [
                 GestureDetector(
                   onTap: () => notifier.toggleDone(goal.id),

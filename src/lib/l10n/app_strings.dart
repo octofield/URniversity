@@ -106,6 +106,15 @@ abstract class AppStrings {
   // Desktop sidebars
   String get progressOverview;
   String get filters;
+  String get anySemester;
+  String get sortBy;
+  String minutesLater(int minutes);
+  String hoursLater(int hours);
+  String get sortManual;
+  String get sortCreated;
+  String get sortTitle;
+  String get sortTarget;
+  String get sortDue;
 
   // Today greeting header
   String greetingMorning(String name);

@@ -487,6 +487,17 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 
 ---
 
+## D19. 裝置本機儲存 — `task_sort`（任務排序）
+
+媒介：SharedPreferences，`String`（`manual` / `created` / `title` / `target` / `due`，預設 `manual`）。
+
+寫入／讀取處理程序：`TaskSortNotifier`（`src/lib/providers/tasks_provider.dart`）
+
+任務清單目前照哪種順序排（見 system_design.md §3-A）。與 D13／D17／D18 一樣是**這台裝置的
+偏好**，不上雲。讀到不認得的值就退回 `manual`。
+
+---
+
 ## D18. 裝置本機儲存 — `fab_pos_main` / `fab_pos_inspiration`（新增鈕的位置）
 
 媒介：SharedPreferences，`String`，格式 `"{x},{y}"`，兩個值都是 **0–1 的比例**。

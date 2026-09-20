@@ -51,6 +51,20 @@ void main() {
     );
   });
 
+  testWidgets('a title-only card centres the title against the icon box',
+      (tester) async {
+    final c = testContainer();
+    final sem = currentSemester(c.read(semesterSettingsProvider));
+    c.read(semesterGoalsProvider.notifier).addGoal('只有標題', sem);
+
+    await pumpTargets(tester, c);
+
+    final box = tester.getRect(iconBox);
+    final title = tester.getRect(find.text('只有標題'));
+    expect((box.center.dy - title.center.dy).abs(), lessThan(2),
+        reason: 'nothing under the title, so the two share a centre line');
+  });
+
   testWidgets('a categorized target keeps its own colour and icon',
       (tester) async {
     final c = testContainer();

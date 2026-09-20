@@ -662,7 +662,7 @@ Widget _goalLinkTile(
     onTap: onTap,
     borderRadius: BorderRadius.circular(AppRadius.md),
     child: Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: linked != null ? AppColors.borderFocus : AppColors.border),

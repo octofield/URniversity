@@ -413,6 +413,14 @@ void showTaskSheet(
                   onClear: () => setState(() => dueTime = null),
                 ),
                 _suggestionChips(sheetCtx, [
+                  // "In a few minutes" first: a task being written down now is
+                  // usually about to be done now. Remembered clock times follow
+                  for (final (label, gap) in [
+                    (s.minutesLater(5), const Duration(minutes: 5)),
+                    (s.minutesLater(30), const Duration(minutes: 30)),
+                    (s.hoursLater(1), const Duration(hours: 1)),
+                  ])
+                    (label, () => setState(() => dueTime = DateTime.now().add(gap))),
                   for (final clock in recent.times.take(3))
                     (clock, () => setState(() => dueTime = suggestedDueDate(clock, DateTime.now()))),
                 ]),
