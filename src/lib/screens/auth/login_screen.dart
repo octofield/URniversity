@@ -2,13 +2,14 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/sign_in_failure.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/guest_provider.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/settings_provider.dart';
+import 'auth_layout.dart';
 import 'register_screen.dart';
-import '../../widgets/responsive_body.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -22,6 +23,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
   bool _showPassword = false;
+  // Shown above the sign-in button rather than in a snackbar: a message that
+  // slides away on its own is the wrong place for "that password was wrong"
+  SignInFailure? _failure;
 
   @override
   void dispose() {
@@ -31,7 +35,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _googleLogin() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _failure = null;
+    });
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
@@ -39,12 +46,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ? Uri.base.origin
             : 'com.octofield.urniversity://login-callback',
       );
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+    } catch (e) {
+      if (mounted) setState(() => _failure = signInFailureFrom(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -55,18 +58,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final password = _passwordCtrl.text;
     if (email.isEmpty || password.isEmpty) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _failure = null;
+    });
     try {
       await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+    } catch (e) {
+      // Supabase answers "no such account" and "wrong password" with the same
+      // error on purpose, so the line says both (core/sign_in_failure.dart)
+      if (mounted) setState(() => _failure = signInFailureFrom(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -91,12 +95,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SnackBar(content: Text(s.resetEmailSent)),
         );
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+    } catch (e) {
+      if (mounted) setState(() => _failure = signInFailureFrom(e));
     }
   }
 
@@ -104,28 +104,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
 
-    final form = Column(
+    final card = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 80),
-        Text(
-          'URniversity',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
         Text(
           s.login,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
         ),
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: AppSpacing.lg),
         TextField(
           controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
+          onChanged: (_) {
+            if (_failure != null) setState(() => _failure = null);
+          },
           decoration: InputDecoration(
             labelText: s.emailLabel,
             prefixIcon: const Icon(Icons.email_outlined),
@@ -136,6 +131,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _passwordCtrl,
           obscureText: !_showPassword,
+          onChanged: (_) {
+            if (_failure != null) setState(() => _failure = null);
+          },
           decoration: InputDecoration(
             labelText: s.passwordLabel,
             prefixIcon: const Icon(Icons.lock_outlined),
@@ -154,9 +152,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: _loading ? null : _sendResetLink,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            ),
             child: Text(s.forgotPassword),
           ),
         ),
+        // On the page rather than in a snackbar: a message that slides away on
+        // its own is the wrong place for "that password was wrong"
+        if (_failure != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.error_outline, size: 16, color: AppColors.error),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  signInFailureMessage(_failure!, s),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
           width: double.infinity,
@@ -171,86 +194,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 : Text(s.login),
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            const Expanded(child: Divider()),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(s.orDivider,
-                  style: const TextStyle(color: AppColors.textTertiary)),
-            ),
-            const Expanded(child: Divider()),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            icon: const Icon(Icons.g_mobiledata, size: 22),
-            label: Text(s.signInWithGoogle),
-            onPressed: _loading ? null : _googleLogin,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(s.noAccountYet),
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RegisterScreen()),
-              ),
-              child: Text(s.register),
-            ),
-          ],
+        AuthDivider(s: s),
+        GoogleAuthButton(
+          label: s.signInWithGoogle,
+          onPressed: _loading ? null : _googleLogin,
         ),
         const SizedBox(height: AppSpacing.sm),
-        Consumer(
-          builder: (ctx, ref, _) {
-            final isGuest = ref.watch(guestModeProvider);
-            final pending = ref.watch(pendingGuestLoginProvider);
-            if (isGuest && pending) {
-              return TextButton(
-                onPressed: () =>
-                    ref.read(pendingGuestLoginProvider.notifier).state = false,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textTertiary,
-                ),
-                child: Text(s.backToGuestMode),
-              );
-            }
-            return TextButton(
-              onPressed: _loading
-                  ? null
-                  : () async {
-                      setState(() => _loading = true);
-                      await ref.read(guestModeProvider.notifier).enable();
-                      if (mounted) setState(() => _loading = false);
-                    },
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textTertiary,
-              ),
-              child: Text(s.tryAsGuest),
-            );
-          },
+        AuthSwitchLine(
+          question: s.noAccountYet,
+          action: s.register,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+          ),
         ),
       ],
     );
 
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pageHorizontal,
-          ),
-          child: ResponsiveBody(
-            maxWidth: ResponsiveBody.formWidth,
-            child: form,
-          ),
-        ),
-      ),
+    // The guest entry sits under the card: it is a way out, not a way in
+    final guest = Consumer(
+      builder: (ctx, ref, _) {
+        final isGuest = ref.watch(guestModeProvider);
+        final pending = ref.watch(pendingGuestLoginProvider);
+        if (isGuest && pending) {
+          return TextButton(
+            onPressed: () =>
+                ref.read(pendingGuestLoginProvider.notifier).state = false,
+            style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+            child: Text(s.backToGuestMode),
+          );
+        }
+        return TextButton(
+          onPressed: _loading
+              ? null
+              : () async {
+                  setState(() => _loading = true);
+                  await ref.read(guestModeProvider.notifier).enable();
+                  if (mounted) setState(() => _loading = false);
+                },
+          style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+          child: Text(s.tryAsGuest),
+        );
+      },
+    );
+
+    return AuthLayout(
+      title: 'URniversity',
+      subtitle: s.appTagline,
+      bullets: [s.authBulletTasks, s.authBulletTargets, s.authBulletVisions],
+      card: card,
+      footer: guest,
     );
   }
 }

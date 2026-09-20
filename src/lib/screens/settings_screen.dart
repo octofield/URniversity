@@ -1,13 +1,21 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/sign_in_failure.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
 import '../core/app_version.dart';
 import '../l10n/app_strings.dart';
+import '../providers/auth_provider.dart';
+import '../providers/future_goals_provider.dart';
 import '../providers/guest_provider.dart';
+import '../providers/inspirations_provider.dart';
+import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/semester_goals_provider.dart';
+import '../providers/tasks_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
 import 'category_settings_screen.dart';
@@ -42,6 +50,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
+
+    // Coming back from Google with a deletion still pending. The sign-in is
+    // the proof of identity, never the confirmation — that is asked again here
+    ref.listen<AsyncValue<AuthState>>(authStateProvider, (_, next) {
+      final event = next.value?.event;
+      if (event != AuthChangeEvent.signedIn) return;
+      if (!ref.read(pendingAccountDeletionProvider)) return;
+      ref.read(pendingAccountDeletionProvider.notifier).state = false;
+      showVerifiedDeleteDialog(context, ref, s);
+    });
+
     final currentLang = ref.watch(languageProvider);
     final currentFmt = ref.watch(settingsProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
@@ -516,32 +535,51 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     super.dispose();
   }
 
+  // A Google account has no password to type, and its address is whatever the
+  // keyboard offers first — so the proof is signing in again. The app leaves
+  // for Google and the settings screen picks the flow back up on return
+  Future<void> _reauthWithGoogle() async {
+    setState(() { _loading = true; _errorMsg = null; });
+    widget.ref.read(pendingAccountDeletionProvider.notifier).state = true;
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb
+            ? Uri.base.origin
+            : 'com.octofield.urniversity://login-callback',
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      widget.ref.read(pendingAccountDeletionProvider.notifier).state = false;
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMsg = signInFailureMessage(signInFailureFrom(e), widget.s);
+        });
+      }
+    }
+  }
+
   Future<void> _delete() async {
     setState(() { _loading = true; _errorMsg = null; });
 
-    if (widget.isGoogle) {
-      if (_inputCtrl.text.trim().toLowerCase() != widget.email.toLowerCase()) {
-        setState(() { _loading = false; _errorMsg = widget.s.emailMismatch; });
-        return;
-      }
-    }
-
     try {
-      if (!widget.isGoogle) {
-        await Supabase.instance.client.auth.signInWithPassword(
-          email: widget.email,
-          password: _inputCtrl.text,
-        );
-      }
-      final uid = Supabase.instance.client.auth.currentUser!.id;
-      await widget.ref.read(profileProvider.notifier).deleteAllData(uid);
-      await Supabase.instance.client.auth.signOut();
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: widget.email,
+        password: _inputCtrl.text,
+      );
+      await deleteAccountForGood(widget.ref);
       if (mounted) Navigator.pop(context);
       if (widget.outerContext.mounted) {
         Navigator.of(widget.outerContext).popUntil((route) => route.isFirst);
       }
-    } on AuthException catch (e) {
-      if (mounted) setState(() { _loading = false; _errorMsg = e.message; });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMsg = signInFailureMessage(signInFailureFrom(e), widget.s);
+        });
+      }
     }
   }
 
@@ -554,19 +592,33 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(widget.isGoogle
-              ? widget.s.deleteAccountConfirmEmail(widget.email)
+              ? widget.s.deleteAccountReauthHint
               : widget.s.deleteAccountConfirmPassword),
           const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _inputCtrl,
-            obscureText: !widget.isGoogle,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: widget.isGoogle ? widget.s.emailLabel : widget.s.passwordLabel,
-              errorText: _errorMsg,
+          // Named, with counts: "delete everything" is abstract until it says
+          // how much everything is
+          AccountDataSummary(ref: widget.ref, s: widget.s),
+          const SizedBox(height: AppSpacing.md),
+          if (widget.isGoogle) ...[
+            if (_errorMsg != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Text(
+                  _errorMsg!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              ),
+          ] else
+            TextField(
+              controller: _inputCtrl,
+              obscureText: true,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: widget.s.passwordLabel,
+                errorText: _errorMsg,
+              ),
+              onSubmitted: (_) => _loading ? null : _delete(),
             ),
-            onSubmitted: (_) => _loading ? null : _delete(),
-          ),
         ],
       ),
       actions: [
@@ -575,19 +627,122 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
           child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
         ),
         FilledButton(
-          onPressed: _loading ? null : _delete,
-          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          onPressed: _loading
+              ? null
+              : (widget.isGoogle ? _reauthWithGoogle : _delete),
+          style: FilledButton.styleFrom(
+            backgroundColor:
+                widget.isGoogle ? AppColors.primary : AppColors.error,
+          ),
           child: _loading
               ? const SizedBox(
                   height: 16,
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textOnPrimary),
                 )
-              : Text(widget.s.confirmDeleteAction),
+              : Text(widget.isGoogle
+                  ? widget.s.deleteAccountReauthGoogle
+                  : widget.s.confirmDeleteAction),
         ),
       ],
     );
   }
+}
+
+// What the account is holding, so "this deletes everything" has a size
+class AccountDataSummary extends ConsumerWidget {
+  final WidgetRef ref;
+  final AppStrings s;
+
+  const AccountDataSummary({super.key, required this.ref, required this.s});
+
+  @override
+  Widget build(BuildContext context, WidgetRef _) {
+    final rows = <(String, int)>[
+      (s.tasks, ref.watch(tasksProvider).length),
+      (s.targets, ref.watch(semesterGoalsProvider).length),
+      (s.goals, ref.watch(futureGoalsProvider).length),
+      (s.inspirations, ref.watch(inspirationsProvider).length),
+      (s.journal, ref.watch(journalProvider).length),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          s.deleteAccountWhatGoes,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        for (final (label, count) in rows)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(
+              children: [
+                const Icon(Icons.remove, size: 12, color: AppColors.error),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+                Text(
+                  '$count',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// The write itself, shared by the password path and the post-Google one
+Future<void> deleteAccountForGood(WidgetRef ref) async {
+  final uid = Supabase.instance.client.auth.currentUser!.id;
+  await ref.read(profileProvider.notifier).deleteAllData(uid);
+  await Supabase.instance.client.auth.signOut();
+}
+
+// Shown when the app comes back from Google with the deletion still pending.
+// Re-authenticating is not the confirmation — this is
+Future<void> showVerifiedDeleteDialog(
+  BuildContext context,
+  WidgetRef ref,
+  AppStrings s,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dlgCtx) => AlertDialog(
+      title: Text(s.deleteAccount),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.deleteAccountVerified),
+          const SizedBox(height: AppSpacing.md),
+          AccountDataSummary(ref: ref, s: s),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dlgCtx, false),
+          child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dlgCtx, true),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          child: Text(s.confirmDeleteAction),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  await deleteAccountForGood(ref);
+  if (context.mounted) Navigator.of(context).popUntil((route) => route.isFirst);
 }
 
 class _FeedbackDialog extends StatefulWidget {

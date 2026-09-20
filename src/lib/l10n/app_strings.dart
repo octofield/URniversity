@@ -107,6 +107,15 @@ abstract class AppStrings {
   String get progressOverview;
   String get filters;
   String get anySemester;
+  String get deleteAccountWhatGoes;
+  String get deleteAccountReauthHint;
+  String get deleteAccountReauthGoogle;
+  String get deleteAccountVerified;
+  String get signInBadCredentials;
+  String get signInEmailNotConfirmed;
+  String get signInTooManyTries;
+  String get signInNetwork;
+  String get signInUnknown;
   String get sortBy;
   String minutesLater(int minutes);
   String hoursLater(int hours);
@@ -248,6 +257,12 @@ abstract class AppStrings {
   String get confirmPasswordLabel;
   String get orDivider;
   String get signInWithGoogle;
+  String get signUpWithGoogle;
+  String get appTagline;
+  String get registerTagline;
+  String get authBulletTasks;
+  String get authBulletTargets;
+  String get authBulletVisions;
   String get noAccountYet;
   String get haveAccountAlready;
   String get backToGuestMode;
@@ -280,9 +295,7 @@ abstract class AppStrings {
   String get exitGuestConfirm;
   String get exitAction;
   String get logoutConfirm;
-  String deleteAccountConfirmEmail(String email);
   String get deleteAccountConfirmPassword;
-  String get emailMismatch;
   String get confirmDeleteAction;
 
   // Trash

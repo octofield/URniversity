@@ -16,7 +16,6 @@ import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
-import '../widgets/category_manager.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/link_color_bar.dart';
@@ -24,6 +23,7 @@ import '../widgets/sheet_body.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
 import '../widgets/sheet_fields.dart';
+import '../widgets/semester_list_dialog.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
@@ -295,45 +295,18 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
 
   void _showMoreSemesters(BuildContext context, SemesterSettings settings) {
     final s = ref.read(stringsProvider);
-    final all = generateSemesters(settings);
 
     showDialog(
       context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: Text(s.semester),
-        content: SizedBox(
-          width: 400,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              ListTile(
-                title: Text(s.catAll),
-                selected: _semFilter == null,
-                selectedColor: AppColors.primary,
-                onTap: () {
-                  setState(() => _semFilter = null);
-                  Navigator.pop(dlgCtx);
-                },
-              ),
-              for (final sem in all)
-                ListTile(
-                  title: Text(formatSemester(sem, settings, s)),
-                  selected: sem == _semFilter,
-                  selectedColor: AppColors.primary,
-                  onTap: () {
-                    setState(() => _semFilter = sem);
-                    Navigator.pop(dlgCtx);
-                  },
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dlgCtx),
-            child: Text(MaterialLocalizations.of(dlgCtx).cancelButtonLabel),
-          ),
-        ],
+      builder: (_) => SemesterListDialog(
+        title: s.semester,
+        semesters: generateSemesters(settings),
+        selected: _semFilter,
+        openAt: currentSemester(settings),
+        settings: settings,
+        s: s,
+        anyLabel: s.anySemester,
+        onSelect: (sem) => setState(() => _semFilter = sem),
       ),
     );
   }
@@ -348,32 +321,39 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
           final cats = cRef.watch(categoriesProvider);
           return AlertDialog(
             title: Text(s.category),
+            // Picking what to filter by only. Colours, icons, order and adding
+            // or removing a category all live on the settings page — this
+            // dialog opens with a tap while scanning a list, which is exactly
+            // when a delete button next to the name is a mistake waiting
             content: SizedBox(
               width: 400,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    height: 300,
-                    child: ReorderableListView.builder(
-                      itemCount: cats.length,
-                      onReorderItem: (o, n) => cRef.read(categoriesProvider.notifier).reorder(o, n),
-                      itemBuilder: (tileCtx, i) => categoryManageTile(
-                        context: tileCtx,
-                        ref: cRef,
-                        entry: cats[i],
-                        s: s,
-                        selected: _catFilter == cats[i].id,
-                        onTap: () {
-                          setState(() => _catFilter = _catFilter == cats[i].id ? null : cats[i].id);
-                          Navigator.pop(dlgCtx);
-                        },
-                      ),
-                    ),
-                  ),
-                  const Divider(),
-                  const CategoryAddRow(),
-                ],
+              height: 300,
+              child: ListView.builder(
+                itemCount: cats.length + 1,
+                itemBuilder: (_, i) {
+                  if (i == 0) {
+                    return ListTile(
+                      title: Text(s.catAll),
+                      selected: _catFilter == null,
+                      selectedColor: AppColors.primary,
+                      onTap: () {
+                        setState(() => _catFilter = null);
+                        Navigator.pop(dlgCtx);
+                      },
+                    );
+                  }
+                  final cat = cats[i - 1];
+                  return ListTile(
+                    leading: Icon(cat.icon, color: cat.color),
+                    title: Text(catLabel(cat.id, s)),
+                    selected: _catFilter == cat.id,
+                    selectedColor: AppColors.primary,
+                    onTap: () {
+                      setState(() => _catFilter = _catFilter == cat.id ? null : cat.id);
+                      Navigator.pop(dlgCtx);
+                    },
+                  );
+                },
               ),
             ),
             actions: [

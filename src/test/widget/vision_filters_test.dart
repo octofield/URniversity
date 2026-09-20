@@ -4,6 +4,7 @@ import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/models/future_goal.dart';
 import 'package:urniversity/providers/future_goals_provider.dart';
 import 'package:urniversity/screens/future_screen.dart';
+import 'package:urniversity/widgets/category_manager.dart';
 
 import '../helpers/pump_app.dart';
 
@@ -29,6 +30,35 @@ void main() {
     final categories = tester.getRect(find.text(zh.catAll));
     final semesters = tester.getRect(find.text(zh.anySemester));
     expect(categories.top, lessThan(semesters.top));
+  });
+
+  testWidgets('the more-categories dialog only picks, never edits',
+      (tester) async {
+    final c = testContainer();
+    c.read(futureGoalsProvider.notifier).addGoal(
+          title: '出國交換',
+          categories: const [FutureCategories.exchange],
+        );
+
+    await pumpScreen(tester, const Scaffold(body: FutureScreen()), container: c);
+    await tester.pumpAndSettle();
+
+    // The category row's own "more" chip, not the semester one
+    await tester.tap(find.widgetWithIcon(ActionChip, Icons.tune));
+    await tester.pumpAndSettle();
+
+    expect(find.text(zh.catExchange), findsWidgets);
+    // Colours, icons, order and adding or deleting all belong to the settings
+    // page now — a delete button next to a name you are only scanning is a
+    // mistake waiting
+    // Scoped to the dialog: the cards behind it have their own delete buttons
+    final dialog = find.byType(AlertDialog);
+    expect(
+      find.descendant(of: dialog, matching: find.byIcon(Icons.delete_outline)),
+      findsNothing,
+    );
+    expect(find.byType(ReorderableListView), findsNothing);
+    expect(find.byType(CategoryAddRow), findsNothing);
   });
 
   testWidgets('picking a category filters the list', (tester) async {

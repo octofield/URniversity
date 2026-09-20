@@ -97,6 +97,28 @@ flowchart TD
 | 訪客模式 | 無 | 無 | 立即進入 `HomeScreen`，資料存本機（見 DD.md D11） |
 | 首次登入設定暱稱 | 使用者名稱（文字，必填）、頭像（10 選 1 或不選） | 名稱非空才能按「完成」 | 寫入 `user_settings`，之後導向 Home |
 
+**登入與註冊的版面（2026-09-23，設計稿 A）**：兩頁共用 `screens/auth/auth_layout.dart`——
+手機是 250px 的暖色品牌區（漸層、幾顆分類色圓點、圓角方塊的 U、標題與一句話），
+表單白卡片壓在它下緣上；桌面（≥768）左半邊是同一塊品牌區並多出三行說明，右半邊置中一張
+420 寬的卡片。**這兩頁不再用 `ResponsiveBody`**，因為它們的寬版是雙欄而不是置中限寬。
+訪客入口放在卡片下方——它是一條出路，不是入口。
+
+**登入失敗怎麼說（2026-09-23）**：錯誤顯示在**登入按鈕正上方的一行**（錯誤色的圖示＋一句話），
+不是 SnackBar——會自己滑走的東西不適合用來說「密碼錯了」；重新送出或改動輸入就清掉。
+分類在 `core/sign_in_failure.dart`（純函式，可測）：
+
+| 情況 | 說法 |
+|---|---|
+| `invalid_credentials`（帳號不存在**或**密碼錯誤） | 帳號或密碼錯誤，請再確認一次 |
+| `email_not_confirmed` | 這個信箱還沒完成驗證 |
+| `over_request_rate_limit` / 429 | 嘗試太多次了，請等幾分鐘 |
+| `SocketException` / host lookup 失敗 | 連不上伺服器 |
+| 其他 | 登入沒有成功，請稍後再試 |
+
+⚠️ **「帳號不存在」與「密碼錯誤」不能分開講**。Supabase 兩者都回同一個碼是刻意的：分得出來，
+任何人就能拿這個 App 逐一測試某個 email 有沒有註冊。要分辨得自己加一支查詢 email 是否存在的
+API，等於把那份名單公開出去。
+
 ### 2-B 任務（Today 頁）
 
 | 欄位 | 輸入元件 | 格式 | 必填 |
@@ -224,11 +246,15 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 學期那排的「全部」寫成**不限學期**——兩排疊在一起時，兩個「全部」分不出是哪一種。
 桌面版側欄的順序與手機一致。
 
+**學期清單（`widgets/semester_list_dialog.dart`，2026-09-23）**：目標頁、目標 sheet、願景頁的
+學期篩選共用同一個對話框，**開啟時捲到當前學期**（固定 48px 行高＋算好的 `initialScrollOffset`），
+更早的學期往上捲得到。清單是由早到晚，從頭開始等於每次都要滑過已經念完的年份。
+
 **學期切換（2026-09-22，設計稿的樣子）**：`‹ 115-1 ›` 一列——左右各一個箭頭走一個學期
 （到頭就變灰），中間的膠囊點下去開完整的學期清單，不是本學期時右邊出現「回到本學期」。
 卡片區左右快滑同樣換學期（`_stepSemester`）。
 
-**排序（2026-09-22）**：任務區標頭的篩選鈕旁邊有一顆排序鈕，開一張 sheet 選
+**排序（2026-09-22）**：任務區標頭的篩選鈕旁邊有一顆排序鈕（`Icons.arrow_downward`），開一張 sheet 選
 **手動（可拖曳）／新增時間／A–Z／依目標／依截止時間**，記在裝置本機（D19）。
 手動以外的排序會**停用拖曳**——拖曳寫的是 `sort_order`，在別種排序下看不出效果。
 規則見 §3-A。
@@ -304,8 +330,10 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 
 ### 2-I 分類設定（CategorySettingsScreen／「更多分類」對話框）
 
-兩個入口（設定頁「分類設定」全螢幕頁、未來願景頁「更多分類」對話框）共用同一份列表元件
-（`src/lib/widgets/category_manager.dart`）。
+**入口只有一個**：設定頁的「分類設定」全螢幕頁（`src/lib/widgets/category_manager.dart`）。
+願景頁的「更多分類」自 2026-09-23 起只是**挑選要篩選哪一個分類**——只有圖示、顏色圓點與名稱，
+沒有刪除／換色／換圖示／排序／新增。那個對話框是在瀏覽清單時順手點開的，把刪除鈕放在名字旁邊
+只是等著被誤觸。
 
 | 欄位 | 輸入元件 | 格式 |
 |---|---|---|
@@ -505,7 +533,7 @@ IconButton 的觸控範圍，也放得下 headlineSmall），三條線在左、�
 
 | maxWidth | 畫面 |
 |---|---|
-| 420（`formWidth`） | `LoginScreen`、`RegisterScreen`、`SetupProfileScreen` |
+| 420（`formWidth`） | `ResetPasswordScreen`、`SetupProfileScreen` |
 | 640（`contentWidth`） | `SettingsScreen`、`SemesterGoalDetailScreen`、`FutureGoalDetailScreen`、`CategorySettingsScreen`、`JournalsScreen`、`JournalEditScreen`、`TaskHistoryScreen`、`TrashScreen`、`InspirationsScreen` |
 
 `TodayScreen`、`SemesterScreen`、`FutureScreen`、`MeScreen` 走 §5-E 的雙欄模式，
@@ -958,12 +986,19 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 
 ### UC12　刪除帳號
 1. 設定頁點「刪除帳號」→ 彈出 `_DeleteAccountDialog`。
-2. 身分確認方式依登入方式而定：Email／密碼帳號需重新輸入密碼（`signInWithPassword` 驗證通過
-   才繼續）；Google 帳號沒有密碼可驗證，改為要求輸入完整信箱地址並與帳號信箱字串比對相符。
+2. 身分確認方式依登入方式而定（見下方 2026-09-23 的說明）。
 3. 確認通過 → `profileProvider.deleteAllData(uid)` 清除該使用者全部資料 → `auth.signOut()`。
 4. 關閉對話框後呼叫 `Navigator.popUntil((route) => route.isFirst)`（沿用 UC 登出的既有作法）
    跳回堆疊最底層，讓 `_AuthGate` 依新的 session 狀態顯示 `LoginScreen`；若不做這一步，畫面會
    卡在已經失去 session 的設定頁而非自動導回登入頁。
+
+> **2026-09-23**：刪除前一律先看到**這個帳號有多少資料**（任務／目標／願景／靈感／日記各幾筆），
+> 再依帳號類型驗證身分：
+> - **密碼帳號**：輸入密碼（`signInWithPassword` 成功才算數）
+> - **Google 帳號**：按「用 Google 重新驗證」→ 跳回 Google 登入 → 回到 App 後才跳**最後一次確認**，
+>   按下去才真的刪。只打得出自己的 email 不再算數——那串字通常是鍵盤自動填的。
+>   待刪除的旗標（`pendingAccountDeletionProvider`）**只存在記憶體**：App 若在中途被系統收掉，
+>   回來時不該還記得「要刪帳號」。
 
 ### UC13　設定通知提醒
 1. 設定頁點「通知」→ `NotificationSettingsScreen`。

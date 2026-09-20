@@ -28,6 +28,15 @@ void main() {
     );
     expect(find.byType(LongPressDraggable<String>), findsNWidgets(2));
 
+    // A downward arrow, not Material's sort glyph (2026-09-23)
+    expect(
+      find.descendant(
+        of: find.byTooltip(zh.sortBy),
+        matching: find.byIcon(Icons.arrow_downward),
+      ),
+      findsOneWidget,
+    );
+
     await tester.tap(find.byTooltip(zh.sortBy));
     await tester.pumpAndSettle();
     await tester.tap(find.text(zh.sortTitle));
