@@ -131,7 +131,7 @@ class _Card extends StatelessWidget {
   }
 }
 
-// The app's mark: the same rounded square the launcher icon uses
+// The app's mark: the launcher icon itself, as the splash screen shows it
 class AppMark extends StatelessWidget {
   final double size;
 
@@ -139,22 +139,10 @@ class AppMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Image.asset(
+      'assets/icon/app_icon.png',
       width: size,
       height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(size * 0.32),
-      ),
-      child: Text(
-        'U',
-        style: TextStyle(
-          color: AppColors.textOnPrimary,
-          fontSize: size * 0.46,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
     );
   }
 }

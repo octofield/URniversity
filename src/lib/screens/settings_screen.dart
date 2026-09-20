@@ -245,9 +245,18 @@ void _confirmExitGuest(BuildContext context, WidgetRef ref) {
   );
 }
 
+// Which proof of identity the delete dialog asks for. An account that carries
+// an email identity has a password to type, even when Google is linked to it
+// as well — only an account with no password at all is sent back to Google
+bool needsGoogleReauth(Iterable<String> providers) {
+  final list = providers.toList();
+  return !list.contains('email') && list.contains('google');
+}
+
 void _showDeleteAccountDialog(BuildContext context, WidgetRef ref, AppStrings s) {
   final user = Supabase.instance.client.auth.currentUser;
-  final isGoogle = user?.identities?.any((i) => i.provider == 'google') ?? false;
+  final providers = (user?.identities ?? const []).map((i) => i.provider);
+  final isGoogle = needsGoogleReauth(providers);
 
   showDialog(
     context: context,
