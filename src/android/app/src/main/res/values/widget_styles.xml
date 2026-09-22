@@ -17,4 +17,15 @@
         <item name="android:layout_marginEnd">11dp</item>
         <item name="android:textSize">13sp</item>
     </style>
+
+    <!-- The same two, tightened for the three-column layout -->
+    <style name="WidgetTabCompact" parent="WidgetTab">
+        <item name="android:layout_marginEnd">10dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="WidgetTabSmallCompact" parent="WidgetTab">
+        <item name="android:layout_marginEnd">7dp</item>
+        <item name="android:textSize">12sp</item>
+    </style>
 </resources>

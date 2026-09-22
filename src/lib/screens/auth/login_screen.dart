@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/input_limits.dart';
 import '../../core/sign_in_failure.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -118,6 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
+          inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.email)],
           onChanged: (_) {
             if (_failure != null) setState(() => _failure = null);
           },
@@ -131,6 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _passwordCtrl,
           obscureText: !_showPassword,
+          inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.password)],
           onChanged: (_) {
             if (_failure != null) setState(() => _failure = null);
           },
@@ -286,6 +290,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
             controller: _ctrl,
             autofocus: true,
             keyboardType: TextInputType.emailAddress,
+            inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.email)],
             decoration: InputDecoration(labelText: s.emailLabel),
             onSubmitted: (v) => Navigator.pop(context, v.trim()),
           ),

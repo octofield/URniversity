@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/input_limits.dart';
 import '../core/sign_in_failure.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
@@ -622,6 +624,9 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               controller: _inputCtrl,
               obscureText: true,
               autofocus: true,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(InputLimits.password),
+              ],
               decoration: InputDecoration(
                 labelText: widget.s.passwordLabel,
                 errorText: _errorMsg,
@@ -765,7 +770,7 @@ class _FeedbackDialog extends StatefulWidget {
 class _FeedbackDialogState extends State<_FeedbackDialog> {
   static DateTime? _lastSubmitTime;
   static const _cooldownMinutes = 5;
-  static const _maxLength = 1000;
+  static const _maxLength = InputLimits.feedback;
   static const _minLength = 10;
 
   String _type = 'bug';

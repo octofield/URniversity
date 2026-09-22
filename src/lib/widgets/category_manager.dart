@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
@@ -7,6 +9,7 @@ import '../models/category.dart';
 import '../providers/categories_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/category_helpers.dart';
+import 'sheet_fields.dart' show nearLimitCounter;
 
 // One row in a category management list: swatch+icon, label, then (for
 // custom categories) delete, then color picker, icon picker, and finally a
@@ -227,6 +230,9 @@ class _HexColorFieldState extends State<_HexColorField> {
         Expanded(
           child: TextField(
             controller: _ctrl,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(InputLimits.hexColor),
+            ],
             decoration: InputDecoration(
               labelText: 'Hex',
               hintText: '#RRGGBB',
@@ -290,6 +296,8 @@ class _CategoryAddRowState extends State<CategoryAddRow> {
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
+                    maxLength: InputLimits.categoryName,
+                    buildCounter: nearLimitCounter,
                     decoration: InputDecoration(hintText: s.categoryName),
                     textCapitalization: TextCapitalization.sentences,
                     onSubmitted: (_) => submit(),

@@ -25,6 +25,20 @@
   格式為 `{毫秒時間戳}_{隨機數}`。⚠️ 2026-09-05 之前只有毫秒時間戳，
   同一毫秒建立的多列會共用 id 而互相覆蓋（id 是主鍵）。舊資料的 id 維持原樣，不需遷移。
 - **寫入失敗一律經 `reportSyncError()`** 顯示，不得靜默吞掉（詳見 system_design.md §3-I）。
+- **文字欄位有字數上限**（2026-09 第十一批起）：App 端集中在 `src/lib/core/input_limits.dart`
+  的 `InputLimits`，資料庫端以 `CHECK (char_length(col) <= N)` 強制，定義在
+  `supabase/input_length_limits.sql`（需在 Supabase SQL Editor 手動執行一次）。**兩邊的數字必須一致**，
+  改一邊就要改另一邊，否則資料庫會拒絕 App 放行的內容（PostgREST `23514`，經 `reportSyncError` 顯示）。
+  `NULL` 會通過 CHECK，所以選填欄位仍是選填。
+
+  | 欄位 | 上限 | 資料庫 constraint |
+  |---|---|---|
+  | `tasks.title`、`semester_goals.title`、`future_goals.title`、`inspirations.title` | 100 | `{table}_title_len` |
+  | `tasks.content`、`semester_goals.notes`、`future_goals.notes`、`inspirations.content` | 500 | `{table}_{col}_len` |
+  | `journals.content` | 5000 | `journals_content_len` |
+  | `user_settings.username` | 30 | `user_settings_username_len` |
+  | `user_settings.school`、`user_settings.department` | 50 | `user_settings_{col}_len` |
+  | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
 ## D1. `tasks`（任務）
 
@@ -35,8 +49,8 @@
 |---|---|---|---|---|
 | `id` | text (PK) | ✓ | — | 前端產生的時間戳記字串 |
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 在寫入時附加，不在 `Task.toJson()` 內 |
-| `title` | text | ✓ | — | 任務標題 |
-| `content` | text | ✗ | `null` | 備註內容 |
+| `title` | text | ✓ | — | 任務標題；≤ 100 字 |
+| `content` | text | ✗ | `null` | 備註內容；≤ 500 字 |
 | `due_time` | timestamptz | ✗ | `null` | 截止時間；非循環任務靠此欄位判斷「屬於哪一天」 |
 | `priority` | int | ✓ | `1` | **保留欄位，App 已不再讀寫**。原本是 1=低、2=中、3=高，2026-09-20 移除優先度功能後新增的任務一律寫預設值 `1`；欄位留著不動 |
 | `is_completed` | bool | ✓ | `false` | **僅供非循環任務使用**；循環任務的完成狀態改看 `completed_dates` |
@@ -89,11 +103,11 @@
 | `id` | text (PK) | ✓ | — | 前端產生的時間戳記字串 |
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 附加 |
 | `parent_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 子目標的父節點；`null` 代表頂層目標 |
-| `title` | text | ✓ | — | 目標標題 |
+| `title` | text | ✓ | — | 目標標題；≤ 100 字 |
 | `semester` | text | ✓ | — | 學期字串，格式 `"{民國年}-{學期序}"`，例如 `"114-1"`；產生規則見 `semester_goals_provider.dart` 的 `currentSemester()` |
 | `category` | text（**JSON 字串**，內容是 `List<String>`） | ✓ | `'[]'` | ⚠️ **欄位名為單數，實際存的是分類「陣列」的 JSON 字串**（用 `jsonEncode`/`jsonDecode` 手動轉換），與 D3 `future_goals.categories` 的存法不同，修改時請特別留意，勿混用。**空陣列＝沒有分類**（2026-09-20 起；在那之前空的會被寫成 `["other"]`）。畫面上**不畫任何顏色與圖示**；若該目標連結了有分類的願景，就顯示那個願景的顏色（見 system_design.md §3-J）。舊的單一字串值（例如 `'intern'`）仍能讀，會被當成一個元素 |
 | `future_goal_id` | text（邏輯 FK → `future_goals.id`） | ✗ | `null` | 連結的未來願景（跨層關聯，也是關聯圖頁面畫虛線箭頭的資料來源）。⚠️ 這是**真實的外鍵** `semester_goals_future_goal_id_fkey → future_goals(id) ON DELETE SET NULL`（不是邏輯關聯），指向不存在的願景會被資料庫拒絕。另外 **僅頂層目標（`parent_id IS NULL`）可有值**；`linkFutureGoal()` 會擋下對子目標的連結，`reparent()` 把目標拖成子目標時會清成 `null` |
-| `notes` | text | ✗ | `null` | 備註 |
+| `notes` | text | ✗ | `null` | 備註；≤ 500 字 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |
 | `sort_order` | int | ✓ | `0` | 同層（同 `parent_id` 且同 `semester`）手動排序用；新增時取同層最小值 `−1000`（新的排最上面，可為負數） |
 
@@ -114,11 +128,11 @@
 | `id` | text (PK) | ✓ | — | 前端產生的時間戳記字串 |
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 附加 |
 | `parent_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | 子願景的父節點；`null` 代表頂層願景 |
-| `title` | text | ✓ | — | 願景標題 |
+| `title` | text | ✓ | — | 願景標題；≤ 100 字 |
 | `categories` | text[]（**Postgres 陣列，非 JSON 字串**） | ✓ | `['other']` | ⚠️ 與 D2 `semester_goals.category` 的存法不同（那邊是 JSON 字串），這裡是原生陣列，由 Supabase client 直接序列化 |
 | `start_semester` | text | ✗ | `null` | 起始學期，格式同 D2 的 `semester`（`"YYY-N"`） |
 | `end_semester` | text | ✗ | `null` | 結束學期，格式同上 |
-| `notes` | text | ✗ | `null` | 備註 |
+| `notes` | text | ✗ | `null` | 備註；≤ 500 字 |
 | `is_done` | bool | ✓ | `false` | 是否完成 |
 | `sort_order` | int | ✓ | `0` | 同層（同 `parent_id`）手動排序用；新增時取同層最小值 `−1000`（新的排最上面，可為負數） |
 
@@ -139,8 +153,8 @@
 |---|---|---|---|---|
 | `id` | text (PK) | ✓ | — | 前端產生的時間戳記字串 |
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 附加 |
-| `title` | text | ✓ | — | 靈感標題 |
-| `content` | text | ✗ | `null` | 詳細內容 |
+| `title` | text | ✓ | — | 靈感標題；≤ 100 字 |
+| `content` | text | ✗ | `null` | 詳細內容；≤ 500 字 |
 | `is_completed` | bool | ✓ | `false` | 是否已被實現／處理 |
 | `created_at` | timestamptz | ✓ | — | 建立時間；讀取時依此欄位新到舊排序 |
 
@@ -156,7 +170,7 @@
 | `id` | text (PK) | ✓ | — | 一般手動新增：時間戳記字串；自動補齊：`"auto_{yyyyMMdd}"` |
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 附加 |
 | `date` | text | ✓ | — | 日期，格式 `"yyyy-MM-dd"`（僅日期，無時間） |
-| `content` | text | ✗ | `null` | 日記內容；自動補齊的條目固定內容為 `"好像忘記什麼了……"` |
+| `content` | text | ✗ | `null` | 日記內容，≤ 5000 字；自動補齊的條目固定內容為 `"好像忘記什麼了……"` |
 | `created_at` | timestamptz | ✓ | — | 建立時間 |
 
 **特別說明：**
@@ -246,9 +260,9 @@
 | 欄位 | 型別 | 必填 | 預設值 | 說明 |
 |---|---|---|---|---|
 | `user_id` | text (PK, FK → auth.users.id) | ✓ | — | 一個使用者一列 |
-| `username` | text | ✗ | `null` | 暱稱；Google 登入使用者若未設定，`sync_provider` 會自動帶入 Google 帳號名稱（僅限第一次、且 `username` 為空時） |
-| `school` | text | ✗ | `null` | 學校名稱，來源見 `universities_provider`（唯讀靜態資料，非本表） |
-| `department` | text | ✗ | `null` | 系所名稱 |
+| `username` | text | ✗ | `null` | 暱稱，≤ 30 字；Google 登入使用者若未設定，`sync_provider` 會自動帶入 Google 帳號名稱（僅限第一次、且 `username` 為空時） |
+| `school` | text | ✗ | `null` | 學校名稱，≤ 50 字；來源見 `universities_provider`（唯讀靜態資料，非本表） |
+| `department` | text | ✗ | `null` | 系所名稱；≤ 50 字 |
 | `grade` | int | ✗ | `null` | 設定當下的年級（1～7） |
 | `grade_set_year` | int | ✗ | `null` | 設定 `grade` 當下的學年度（民國年），用來讓年級隨學年自動推進，見 `settings_provider.dart` 的 `computedGrade()` |
 | `avatar_index` | int | ✗ | `null` | 內建頭像索引（對應 `AppAvatars.presets`，目前 **0–23**）；`null` 代表改用 Google 大頭貼或姓名縮寫。**presets 的順序即是這個索引的意義，既有項目不得調換或刪除**，只能往後追加 |
@@ -338,6 +352,7 @@
 | `enabled` | bool | ✗ | `false` | 總開關。**預設關閉**：要先向系統要到通知權限才有意義，而在使用者還沒有任何資料時就跳權限請求最容易被永久拒絕 |
 | `task_due_enabled` | bool | ✗ | `true` | 任務到期提醒 |
 | `task_lead_minutes` | int | ✗ | `30` | 提前幾分鐘提醒；`0` = 準時。可選值見 `NotificationConstants.taskLeadMinuteOptions` |
+| `recurring_minute_of_day` | int | ✗ | `480` | **沒設截止時間的重複任務**在它落到的每一天的提醒時刻，以「當日第幾分鐘」儲存（480 = 08:00）。不套用 `task_lead_minutes`（那是「截止前多久」，這種任務沒有截止時刻）；由 `task_due_enabled` 一起控制。2026-09 第十一批新增，舊版寫入的 JSON 缺這個 key 時退回預設 |
 | `daily_summary_enabled` | bool | ✗ | `true` | 每日摘要 |
 | `summary_minute_of_day` | int | ✗ | `480` | 摘要時間，以「當日第幾分鐘」儲存（480 = 08:00） |
 | `goal_deadline_enabled` | bool | ✗ | `true` | 學期目標截止提醒 |
@@ -445,6 +460,9 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 | `TrashItemType`（儲存為字串） | `src/lib/models/trash_item.dart` | `task` / `semester_goal` / `future_goal` |
 | `FutureCategories`（內建分類） | `src/lib/models/future_goal.dart` | `exchange` / `intern` / `competition` / `certification` / `performance` / `other` |
 | `NotificationKind` | `src/lib/models/notification_settings.dart` | `taskDue` / `dailySummary` / `goalDeadline` |
+| `TaskSort`（儲存為字串，D19） | `src/lib/providers/tasks_provider.dart` | `manual` / `created` / `title` / `target` / `due` |
+| `TargetSort`（儲存為字串，D20） | `src/lib/providers/semester_goals_provider.dart` | `manual` / `title` / `vision` / `undoneFirst` |
+| `VisionSort`（儲存為字串，D21） | `src/lib/providers/future_goals_provider.dart` | `manual` / `title` / `startSemester` / `endSemester` |
 | 通知 payload 格式 | `src/lib/core/notification_payload.dart` | `"{task_id}\|{yyyy-MM-dd}"`；日期是**該次提醒對應的那一天**，循環任務靠它決定勾掉哪一天 |
 | `DateDisplayFormat`（儲存為字串） | `src/lib/providers/settings_provider.dart` | `mmddWeekday` / `mmdd` / `yyyymmdd` / `longDate` |
 | `AppLanguage`（儲存為字串） | `src/lib/providers/settings_provider.dart` | `zh_tw` / `en` / `jp` |
@@ -491,10 +509,37 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 
 媒介：SharedPreferences，`String`（`manual` / `created` / `title` / `target` / `due`，預設 `manual`）。
 
-寫入／讀取處理程序：`TaskSortNotifier`（`src/lib/providers/tasks_provider.dart`）
+寫入／讀取處理程序：`taskSortProvider`，型別是通用的 `EnumPrefNotifier<TaskSort>`
+（`src/lib/providers/sort_prefs.dart`；定義在 `tasks_provider.dart`）
 
 任務清單目前照哪種順序排（見 system_design.md §3-A）。與 D13／D17／D18 一樣是**這台裝置的
 偏好**，不上雲。讀到不認得的值就退回 `manual`。
+
+「調整順序」模式（顯示拖曳把手）**不持久化**：`taskSortModeProvider` 只存在記憶體，App 重開一律是關閉。
+
+---
+
+## D20. 裝置本機儲存 — `target_sort`（目標排序）
+
+媒介：SharedPreferences，`String`（`manual` / `title` / `vision` / `undoneFirst`，預設 `manual`）。
+
+寫入／讀取處理程序：`targetSortProvider`（`EnumPrefNotifier<TargetSort>`，定義在
+`src/lib/providers/semester_goals_provider.dart`）
+
+目標頁的排序方式，規則同 D19：本機偏好、不上雲、不認得的值退回 `manual`。排序只改變**顯示順序**，
+不寫回 D2 的 `sort_order`；只有 `manual` 時可以拖曳（拖曳才會寫 `sort_order`）。
+「調整順序」模式同樣只存記憶體（`targetSortModeProvider`）。
+
+---
+
+## D21. 裝置本機儲存 — `vision_sort`（願景排序）
+
+媒介：SharedPreferences，`String`（`manual` / `title` / `startSemester` / `endSemester`，預設 `manual`）。
+
+寫入／讀取處理程序：`visionSortProvider`（`EnumPrefNotifier<VisionSort>`，定義在
+`src/lib/providers/future_goals_provider.dart`）
+
+願景頁的排序方式，規則同 D20。「調整順序」模式只存記憶體（`visionSortModeProvider`）。
 
 ---
 

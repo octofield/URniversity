@@ -121,6 +121,11 @@ class StringsJp implements AppStrings {
   @override String get sortTitle => 'A–Z';
   @override String get sortTarget => '目標ごと';
   @override String get sortDue => '締切順';
+  @override String get sortVision => 'ビジョンごと';
+  @override String get sortUndoneFirst => '未完了を先に';
+  @override String get sortStartSemester => '開始学期順';
+  @override String get sortEndSemester => '終了学期順';
+  @override String get sortRearrange => '順番を並べ替える';
   @override String greetingMorning(String name) => name.isEmpty ? 'おはよう 👋' : 'おはよう、$name 👋';
   @override String greetingAfternoon(String name) => name.isEmpty ? 'こんにちは 👋' : 'こんにちは、$name 👋';
   @override String greetingEvening(String name) => name.isEmpty ? 'こんばんは 👋' : 'こんばんは、$name 👋';
@@ -303,6 +308,7 @@ class StringsJp implements AppStrings {
   @override String get notifEnabledHint => 'オフにすると下の3つはすべて通知されません';
   @override String get notifTaskDue => 'タスクの期限通知';
   @override String get notifTaskLead => '通知タイミング';
+  @override String get notifRecurringTime => '時刻なしの繰り返しタスク';
   @override String get notifDailySummary => '今日のまとめ';
   @override String get notifSummaryTime => 'まとめの時刻';
   @override String get notifGoalDeadline => '学期目標の締切通知';

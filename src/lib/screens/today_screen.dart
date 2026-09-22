@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter/services.dart'
+    show FilteringTextInputFormatter, LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
@@ -34,6 +36,7 @@ import '../widgets/link_color_bar.dart';
 import '../widgets/page_header.dart';
 import '../widgets/swipe_switcher.dart';
 import '../widgets/sheet_fields.dart';
+import '../widgets/sort_sheet.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 
@@ -78,6 +81,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final taskView = ref.watch(taskViewProvider);
+    final sortMode = ref.watch(taskSortModeProvider);
     final selectedDate = ref.watch(dateProvider);
     final dateFormat = ref.watch(settingsProvider);
     final now = ref.watch(effectiveNowProvider);
@@ -303,15 +307,21 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         Expanded(
           // Swiping the body moves between 全部 / 當日 / 當週, in the order the
           // segmented button shows them
+          // Off while rearranging, so a sideways drag of a handle does not
+          // turn the page instead
           child: SwipeSwitcher(
-            onNext: taskView < 2
-                ? () => ref.read(taskViewProvider.notifier).state = taskView + 1
-                : null,
+            onNext: sortMode
+                ? null
+                : taskView < 2
+                    ? () => ref.read(taskViewProvider.notifier).state = taskView + 1
+                    : null,
             // Nothing before the first view, so that swipe pulls out the
             // drawer instead — the same direction as dragging from the edge
-            onPrevious: taskView > 0
-                ? () => ref.read(taskViewProvider.notifier).state = taskView - 1
-                : () => Scaffold.of(context).openDrawer(),
+            onPrevious: sortMode
+                ? null
+                : taskView > 0
+                    ? () => ref.read(taskViewProvider.notifier).state = taskView - 1
+                    : () => Scaffold.of(context).openDrawer(),
             child: taskView == 2
                 ? _WeeklyGrid(weekStart: _weekStart)
                 : SingleChildScrollView(
@@ -912,18 +922,26 @@ class _TasksSection extends ConsumerWidget {
             children: [
               Text(s.tasksWithCount(tasks.length), style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_downward,
-                  color: sort == TaskSort.manual
-                      ? AppColors.textTertiary
-                      : AppColors.primary,
-                  size: 20,
+              SortButton(
+                s: s,
+                isManual: sort == TaskSort.manual,
+                sortMode: ref.watch(taskSortModeProvider),
+                onOpen: () => showSortSheet(
+                  context,
+                  s: s,
+                  labels: {
+                    TaskSort.manual: s.sortManual,
+                    TaskSort.created: s.sortCreated,
+                    TaskSort.title: s.sortTitle,
+                    TaskSort.target: s.sortTarget,
+                    TaskSort.due: s.sortDue,
+                  },
+                  sortProvider: taskSortProvider,
+                  sortModeProvider: taskSortModeProvider,
+                  manual: TaskSort.manual,
                 ),
-                tooltip: s.sortBy,
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                onPressed: () => _showSortMenu(context, ref, s),
+                onDone: () =>
+                    ref.read(taskSortModeProvider.notifier).state = false,
               ),
               const SizedBox(width: AppSpacing.xs),
               IconButton(
@@ -969,62 +987,6 @@ class _TasksSection extends ConsumerWidget {
       ],
     );
   }
-}
-
-// Which order the list is in. A sheet rather than a popup menu: the same
-// control has to be reachable on a phone held one-handed
-void _showSortMenu(BuildContext context, WidgetRef ref, AppStrings s) {
-  final labels = {
-    TaskSort.manual: s.sortManual,
-    TaskSort.created: s.sortCreated,
-    TaskSort.title: s.sortTitle,
-    TaskSort.target: s.sortTarget,
-    TaskSort.due: s.sortDue,
-  };
-
-  showAppSheet(
-    context,
-    builder: (sheetCtx) => Consumer(
-      builder: (_, sheetRef, _) {
-        final current = sheetRef.watch(taskSortProvider);
-        return SheetBody(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(s.sortBy, style: Theme.of(sheetCtx).textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.sm),
-              // The sheet's own background is a DecoratedBox, so the tiles need
-              // a Material of their own to paint their ink on
-              Material(
-                type: MaterialType.transparency,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final entry in labels.entries)
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(entry.value),
-                        trailing: entry.key == current
-                            ? const Icon(Icons.check, color: AppColors.primary)
-                            : null,
-                        selected: entry.key == current,
-                        selectedColor: AppColors.primary,
-                        onTap: () {
-                          sheetRef.read(taskSortProvider.notifier).set(entry.key);
-                          Navigator.pop(sheetCtx);
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ),
-  );
 }
 
 // Filtering tasks by target, grouped by semester the same way the link picker

@@ -72,12 +72,13 @@
 | `test/semester_test.dart` | `generateSemesters()`／`compareSemesters()`／`currentSemester()`／`formatSemester()`／`breakName()`，含 2／3／4 學期制與假期 token 排序 |
 | `test/task_model_test.dart` | `Task` 的 JSON 往返、`copyWith` 的 sentinel 行為（含可清空 `content`）、`isCompletedOn()` 的循環／非循環分流 |
 | `test/category_reorder_test.dart` | 分類拖曳排序的 `orderBetween()` 與寫回順序 |
-| `test/sync_retry_test.dart` | `isTransientSyncError()` 的分類、`runWithRetry()` 的重試次數與退避 |
+| `test/sync_retry_test.dart` | `isTransientSyncError()` 的分類（含回前景時 token 更新失敗的 `AuthRetryableFetchException`）、`runWithRetry()` 的重試次數與退避 |
 | `test/restore_sanitize_test.dart` | `sanitizeForRestore()` 清掉指向已刪除列的懸空外鍵 |
 | `test/merge_order_test.dart` | `mergeOrder()` 的拓撲排序：父先於子、懸空 parent 視為根、循環不會無窮迴圈 |
 | `test/trash_snapshot_test.dart` | `remove()` 回傳整棵子樹（目標／願景／任務），還原後父子關係完整 |
 | `test/auth_link_error_test.dart` | 失效的驗證連結分類：query string／fragment／Android custom scheme 三種形式，以及 PKCE 跨裝置與一般登入錯誤的區分 |
 | `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期 |
+| `test/notification_schedule_test.dart`（第十一批追加） | 沒設時間的重複任務（§3-K）：在設定的時刻排、不套提前量、當天時刻已過就從明天起、跳過已完成那天、跟著任務提醒開關；設定 JSON 來回與舊資料缺 key 時的預設 |
 | `test/notification_action_test.dart` | 通知動作依賴的純邏輯（§3-L）：`Task.toggledOn()` 與 `isCompletedOn()` 互為反函式、payload 編解碼、畸形輸入回 null 不拋例外、動作結果的成功／失敗記錄 |
 | `test/widget_snapshot_test.dart` | 桌面小工具要顯示什麼（§3-M）：六份預算好的頁面、三個期間互不影響、day/week/month 的範圍與去重、任務列 `filters` 含祖先 id（含循環 parent 不卡死）、篩選挑選器的分組與排序、序列化（無副標為 null） |
 | `test/row_id_test.dart` | `newRowId()` 在**每個平台**都做得出 id、亂數後綴在 32 位元內。⚠️ 這份要**另外在 Chrome 跑一次**（`flutter test --platform chrome test/row_id_test.dart`）：網頁上 `<<` 只有 32 位元，`1 << 32` 會變成 0，VM 上的測試完全抓不到 |
@@ -90,6 +91,8 @@
 | `test/account_delete_auth_test.dart` | 刪除帳號要哪一種身分證明（UC12）：有密碼就輸入密碼（即使也連結了 Google）、只有 Google 才跳出去重新登入 |
 | `test/task_sort_test.dart` | 任務排序（§3-A）：五種順序、沒有截止時間／沒有連結目標排最後、已刪除的目標視為未連結、同鍵值時退回自動順序 |
 | `test/goal_category_test.dart` | 沒有分類的目標（§2-C、§3-J）：`primaryCategoryOf()` 回 null、中性色與中性圖示、有分類時不受影響 |
+| `test/goal_sort_test.dart` | 目標與願景的排序（§3-C）：手動＝拖曳順序、A–Z 不分大小寫、依願景／依學期時沒有值的排最後、未完成優先、同鍵值時退回手動順序 |
+| `test/category_inherit_test.dart` | 連結願景時帶入分類（UC4）：沒有分類才帶入、已有分類不覆蓋、取消連結不清掉 |
 | `test/notification_cancel_test.dart` | 完成時該收掉哪幾則通知（§3-K）：只收該任務的、沒有 payload 的摘要不動、沒有 id 的跳過 |
 | `test/fab_position_test.dart` | 新增鈕的位置（D18）：比例值往返、讀不懂＝沒移動過、比 1 大的值夾回畫面內 |
 | `test/app_version_test.dart` | 版本號（§5-Z）：格式 `alpha-X.Y.Z`，且 `pubspec.yaml` 帶同樣的數字 |
@@ -146,6 +149,7 @@
 | 年級推進 `computedGrade` | 推進後 < 1 或 > 7 | `clamp(1, 7)` |
 | 學期制度 | `semester_count` = 2／4 | 上下限皆需正確產生對應數量的起始月欄位 |
 | 意見回饋長度 | 9／10／1000／1001 字 | 9 字禁止送出；1001 字截斷為 1000 |
+| 輸入字數上限（§2-K） | 上限 × 0.8 − 1／× 0.8／上限／上限 + 1 | 80% 之前不顯示計數器、到 80% 出現、到上限變紅、超過的字打不進去；資料庫 CHECK 擋下 101 字的標題（`23514`） |
 | 意見回饋冷卻 | 第 299／300 秒 | 299 秒內拒絕；滿 300 秒可送出 |
 | 目標／願景樹深度 | 深度 1／5 層 | 遞迴刪除與 `isAncestor` 在深層仍正確 |
 
@@ -176,6 +180,8 @@
 | `test/widget/target_filter_dialog_test.dart` | 目標篩選對話框（§2-D）：每個學期都有 chip 與標頭、chip 只留該學期、列是可複選的勾選列且勾了不關閉、有重置 |
 | `test/widget/link_color_bar_test.dart` | 色條：兩個連結顏色不同時上下分色、相同時合併、單一連結一色、沒有連結仍保留寬度 |
 | `test/widget/notification_reschedule_test.dart` | 「重新安排時間」會打開**該任務**的編輯 sheet；冷啟動時資料還沒到會等待而不是放棄 | —（新功能） |
+| `test/widget/sort_mode_test.dart` | 調整順序模式（§2-B、UC5-B）：出現把手且改用立即拖曳的 `Draggable`、點列不打開、從別種排序進入會先切回手動、「完成」恢復長按拖曳；目標頁與願景頁的排序 sheet 會重排卡片並停用拖曳 | —（新功能） |
+| `test/widget/input_limits_test.dart` | 字數上限與全文顯示（§2-K、§2-B）：標題停在 100 字且出現計數器、遠低於上限時不顯示計數器、長標題不截斷；新增子目標時預先帶入父目標分類（UC4） | —（新功能） |
 
 **可行的前提**：訪客模式下 `SyncedListNotifier.upsert()` 走完 `persistLocally()`
 就返回，不碰 Supabase。Supabase 本身仍需初始化（多個 Provider 會讀

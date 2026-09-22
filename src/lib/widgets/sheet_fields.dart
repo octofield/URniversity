@@ -31,11 +31,33 @@ Widget _boxLabel(BuildContext context, String label) => Text(
           ),
     );
 
+// The character counter for a capped field, shown only once the text is close
+// to the cap. Always showing it would add a "0/100" line under every field;
+// near the cap it is what explains why typing stopped
+Widget? nearLimitCounter(
+  BuildContext context, {
+  required int currentLength,
+  required int? maxLength,
+  required bool isFocused,
+}) {
+  if (maxLength == null || currentLength < maxLength * 0.8) return null;
+  return Text(
+    '$currentLength/$maxLength',
+    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: currentLength >= maxLength
+              ? AppColors.error
+              : AppColors.textSecondary,
+        ),
+  );
+}
+
 // A plain text field, so every sheet spells its fields the same way
 class SheetTextField extends StatelessWidget {
   final String label;
   final String? hint;
   final TextEditingController controller;
+  // Required so no sheet field ships uncapped; the numbers live in InputLimits
+  final int maxLength;
   final bool autofocus;
   final int minLines;
   final int maxLines;
@@ -45,6 +67,7 @@ class SheetTextField extends StatelessWidget {
     super.key,
     required this.label,
     required this.controller,
+    required this.maxLength,
     this.hint,
     this.autofocus = false,
     this.minLines = 1,
@@ -62,6 +85,8 @@ class SheetTextField extends StatelessWidget {
       autofocus: autofocus,
       minLines: minLines,
       maxLines: maxLines,
+      maxLength: maxLength,
+      buildCounter: nearLimitCounter,
       textCapitalization: TextCapitalization.sentences,
       decoration: InputDecoration(
         labelText: label,

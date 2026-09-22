@@ -22,6 +22,7 @@ import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
 import '../widgets/swipe_switcher.dart';
 import '../widgets/semester_list_dialog.dart';
+import '../widgets/sort_sheet.dart';
 import 'overview_graph_screen.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
@@ -32,16 +33,13 @@ class _SemGroup {
   const _SemGroup({required this.parent, required this.children});
 }
 
-List<_SemGroup> _buildSemGroups(
-    List<SemesterGoal> topLevel, List<SemesterGoal> all) {
+List<_SemGroup> _buildSemGroups(List<SemesterGoal> topLevel,
+    List<SemesterGoal> all, List<SemesterGoal> Function(List<SemesterGoal>) order) {
   return [
     for (final p in topLevel)
       _SemGroup(
         parent: p,
-        children: all
-            .where((g) => g.parentId == p.id)
-            .toList()
-          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+        children: order(all.where((g) => g.parentId == p.id).toList()),
       ),
   ];
 }
@@ -69,6 +67,16 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final index = semesters.indexOf(ref.read(selectedSemesterProvider)) + delta;
     if (index < 0 || index >= semesters.length) return;
     ref.read(selectedSemesterProvider.notifier).state = semesters[index];
+  }
+
+  // One level of the tree in the order the page is sorted by
+  List<SemesterGoal> _ordered(List<SemesterGoal> siblings) {
+    final visions = ref.watch(futureGoalsProvider);
+    return applyTargetSort(
+      siblings,
+      ref.watch(targetSortProvider),
+      visionTitles: {for (final v in visions) v.id: v.title},
+    );
   }
 
   Widget _endGapZone(List<_SemGroup> groups) {
@@ -126,6 +134,12 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
   }) {
     final goalId = goal.id;
     final notifier = ref.read(semesterGoalsProvider.notifier);
+    // Same rule as the task list: dragging writes the manual order, so it is
+    // off while the page shows any other
+    if (ref.watch(targetSortProvider) != TargetSort.manual) {
+      return _SemGoalCardTile(goal: goal, depth: depth);
+    }
+    final sortMode = ref.watch(targetSortModeProvider);
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) =>
@@ -179,13 +193,30 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         final showBeforeLine = isHovered && _hoverZone == DropZone.before;
         final showAfterLine = isHovered && _hoverZone == DropZone.after;
         final showChildBg = isHovered && _hoverZone == DropZone.into;
-        final tile = _SemGoalCardTile(goal: goal, depth: depth);
+        final feedback = _feedbackCard(goal);
+        final tile = _SemGoalCardTile(
+          goal: goal,
+          depth: depth,
+          // Drags at once from the handle, no long press
+          handle: sortMode
+              ? DragHandle<String>(
+                  data: goalId,
+                  feedback: feedback,
+                  onDragStarted: () => setState(() => _draggingId = goalId),
+                  onDragEnd: () => setState(() {
+                    _draggingId = null;
+                    _hoveredId = null;
+                  }),
+                )
+              : null,
+        );
         final fading = Opacity(
             opacity: 0.3, child: _SemGoalCardTile(goal: goal, depth: depth));
-        final feedback = _feedbackCard(goal);
 
         Widget draggable;
-        if (kIsWeb) {
+        if (sortMode) {
+          draggable = tile;
+        } else if (kIsWeb) {
           draggable = Draggable<String>(
             data: goalId,
             dragAnchorStrategy: pointerDragAnchorStrategy,
@@ -241,10 +272,8 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
 
   List<Widget> _buildDescendantRows(
       String parentId, List<SemesterGoal> all, int depth) {
-    final children = all
-        .where((g) => g.parentId == parentId)
-        .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final children =
+        _ordered(all.where((g) => g.parentId == parentId).toList());
     if (children.isEmpty) return [];
     final result = <Widget>[];
     for (int i = 0; i < children.length; i++) {
@@ -296,11 +325,12 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final s = ref.watch(stringsProvider);
     final selectedSem = ref.watch(selectedSemesterProvider);
     final allGoals = ref.watch(semesterGoalsProvider);
-    final topLevel = allGoals
+    final topLevel = _ordered(allGoals
         .where((g) => g.semester == selectedSem && g.parentId == null)
-        .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    final groups = _buildSemGroups(topLevel, allGoals);
+        .toList());
+    final groups = _buildSemGroups(topLevel, allGoals, _ordered);
+    final sort = ref.watch(targetSortProvider);
+    final sortMode = ref.watch(targetSortModeProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
     // The header's own line: how much of this semester's plan is done
     final milestones = [for (final g in groups) ...g.children];
@@ -347,6 +377,26 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
                 ),
           ),
           actions: [
+            SortButton(
+              s: s,
+              isManual: sort == TargetSort.manual,
+              sortMode: sortMode,
+              onOpen: () => showSortSheet(
+                context,
+                s: s,
+                labels: {
+                  TargetSort.manual: s.sortManual,
+                  TargetSort.title: s.sortTitle,
+                  TargetSort.vision: s.sortVision,
+                  TargetSort.undoneFirst: s.sortUndoneFirst,
+                },
+                sortProvider: targetSortProvider,
+                sortModeProvider: targetSortModeProvider,
+                manual: TargetSort.manual,
+              ),
+              onDone: () =>
+                  ref.read(targetSortModeProvider.notifier).state = false,
+            ),
             IconButton(
               icon: const Icon(Icons.hub_outlined),
               tooltip: s.overview,
@@ -388,8 +438,10 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
                   ],
                 )
               : SwipeSwitcher(
-                  onNext: () => _stepSemester(1),
-                  onPrevious: () => _stepSemester(-1),
+                  // Off while rearranging, so a sideways handle drag does not
+                  // change the semester instead
+                  onNext: sortMode ? null : () => _stepSemester(1),
+                  onPrevious: sortMode ? null : () => _stepSemester(-1),
                   child: goalsList,
                 ),
         ),
@@ -674,8 +726,11 @@ const double _childIndent =
 class _SemGoalCardTile extends ConsumerWidget {
   final SemesterGoal goal;
   final int depth;
+  // Set while rearranging: shown instead of the row's buttons, and the row
+  // stops opening the detail page so a stray tap does not leave sort mode
+  final Widget? handle;
 
-  const _SemGoalCardTile({required this.goal, this.depth = 0});
+  const _SemGoalCardTile({required this.goal, this.depth = 0, this.handle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -728,7 +783,7 @@ class _SemGoalCardTile extends ConsumerWidget {
     // 2026-09-16): the full card treatment for every level buried the goal
     if (depth > 0) {
       return InkWell(
-        onTap: openDetail,
+        onTap: handle != null ? null : openDetail,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
               _childIndent + (depth - 1) * 16.0, 7, AppSpacing.sm, 7),
@@ -768,8 +823,6 @@ class _SemGoalCardTile extends ConsumerWidget {
                             goal.isDone ? TextDecoration.lineThrough : null,
                         color: goal.isDone ? AppColors.textTertiary : null,
                       ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (total > 0)
@@ -782,13 +835,14 @@ class _SemGoalCardTile extends ConsumerWidget {
                         ),
                   ),
                 ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 16),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: deleteGoal,
-              ),
+              handle ??
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    onPressed: deleteGoal,
+                  ),
             ],
           ),
         ),
@@ -796,7 +850,7 @@ class _SemGoalCardTile extends ConsumerWidget {
     }
 
     return InkWell(
-      onTap: openDetail,
+      onTap: handle != null ? null : openDetail,
       child: Stack(
         children: [
           Padding(
@@ -844,11 +898,7 @@ class _SemGoalCardTile extends ConsumerWidget {
                                     : null,
                                 color:
                                     goal.isDone ? AppColors.textTertiary : null,
-                              ),
-                          // Two lines, then an ellipsis: cutting every
-                          // long title at one line hid what they were
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
+                              )),
                       if (linkedVision != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
@@ -917,7 +967,7 @@ class _SemGoalCardTile extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Row(
+                handle ?? Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(

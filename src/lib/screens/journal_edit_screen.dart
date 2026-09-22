@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/avatars.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
@@ -9,6 +10,7 @@ import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/sheet_fields.dart' show nearLimitCounter;
 
 class JournalEditScreen extends ConsumerStatefulWidget {
   // null = add mode, non-null = edit mode
@@ -164,6 +166,8 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                               autofocus: true,
                               minLines: 6,
                               maxLines: null,
+                              maxLength: InputLimits.journal,
+                              buildCounter: nearLimitCounter,
                               textCapitalization: TextCapitalization.sentences,
                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                 height: 1.7,

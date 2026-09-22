@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/avatars.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/sheet_fields.dart' show nearLimitCounter;
 
 class SetupProfileScreen extends ConsumerStatefulWidget {
   const SetupProfileScreen({super.key});
@@ -109,6 +111,8 @@ class _SetupProfileScreenState extends ConsumerState<SetupProfileScreen> {
                 TextField(
                   controller: _usernameCtrl,
                   autofocus: true,
+                  maxLength: InputLimits.username,
+                  buildCounter: nearLimitCounter,
                   textCapitalization: TextCapitalization.words,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(

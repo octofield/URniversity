@@ -4,7 +4,6 @@ import '../core/notification_constants.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
-import '../models/notification_settings.dart';
 import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/notification_service.dart';
@@ -64,17 +63,31 @@ class NotificationSettingsScreen extends ConsumerWidget {
               enabled: settings.taskDueEnabled,
               masterOn: settings.enabled,
               onToggle: (v) => notifier.update(settings.copyWith(taskDueEnabled: v)),
-              detailLabel: s.notifTaskLead,
-              detailValue: s.notifLeadMinutes(settings.taskLeadMinutes),
-              onTapDetail: () => _pickOption<int>(
-                context: context,
-                title: s.notifTaskLead,
-                options: NotificationConstants.taskLeadMinuteOptions,
-                current: settings.taskLeadMinutes,
-                label: s.notifLeadMinutes,
-                onPicked: (v) =>
-                    notifier.update(settings.copyWith(taskLeadMinutes: v)),
-              ),
+              details: [
+                (
+                  label: s.notifTaskLead,
+                  value: s.notifLeadMinutes(settings.taskLeadMinutes),
+                  onTap: () => _pickOption<int>(
+                    context: context,
+                    title: s.notifTaskLead,
+                    options: NotificationConstants.taskLeadMinuteOptions,
+                    current: settings.taskLeadMinutes,
+                    label: s.notifLeadMinutes,
+                    onPicked: (v) =>
+                        notifier.update(settings.copyWith(taskLeadMinutes: v)),
+                  ),
+                ),
+                (
+                  label: s.notifRecurringTime,
+                  value: _hhmm(settings.recurringMinuteOfDay),
+                  onTap: () => _pickTime(
+                    context,
+                    settings.recurringMinuteOfDay,
+                    (minute) => notifier.update(
+                        settings.copyWith(recurringMinuteOfDay: minute)),
+                  ),
+                ),
+              ],
             ),
             const Divider(height: 1),
 
@@ -84,9 +97,18 @@ class NotificationSettingsScreen extends ConsumerWidget {
               masterOn: settings.enabled,
               onToggle: (v) =>
                   notifier.update(settings.copyWith(dailySummaryEnabled: v)),
-              detailLabel: s.notifSummaryTime,
-              detailValue: _hhmm(settings.summaryMinuteOfDay),
-              onTapDetail: () => _pickTime(context, ref, settings, notifier),
+              details: [
+                (
+                  label: s.notifSummaryTime,
+                  value: _hhmm(settings.summaryMinuteOfDay),
+                  onTap: () => _pickTime(
+                    context,
+                    settings.summaryMinuteOfDay,
+                    (minute) => notifier.update(
+                        settings.copyWith(summaryMinuteOfDay: minute)),
+                  ),
+                ),
+              ],
             ),
             const Divider(height: 1),
 
@@ -96,17 +118,21 @@ class NotificationSettingsScreen extends ConsumerWidget {
               masterOn: settings.enabled,
               onToggle: (v) =>
                   notifier.update(settings.copyWith(goalDeadlineEnabled: v)),
-              detailLabel: s.notifGoalLead,
-              detailValue: s.notifLeadDays(settings.goalLeadDays),
-              onTapDetail: () => _pickOption<int>(
-                context: context,
-                title: s.notifGoalLead,
-                options: NotificationConstants.goalLeadDayOptions,
-                current: settings.goalLeadDays,
-                label: s.notifLeadDays,
-                onPicked: (v) =>
-                    notifier.update(settings.copyWith(goalLeadDays: v)),
-              ),
+              details: [
+                (
+                  label: s.notifGoalLead,
+                  value: s.notifLeadDays(settings.goalLeadDays),
+                  onTap: () => _pickOption<int>(
+                    context: context,
+                    title: s.notifGoalLead,
+                    options: NotificationConstants.goalLeadDayOptions,
+                    current: settings.goalLeadDays,
+                    label: s.notifLeadDays,
+                    onPicked: (v) =>
+                        notifier.update(settings.copyWith(goalLeadDays: v)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -119,7 +145,7 @@ String _hhmm(int minuteOfDay) =>
     '${(minuteOfDay ~/ 60).toString().padLeft(2, '0')}:'
     '${(minuteOfDay % 60).toString().padLeft(2, '0')}';
 
-// A switch plus the one number that kind needs. Pulled out because all three
+// A switch plus the numbers that kind needs. Pulled out because all three
 // sections have exactly this shape and inlining them three times was the
 // pattern the 2026-08 refactor spent a stage removing
 class _KindSection extends StatelessWidget {
@@ -127,18 +153,14 @@ class _KindSection extends StatelessWidget {
   final bool enabled;
   final bool masterOn;
   final ValueChanged<bool> onToggle;
-  final String detailLabel;
-  final String detailValue;
-  final VoidCallback onTapDetail;
+  final List<({String label, String value, VoidCallback onTap})> details;
 
   const _KindSection({
     required this.title,
     required this.enabled,
     required this.masterOn,
     required this.onToggle,
-    required this.detailLabel,
-    required this.detailValue,
-    required this.onTapDetail,
+    required this.details,
   });
 
   @override
@@ -151,19 +173,20 @@ class _KindSection extends StatelessWidget {
           activeThumbColor: AppColors.primary,
           onChanged: masterOn ? onToggle : null,
         ),
-        ListTile(
-          enabled: masterOn && enabled,
-          title: Text(detailLabel),
-          trailing: Text(
-            detailValue,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: masterOn && enabled
-                      ? AppColors.primary
-                      : AppColors.textTertiary,
-                ),
+        for (final detail in details)
+          ListTile(
+            enabled: masterOn && enabled,
+            title: Text(detail.label),
+            trailing: Text(
+              detail.value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: masterOn && enabled
+                        ? AppColors.primary
+                        : AppColors.textTertiary,
+                  ),
+            ),
+            onTap: masterOn && enabled ? detail.onTap : null,
           ),
-          onTap: masterOn && enabled ? onTapDetail : null,
-        ),
       ],
     );
   }
@@ -203,21 +226,15 @@ void _pickOption<T>({
 
 Future<void> _pickTime(
   BuildContext context,
-  WidgetRef ref,
-  NotificationSettings settings,
-  NotificationSettingsNotifier notifier,
+  int minuteOfDay,
+  Future<void> Function(int minuteOfDay) onPicked,
 ) async {
   final picked = await showTimePicker(
     context: context,
-    initialTime: TimeOfDay(
-      hour: settings.summaryMinuteOfDay ~/ 60,
-      minute: settings.summaryMinuteOfDay % 60,
-    ),
+    initialTime: TimeOfDay(hour: minuteOfDay ~/ 60, minute: minuteOfDay % 60),
   );
   if (picked == null) return;
-  await notifier.update(
-    settings.copyWith(summaryMinuteOfDay: picked.hour * 60 + picked.minute),
-  );
+  await onPicked(picked.hour * 60 + picked.minute);
 }
 
 // Kept here so settings_screen.dart only needs one import for the whole feature

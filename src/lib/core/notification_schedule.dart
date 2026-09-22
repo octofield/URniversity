@@ -88,9 +88,10 @@ int _baseFor(NotificationKind kind) => switch (kind) {
       NotificationKind.goalDeadline => NotificationConstants.goalIdBase,
     };
 
-// A task with no due time has no moment to remind about — the daily summary is
-// what covers those. Subtasks are skipped so a parent and its children do not
-// buzz twice for the same piece of work
+// A one-off task with no due time has no moment to remind about — the daily
+// summary is what covers those. A repeating one without a time still fires, at
+// the user's chosen time of day, because a habit with no reminder is easy to
+// forget in a way a one-off entry on the list is not
 Iterable<ScheduledNotification> _taskReminders(
   List<Task> tasks,
   NotificationSettings settings,
@@ -101,9 +102,14 @@ Iterable<ScheduledNotification> _taskReminders(
   final lead = Duration(minutes: settings.taskLeadMinutes);
 
   for (final task in tasks) {
-    if (task.dueTime == null) continue;
-
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
+    if (task.dueTime == null) {
+      if (isRecurring) {
+        yield* _untimedRecurringReminders(task, settings, now, horizon);
+      }
+      continue;
+    }
+
     if (!isRecurring) {
       if (task.isCompleted) continue;
       final fireAt = task.dueTime!.subtract(lead);
@@ -150,6 +156,33 @@ Iterable<ScheduledNotification> _taskReminders(
         );
       }
     }
+  }
+}
+
+// No lead time: the lead is "how long before it is due", and a task with no due
+// time is not due at any moment — the chosen time is the reminder itself
+Iterable<ScheduledNotification> _untimedRecurringReminders(
+  Task task,
+  NotificationSettings settings,
+  DateTime now,
+  DateTime horizon,
+) sync* {
+  for (var day = _dateOnly(now);
+      day.isBefore(horizon);
+      day = day.add(const Duration(days: 1))) {
+    if (!taskAppliesTo(task, day)) continue;
+    if (task.isCompletedOn(day)) continue;
+
+    final fireAt = day.add(Duration(minutes: settings.recurringMinuteOfDay));
+    if (!fireAt.isAfter(now) || !fireAt.isBefore(horizon)) continue;
+
+    yield ScheduledNotification(
+      id: 0,
+      kind: NotificationKind.taskDue,
+      when: fireAt,
+      title: task.title,
+      payload: TaskNotificationPayload(taskId: task.id, date: day).encode(),
+    );
   }
 }
 

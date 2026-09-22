@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/ui_symbols.dart';
 import '../core/theme/app_colors.dart';
@@ -24,6 +25,7 @@ import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
 import '../widgets/sheet_fields.dart';
 import '../widgets/semester_list_dialog.dart';
+import '../widgets/sort_sheet.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
@@ -34,13 +36,14 @@ class _FutGroup {
   const _FutGroup({required this.parent, required this.children});
 }
 
-List<_FutGroup> _buildFutGroups(List<FutureGoal> topLevel, List<FutureGoal> all) {
+List<_FutGroup> _buildFutGroups(
+    List<FutureGoal> topLevel, List<FutureGoal> all, VisionSort sort) {
   return [
     for (final p in topLevel)
       _FutGroup(
         parent: p,
-        children: all.where((g) => g.parentId == p.id).toList()
-          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+        children: applyVisionSort(
+            all.where((g) => g.parentId == p.id).toList(), sort),
       ),
   ];
 }
@@ -116,6 +119,12 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
   }) {
     final goalId = goal.id;
     final notifier = ref.read(futureGoalsProvider.notifier);
+    // Same rule as the task list: dragging writes the manual order, so it is
+    // off while the page shows any other
+    if (ref.watch(visionSortProvider) != VisionSort.manual) {
+      return _FutureGoalCardRow(goal: goal, depth: depth);
+    }
+    final sortMode = ref.watch(visionSortModeProvider);
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) =>
@@ -169,15 +178,32 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         final showBeforeLine = isHovered && _hoverZone == DropZone.before;
         final showAfterLine = isHovered && _hoverZone == DropZone.after;
         final showChildBg = isHovered && _hoverZone == DropZone.into;
-        final tile = _FutureGoalCardRow(goal: goal, depth: depth);
+        final feedback = _feedbackCard(goal);
+        final tile = _FutureGoalCardRow(
+          goal: goal,
+          depth: depth,
+          // Drags at once from the handle, no long press
+          handle: sortMode
+              ? DragHandle<String>(
+                  data: goalId,
+                  feedback: feedback,
+                  onDragStarted: () => setState(() => _draggingId = goalId),
+                  onDragEnd: () => setState(() {
+                    _draggingId = null;
+                    _hoveredId = null;
+                  }),
+                )
+              : null,
+        );
         final fading = Opacity(
           opacity: 0.3,
           child: _FutureGoalCardRow(goal: goal, depth: depth),
         );
-        final feedback = _feedbackCard(goal);
 
         Widget draggable;
-        if (kIsWeb) {
+        if (sortMode) {
+          draggable = tile;
+        } else if (kIsWeb) {
           draggable = Draggable<String>(
             data: goalId,
             dragAnchorStrategy: pointerDragAnchorStrategy,
@@ -232,8 +258,9 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
   }
 
   List<Widget> _buildDescendantRows(String parentId, List<FutureGoal> all, int depth) {
-    final children = all.where((g) => g.parentId == parentId).toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final children = applyVisionSort(
+        all.where((g) => g.parentId == parentId).toList(),
+        ref.watch(visionSortProvider));
     if (children.isEmpty) return [];
     final result = <Widget>[];
     for (int i = 0; i < children.length; i++) {
@@ -461,13 +488,17 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     final cats = ref.watch(categoriesProvider);
     final semChips = _semesterChips(settings);
 
-    final filtered = allGoals.where((g) {
-      if (g.parentId != null) return false;
-      final semOk = _semFilter == null || g.startSemester == _semFilter;
-      final catOk = _catFilter == null || g.categories.contains(_catFilter);
-      return semOk && catOk;
-    }).toList()..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    final groups = _buildFutGroups(filtered, allGoals);
+    final sort = ref.watch(visionSortProvider);
+    final sortMode = ref.watch(visionSortModeProvider);
+    final filtered = applyVisionSort(
+        allGoals.where((g) {
+          if (g.parentId != null) return false;
+          final semOk = _semFilter == null || g.startSemester == _semFilter;
+          final catOk = _catFilter == null || g.categories.contains(_catFilter);
+          return semOk && catOk;
+        }).toList(),
+        sort);
+    final groups = _buildFutGroups(filtered, allGoals, sort);
     final subVisions = [for (final g in groups) ...g.children];
     final subTotal = subVisions.length;
     final subDone = subVisions.where((g) => g.isDone).length;
@@ -512,6 +543,26 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                 ),
           ),
           actions: [
+            SortButton(
+              s: s,
+              isManual: sort == VisionSort.manual,
+              sortMode: sortMode,
+              onOpen: () => showSortSheet(
+                context,
+                s: s,
+                labels: {
+                  VisionSort.manual: s.sortManual,
+                  VisionSort.title: s.sortTitle,
+                  VisionSort.startSemester: s.sortStartSemester,
+                  VisionSort.endSemester: s.sortEndSemester,
+                },
+                sortProvider: visionSortProvider,
+                sortModeProvider: visionSortModeProvider,
+                manual: VisionSort.manual,
+              ),
+              onDone: () =>
+                  ref.read(visionSortModeProvider.notifier).state = false,
+            ),
             IconButton(
               icon: const Icon(Icons.hub_outlined),
               tooltip: s.overview,
@@ -717,7 +768,10 @@ const double _childIndent =
 class _FutureGoalCardRow extends ConsumerWidget {
   final FutureGoal goal;
   final int depth;
-  const _FutureGoalCardRow({required this.goal, this.depth = 0});
+  // Set while rearranging: shown instead of the row's buttons, and the row
+  // stops opening the detail page so a stray tap does not leave sort mode
+  final Widget? handle;
+  const _FutureGoalCardRow({required this.goal, this.depth = 0, this.handle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -769,7 +823,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
 
     if (depth > 0) {
       return InkWell(
-        onTap: openDetail,
+        onTap: handle != null ? null : openDetail,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
               _childIndent + (depth - 1) * 16.0, 7, AppSpacing.sm, 7),
@@ -807,8 +861,6 @@ class _FutureGoalCardRow extends ConsumerWidget {
                             goal.isDone ? TextDecoration.lineThrough : null,
                         color: goal.isDone ? AppColors.textTertiary : null,
                       ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (total > 0)
@@ -821,13 +873,14 @@ class _FutureGoalCardRow extends ConsumerWidget {
                         ),
                   ),
                 ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 16),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: deleteGoal,
-              ),
+              handle ??
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    onPressed: deleteGoal,
+                  ),
             ],
           ),
         ),
@@ -835,7 +888,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
     }
 
     return InkWell(
-      onTap: openDetail,
+      onTap: handle != null ? null : openDetail,
       child: Stack(
         children: [
           Padding(
@@ -884,9 +937,6 @@ class _FutureGoalCardRow extends ConsumerWidget {
                                   : null,
                               color: goal.isDone ? AppColors.textTertiary : null,
                             ),
-                        // Two lines like the goal card, for the same reason
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       if (span.isNotEmpty)
                         Padding(
@@ -938,7 +988,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Row(
+                handle ?? Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
@@ -1038,6 +1088,7 @@ void showFutureGoalSheet(
             SheetTextField(
               label: s.titleField,
               controller: titleCtrl,
+              maxLength: InputLimits.title,
               autofocus: true,
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -1045,6 +1096,7 @@ void showFutureGoalSheet(
             SheetTextField(
               label: s.goalNotes,
               controller: notesCtrl,
+              maxLength: InputLimits.body,
               maxLines: 3,
             ),
             const SizedBox(height: AppSpacing.sm),

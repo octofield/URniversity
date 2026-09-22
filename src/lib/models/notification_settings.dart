@@ -13,6 +13,9 @@ class NotificationSettings {
   final bool taskDueEnabled;
   // How long before dueTime to fire. 0 means at the due time itself
   final int taskLeadMinutes;
+  // Minutes since midnight. A repeating task with no due time has no moment of
+  // its own, so it is reminded about at this time on every day it lands on
+  final int recurringMinuteOfDay;
 
   final bool dailySummaryEnabled;
   // Minutes since midnight
@@ -26,6 +29,7 @@ class NotificationSettings {
     this.enabled = false,
     this.taskDueEnabled = true,
     this.taskLeadMinutes = NotificationConstants.defaultTaskLeadMinutes,
+    this.recurringMinuteOfDay = NotificationConstants.defaultRecurringMinuteOfDay,
     this.dailySummaryEnabled = true,
     this.summaryMinuteOfDay = NotificationConstants.defaultSummaryMinuteOfDay,
     this.goalDeadlineEnabled = true,
@@ -50,6 +54,7 @@ class NotificationSettings {
     bool? enabled,
     bool? taskDueEnabled,
     int? taskLeadMinutes,
+    int? recurringMinuteOfDay,
     bool? dailySummaryEnabled,
     int? summaryMinuteOfDay,
     bool? goalDeadlineEnabled,
@@ -59,6 +64,7 @@ class NotificationSettings {
         enabled: enabled ?? this.enabled,
         taskDueEnabled: taskDueEnabled ?? this.taskDueEnabled,
         taskLeadMinutes: taskLeadMinutes ?? this.taskLeadMinutes,
+        recurringMinuteOfDay: recurringMinuteOfDay ?? this.recurringMinuteOfDay,
         dailySummaryEnabled: dailySummaryEnabled ?? this.dailySummaryEnabled,
         summaryMinuteOfDay: summaryMinuteOfDay ?? this.summaryMinuteOfDay,
         goalDeadlineEnabled: goalDeadlineEnabled ?? this.goalDeadlineEnabled,
@@ -69,6 +75,7 @@ class NotificationSettings {
         'enabled': enabled,
         'task_due_enabled': taskDueEnabled,
         'task_lead_minutes': taskLeadMinutes,
+        'recurring_minute_of_day': recurringMinuteOfDay,
         'daily_summary_enabled': dailySummaryEnabled,
         'summary_minute_of_day': summaryMinuteOfDay,
         'goal_deadline_enabled': goalDeadlineEnabled,
@@ -84,6 +91,8 @@ class NotificationSettings {
         taskDueEnabled: j['task_due_enabled'] as bool? ?? true,
         taskLeadMinutes: j['task_lead_minutes'] as int? ??
             NotificationConstants.defaultTaskLeadMinutes,
+        recurringMinuteOfDay: j['recurring_minute_of_day'] as int? ??
+            NotificationConstants.defaultRecurringMinuteOfDay,
         dailySummaryEnabled: j['daily_summary_enabled'] as bool? ?? true,
         summaryMinuteOfDay: j['summary_minute_of_day'] as int? ??
             NotificationConstants.defaultSummaryMinuteOfDay,

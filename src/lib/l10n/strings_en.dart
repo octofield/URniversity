@@ -121,6 +121,11 @@ class StringsEn implements AppStrings {
   @override String get sortTitle => 'A–Z';
   @override String get sortTarget => 'By target';
   @override String get sortDue => 'By due time';
+  @override String get sortVision => 'By vision';
+  @override String get sortUndoneFirst => 'Unfinished first';
+  @override String get sortStartSemester => 'By start semester';
+  @override String get sortEndSemester => 'By end semester';
+  @override String get sortRearrange => 'Rearrange';
   @override String greetingMorning(String name) => name.isEmpty ? 'Good morning 👋' : 'Good morning, $name 👋';
   @override String greetingAfternoon(String name) => name.isEmpty ? 'Good afternoon 👋' : 'Good afternoon, $name 👋';
   @override String greetingEvening(String name) => name.isEmpty ? 'Good evening 👋' : 'Good evening, $name 👋';
@@ -309,6 +314,7 @@ class StringsEn implements AppStrings {
   @override String get notifEnabledHint => 'Turning this off silences all three below';
   @override String get notifTaskDue => 'Task reminders';
   @override String get notifTaskLead => 'Remind me';
+  @override String get notifRecurringTime => 'Repeating tasks with no time';
   @override String get notifDailySummary => 'Daily summary';
   @override String get notifSummaryTime => 'Summary time';
   @override String get notifGoalDeadline => 'Semester goal deadline';

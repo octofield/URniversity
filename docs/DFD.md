@@ -255,7 +255,7 @@ flowchart LR
     D14[("D14 notification_action_log")]
     OS(["作業系統的待送通知佇列"])
 
-    User -- "開關 / 提前時間 / 摘要時間" --> P5
+    User -- "開關 / 提前時間 / 摘要時間 / 無時間重複任務的時刻" --> P5
     P5 -- "寫入 JSON" --> D13
     D13 -- "讀取設定" --> P6
     D1 -- "讀取（到期時間、循環規則、完成狀態）" --> P6
@@ -404,3 +404,5 @@ flowchart LR
 | D17 | `task_completion_effect` | 裝置本機 SharedPreferences（完成動畫強度，每台裝置各自設定） |
 | D18 | `fab_pos_*` | 裝置本機 SharedPreferences（兩顆浮動新增鈕被拖到哪裡，存 0–1 的比例） |
 | D19 | `task_sort` | 裝置本機 SharedPreferences（任務清單的排序方式） |
+| D20 | `target_sort` | 裝置本機 SharedPreferences（目標頁的排序方式；只影響顯示順序，不寫回 D2） |
+| D21 | `vision_sort` | 裝置本機 SharedPreferences（願景頁的排序方式；只影響顯示順序，不寫回 D3） |

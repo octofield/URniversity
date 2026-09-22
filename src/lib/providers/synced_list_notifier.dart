@@ -41,22 +41,30 @@ String describeSyncError(Object error) {
 //
 // PGRST303 is the one that prompted this: a PostgREST bug rejects tokens used
 // within a few hundred ms of being issued, so the same write succeeds a moment
-// later. PGRST301 covers a token that expired mid-flight
+// later. PGRST301 covers a token that expired mid-flight.
+//
+// AuthRetryableFetchException is what the client throws when the access token
+// expired while the app sat in the background and refreshing it failed because
+// the network had not woken up yet. It is the first write after a resume that
+// hits this, and it succeeds once the connection is back
 bool isTransientSyncError(Object error) {
   if (error is PostgrestException) {
     return const {'PGRST301', 'PGRST303'}.contains(error.code);
   }
   return error is SocketException ||
       error is TimeoutException ||
-      error is ClientException;
+      error is ClientException ||
+      error is AuthRetryableFetchException;
 }
 
-// Runs a write, retrying transient failures with growing, jittered delays.
-// Fixed delays were reported as not enough for the PostgREST clock bug, so the
-// gap widens and carries jitter to avoid every pending write retrying in step.
+// Runs a write, retrying transient failures with doubling, jittered delays.
+// Fixed delays were reported as not enough for the PostgREST clock bug, and a
+// network waking from sleep needs seconds rather than the ~1 s three quick
+// attempts used to cover, so five attempts span roughly six seconds. The
+// jitter keeps every pending write from retrying in step
 Future<void> runWithRetry(
   Future<void> Function() write, {
-  int maxAttempts = 3,
+  int maxAttempts = 5,
 }) async {
   final jitter = Random();
   for (var attempt = 1; ; attempt++) {
@@ -65,7 +73,7 @@ Future<void> runWithRetry(
       return;
     } catch (e) {
       if (attempt >= maxAttempts || !isTransientSyncError(e)) rethrow;
-      final backoff = 200 * attempt + jitter.nextInt(200);
+      final backoff = 400 * (1 << (attempt - 1)) + jitter.nextInt(200);
       debugPrint('[sync] attempt $attempt failed, retrying in ${backoff}ms '
           '- ${describeSyncError(e)}');
       await Future<void>.delayed(Duration(milliseconds: backoff));
@@ -136,7 +144,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
         state = (rows as List<dynamic>)
             .map((r) => fromJson(r as Map<String, dynamic>))
             .toList();
-      }, maxAttempts: 4);
+      }, maxAttempts: 6);
       await afterLoad();
     } catch (e) {
       // Leaving _userId null lets a later load() retry instead of no-oping
@@ -159,6 +167,10 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     }
     _userId = null;
     await load(userId);
+    // A failed refetch leaves the list stale but still this user's own. Unlike a
+    // failed first load there is no later load() coming to recover, so without
+    // this every write for the rest of the session would be silently dropped
+    _userId ??= userId;
   }
 
   Future<void> loadGuest() async {
