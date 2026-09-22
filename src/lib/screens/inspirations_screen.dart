@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -9,6 +10,7 @@ import '../providers/settings_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/sheet_fields.dart' show nearLimitCounter;
 
 class InspirationsScreen extends ConsumerWidget {
   const InspirationsScreen({super.key});
@@ -142,9 +144,9 @@ void _showEditSheet(BuildContext context, WidgetRef ref, Inspiration item) {
         children: [
           Text(s.inspirations, style: Theme.of(sheetCtx).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
-          TextField(controller: titleCtrl, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.titleField)),
+          TextField(controller: titleCtrl, autofocus: true, maxLength: InputLimits.title, buildCounter: nearLimitCounter, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.titleField)),
           const SizedBox(height: 12),
-          TextField(controller: contentCtrl, maxLines: 3, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.inspirationDetails)),
+          TextField(controller: contentCtrl, maxLines: 3, maxLength: InputLimits.body, buildCounter: nearLimitCounter, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: s.inspirationDetails)),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,

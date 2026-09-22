@@ -121,6 +121,11 @@ class StringsZhTw implements AppStrings {
   @override String get sortTitle => 'A–Z';
   @override String get sortTarget => '依目標';
   @override String get sortDue => '依截止時間';
+  @override String get sortVision => '依願景';
+  @override String get sortUndoneFirst => '未完成優先';
+  @override String get sortStartSemester => '依開始學期';
+  @override String get sortEndSemester => '依結束學期';
+  @override String get sortRearrange => '調整順序';
   @override String greetingMorning(String name) => name.isEmpty ? '早安 👋' : '早安，$name 👋';
   @override String greetingAfternoon(String name) => name.isEmpty ? '午安 👋' : '午安，$name 👋';
   @override String greetingEvening(String name) => name.isEmpty ? '晚安 👋' : '晚安，$name 👋';
@@ -307,6 +312,7 @@ class StringsZhTw implements AppStrings {
   @override String get notifEnabledHint => '關閉後，下面三項都不會提醒';
   @override String get notifTaskDue => '任務到期提醒';
   @override String get notifTaskLead => '提前多久提醒';
+  @override String get notifRecurringTime => '未設時間的重複任務';
   @override String get notifDailySummary => '每日摘要';
   @override String get notifSummaryTime => '摘要時間';
   @override String get notifGoalDeadline => '學期目標截止提醒';

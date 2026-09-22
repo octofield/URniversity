@@ -185,7 +185,10 @@ Future<RecurrenceRule?> _showRecurrencePicker(
                       keyboardType: TextInputType.number,
                       // Digits only: a 0 or a negative value would break the
                       // modulo in _recurringAppliesTo
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(InputLimits.repeatIntervalDigits),
+                      ],
                       onChanged: (v) {
                         final parsed = int.tryParse(v);
                         if (parsed != null && parsed >= 1) interval = parsed;
@@ -381,6 +384,7 @@ void showTaskSheet(
                 SheetTextField(
                   label: s.titleField,
                   controller: titleController,
+                  maxLength: InputLimits.title,
                   autofocus: true,
                   onSubmitted: isEdit
                       ? null
@@ -399,6 +403,7 @@ void showTaskSheet(
                 SheetTextField(
                   label: s.taskNotes,
                   controller: contentController,
+                  maxLength: InputLimits.body,
                   maxLines: 3,
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -562,12 +567,14 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
           SheetTextField(
             label: s.titleField,
             controller: titleController,
+            maxLength: InputLimits.title,
             autofocus: true,
           ),
           const SizedBox(height: 12),
           SheetTextField(
             label: s.inspirationDetails,
             controller: contentController,
+            maxLength: InputLimits.body,
             maxLines: 3,
           ),
           const SizedBox(height: AppSpacing.md),

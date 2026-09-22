@@ -36,11 +36,24 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
 
   Widget _buildRow(Task task, List<Task> siblings, int index) {
     final isHovered = _hoveredId == task.id;
-    final tile = _TaskTile(task: task);
     // Dragging writes the manual order, which is invisible while the list is
     // sorted by something else — so it is switched off there rather than
     // quietly rearranging a list the user cannot see
     final canDrag = ref.watch(taskSortProvider) == TaskSort.manual;
+    final sortMode = ref.watch(taskSortModeProvider);
+    // While rearranging, the handle takes the delete button's place and is
+    // the thing that drags, at once and without a long press
+    final tile = _TaskTile(
+      task: task,
+      handle: sortMode && canDrag
+          ? DragHandle<String>(
+              data: task.id,
+              feedback: _dragFeedback(task),
+              onDragStarted: () {},
+              onDragEnd: () => setState(() => _hoveredId = null),
+            )
+          : null,
+    );
     if (!canDrag) return tile;
 
     return DragTarget<String>(
@@ -67,7 +80,9 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
       onAcceptWithDetails: (details) => _onAccept(details.data, task, siblings, index),
       builder: (dragCtx, _, _) {
         _rowCtxs[task.id] = dragCtx;
-        final draggable = kIsWeb
+        final draggable = sortMode
+            ? tile
+            : kIsWeb
             ? Draggable<String>(
                 data: task.id,
                 dragAnchorStrategy: pointerDragAnchorStrategy,
@@ -149,7 +164,10 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
 
 class _TaskTile extends ConsumerWidget {
   final Task task;
-  const _TaskTile({required this.task});
+  // Set while rearranging: shown instead of the delete button, and the row
+  // stops opening the task so a stray tap does not leave sort mode behind
+  final Widget? handle;
+  const _TaskTile({required this.task, this.handle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -199,8 +217,6 @@ class _TaskTile extends ConsumerWidget {
           decoration: isCompleted ? TextDecoration.lineThrough : null,
           color: isCompleted ? AppColors.textTertiary : null,
         ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
       ),
       subtitle: hasSubtitle
           ? Column(
@@ -272,7 +288,7 @@ class _TaskTile extends ConsumerWidget {
               ],
             )
           : null,
-      trailing: Row(
+      trailing: handle ?? Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
@@ -293,7 +309,7 @@ class _TaskTile extends ConsumerWidget {
           ),
         ],
       ),
-      onTap: () => showTaskSheet(context, ref, existing: task),
+      onTap: handle != null ? null : () => showTaskSheet(context, ref, existing: task),
     );
 
     // ListTile paints its ink splash on the nearest Material ancestor. The card

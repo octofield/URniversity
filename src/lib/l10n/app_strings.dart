@@ -124,6 +124,12 @@ abstract class AppStrings {
   String get sortTitle;
   String get sortTarget;
   String get sortDue;
+  String get sortVision;
+  String get sortUndoneFirst;
+  String get sortStartSemester;
+  String get sortEndSemester;
+  // The row in the sort sheet that turns on the drag handles
+  String get sortRearrange;
 
   // Today greeting header
   String greetingMorning(String name);
@@ -334,6 +340,8 @@ abstract class AppStrings {
   String get notifEnabledHint;
   String get notifTaskDue;
   String get notifTaskLead;
+  // When a repeating task with no due time is reminded about
+  String get notifRecurringTime;
   String get notifDailySummary;
   String get notifSummaryTime;
   String get notifGoalDeadline;

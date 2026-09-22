@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/ui_symbols.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
@@ -738,8 +739,14 @@ void showSemesterGoalSheet(
   final s = ref.read(stringsProvider);
   final settings = ref.read(semesterSettingsProvider);
   final semesters = generateSemesters(settings);
-  var selectedCategories =
-      isEdit ? existing.categories.toSet() : <String>{};
+  // A new milestone starts with its parent's categories; the chips show them
+  // ticked, so they are a suggestion the user can still change
+  final parent = parentId == null
+      ? null
+      : ref.read(semesterGoalsProvider).where((g) => g.id == parentId).firstOrNull;
+  var selectedCategories = isEdit
+      ? existing.categories.toSet()
+      : {...?parent?.categories};
   String? selectedFutureGoalId = existing?.futureGoalId;
   String selectedSemester = existing?.semester ?? ref.read(selectedSemesterProvider);
 
@@ -800,6 +807,7 @@ void showSemesterGoalSheet(
               SheetTextField(
                 label: s.titleField,
                 controller: titleCtrl,
+                maxLength: InputLimits.title,
                 autofocus: true,
                 onSubmitted: submit,
               ),
@@ -808,6 +816,7 @@ void showSemesterGoalSheet(
               SheetTextField(
                 label: s.goalNotes,
                 controller: notesCtrl,
+                maxLength: InputLimits.body,
                 maxLines: 3,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -865,7 +874,16 @@ void showSemesterGoalSheet(
                     s,
                     settings,
                     selectedFutureGoalId,
-                    (id) => setState(() => selectedFutureGoalId = id),
+                    (id) => setState(() {
+                      selectedFutureGoalId = id;
+                      // Only fills an empty choice: categories the user already
+                      // picked are theirs, not the vision's to overwrite
+                      final vision =
+                          futureGoals.where((g) => g.id == id).firstOrNull;
+                      if (vision != null && selectedCategories.isEmpty) {
+                        selectedCategories = vision.categories.toSet();
+                      }
+                    }),
                   ),
                   () => setState(() => selectedFutureGoalId = null),
                 ),

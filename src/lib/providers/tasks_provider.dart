@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../services/notification_service.dart';
+import 'sort_prefs.dart';
 import 'synced_list_notifier.dart';
 import 'semester_goals_provider.dart';
 import 'date_provider.dart';
@@ -213,32 +213,13 @@ final taskRowDateProvider = Provider.family<DateTime, Task>((ref, task) {
 // would write an order nothing on screen reflects.
 enum TaskSort { manual, created, title, target, due }
 
-class TaskSortNotifier extends StateNotifier<TaskSort> {
-  TaskSortNotifier() : super(TaskSort.manual) {
-    _restore();
-  }
-
-  static const prefsKey = 'task_sort';
-
-  Future<void> _restore() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(prefsKey);
-    if (stored == null) return;
-    // A value this build does not know falls back to the manual order
-    state = TaskSort.values.where((e) => e.name == stored).firstOrNull ??
-        TaskSort.manual;
-  }
-
-  Future<void> set(TaskSort sort) async {
-    state = sort;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(prefsKey, sort.name);
-  }
-}
-
-final taskSortProvider = StateNotifierProvider<TaskSortNotifier, TaskSort>(
-  (ref) => TaskSortNotifier(),
+final taskSortProvider = StateNotifierProvider<EnumPrefNotifier<TaskSort>, TaskSort>(
+  (ref) => EnumPrefNotifier('task_sort', TaskSort.values, TaskSort.manual),
 );
+
+// Whether the list shows drag handles. Held in memory only: coming back to the
+// app in the middle of rearranging is not something to restore
+final taskSortModeProvider = StateProvider<bool>((ref) => false);
 
 // Orders a list that is already in the app's automatic order (recurring first,
 // then by due time), which is what decides ties: two tasks created in the same

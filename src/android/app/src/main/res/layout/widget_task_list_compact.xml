@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- widget_task_list tightened to fit three columns: the same views and ids
+     (TaskWidgetProvider binds both layouts with one code path), with smaller
+     padding and type, a narrower + and the filter reduced to its arrow. Keep
+     the two files in step when either changes. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="10dp">
+
+    <!-- Mode: tasks / targets / visions, and + for whichever is showing -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tab_tasks"
+            style="@style/WidgetTabCompact"
+            android:text="@string/widget_tab_tasks" />
+
+        <TextView
+            android:id="@+id/tab_targets"
+            style="@style/WidgetTabCompact"
+            android:text="@string/widget_tab_targets" />
+
+        <TextView
+            android:id="@+id/tab_goals"
+            style="@style/WidgetTabCompact"
+            android:text="@string/widget_tab_goals" />
+
+        <!-- RemoteViews only inflates an allowlist of view classes, and Space
+             is not on it: using one makes the launcher refuse to add the whole
+             widget. FrameLayout is on the list and spaces just as well -->
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <FrameLayout
+            android:id="@+id/add_button"
+            android:layout_width="40dp"
+            android:layout_height="30dp"
+            android:background="@drawable/widget_add_pill"
+            android:contentDescription="@string/widget_add">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/widget_ic_add"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Period and filter: only meaningful for the task list -->
+    <LinearLayout
+        android:id="@+id/period_row"
+        android:layout_width="match_parent"
+        android:layout_height="24dp"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/period_all"
+            style="@style/WidgetTabSmallCompact"
+            android:text="@string/widget_period_all" />
+
+        <TextView
+            android:id="@+id/period_day"
+            style="@style/WidgetTabSmallCompact"
+            android:text="@string/widget_period_day" />
+
+        <TextView
+            android:id="@+id/period_week"
+            style="@style/WidgetTabSmallCompact"
+            android:text="@string/widget_period_week" />
+
+        <TextView
+            android:id="@+id/period_month"
+            style="@style/WidgetTabSmallCompact"
+            android:text="@string/widget_period_month" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Shows the current filter's name, or a generic label when there is
+             none. Tapping it swaps the list for the picker -->
+        <LinearLayout
+            android:id="@+id/filter_button"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/filter_label"
+                android:visibility="gone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="120dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/widget_filter"
+                android:textColor="@color/widget_muted"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/filter_arrow"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="2dp"
+                android:src="@drawable/widget_ic_dropdown"
+                android:importantForAccessibility="no" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Weighted rather than match_parent: only one of these two is ever
+         visible (setEmptyView swaps them), but two match_parent siblings in a
+         vertical LinearLayout still fight over the space -->
+    <TextView
+        android:id="@+id/empty_label"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:fontFamily="sans-serif-medium"
+        android:textSize="14sp"
+        android:textColor="@color/widget_muted" />
+
+    <ListView
+        android:id="@+id/widget_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:divider="@null"
+        android:dividerHeight="0dp" />
+</LinearLayout>

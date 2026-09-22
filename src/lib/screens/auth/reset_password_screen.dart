@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/input_limits.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/password_recovery_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -99,6 +101,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 TextField(
                   controller: _passwordCtrl,
                   obscureText: !_showPassword,
+                  inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.password)],
                   autofocus: true,
                   decoration: InputDecoration(
                     labelText: s.newPasswordLabel,
@@ -116,6 +119,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 TextField(
                   controller: _confirmCtrl,
                   obscureText: !_showPassword,
+                  inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.password)],
                   decoration: InputDecoration(
                     labelText: s.confirmPasswordLabel,
                     prefixIcon: const Icon(Icons.lock_outlined),

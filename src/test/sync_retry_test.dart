@@ -28,6 +28,17 @@ void main() {
       expect(isTransientSyncError(ClientException('reset')), isTrue);
     });
 
+    test('a token refresh that failed on a sleeping network is transient', () {
+      // What the first write after a long background stint throws when the
+      // expired access token could not be refreshed yet
+      expect(isTransientSyncError(AuthRetryableFetchException()), isTrue);
+    });
+
+    test('other auth errors are not', () {
+      expect(isTransientSyncError(const AuthException('invalid refresh token')),
+          isFalse);
+    });
+
     test('schema and policy errors are not', () {
       // 23502 not-null, 23503 foreign key, 42P10 bad onConflict,
       // 42703 missing column, 42501 RLS — all fail the same way next time
@@ -66,7 +77,7 @@ void main() {
         }),
         throwsA(isA<PostgrestException>()),
       );
-      expect(calls, 3, reason: 'default is 3 attempts, not unbounded');
+      expect(calls, 5, reason: 'default is 5 attempts, not unbounded');
     });
 
     test('does not retry a schema error', () async {

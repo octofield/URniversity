@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/input_limits.dart';
 import '../../core/sign_in_failure.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/settings_provider.dart';
@@ -115,6 +117,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         TextField(
           controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
+          inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.email)],
           decoration: InputDecoration(
             labelText: s.emailLabel,
             prefixIcon: const Icon(Icons.email_outlined),
@@ -124,6 +127,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         TextField(
           controller: _passwordCtrl,
           obscureText: !_showPassword,
+          inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.password)],
           decoration: InputDecoration(
             labelText: s.passwordLabelWithHint,
             prefixIcon: const Icon(Icons.lock_outlined),
@@ -139,6 +143,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         TextField(
           controller: _confirmCtrl,
           obscureText: !_showPassword,
+          inputFormatters: [LengthLimitingTextInputFormatter(InputLimits.password)],
           decoration: InputDecoration(
             labelText: s.confirmPasswordLabel,
             prefixIcon: const Icon(Icons.lock_outlined),

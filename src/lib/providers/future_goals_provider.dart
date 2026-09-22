@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/future_goal.dart';
+import 'sort_prefs.dart';
 import 'synced_list_notifier.dart';
 
 class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
@@ -155,3 +156,47 @@ final futureGoalsProvider =
     StateNotifierProvider<FutureGoalsNotifier, List<FutureGoal>>(
   (ref) => FutureGoalsNotifier(ref),
 );
+
+// How the visions page is ordered. Manual is the drag order; the rest switch
+// dragging off, the same way the task list does
+enum VisionSort { manual, title, startSemester, endSemester }
+
+final visionSortProvider =
+    StateNotifierProvider<EnumPrefNotifier<VisionSort>, VisionSort>(
+  (ref) => EnumPrefNotifier('vision_sort', VisionSort.values, VisionSort.manual),
+);
+
+// Whether the visions page shows drag handles. Memory only, like the task one
+final visionSortModeProvider = StateProvider<bool>((ref) => false);
+
+// Orders one level of the tree. Ties keep the drag order, and a vision with no
+// semester set goes after every one that has one
+List<FutureGoal> applyVisionSort(List<FutureGoal> siblings, VisionSort sort) {
+  final byOrder = [...siblings]
+    ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  if (sort == VisionSort.manual) return byOrder;
+
+  final index = {for (var i = 0; i < byOrder.length; i++) byOrder[i].id: i};
+
+  int bySemester(String? a, String? b) {
+    if (a == null || b == null) {
+      if (a == null && b == null) return 0;
+      return a == null ? 1 : -1;
+    }
+    return compareSemesters(a, b);
+  }
+
+  int compare(FutureGoal a, FutureGoal b) => switch (sort) {
+        VisionSort.title =>
+          a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        VisionSort.startSemester => bySemester(a.startSemester, b.startSemester),
+        VisionSort.endSemester => bySemester(a.endSemester, b.endSemester),
+        VisionSort.manual => 0,
+      };
+
+  return byOrder
+    ..sort((a, b) {
+      final byKey = compare(a, b);
+      return byKey != 0 ? byKey : index[a.id]!.compareTo(index[b.id]!);
+    });
+}

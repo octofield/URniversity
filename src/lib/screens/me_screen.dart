@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input_limits.dart';
 import '../core/avatars.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/tasks_provider.dart';
@@ -31,6 +33,7 @@ import 'journal_edit_screen.dart';
 import 'journals_screen.dart';
 import 'settings_screen.dart';
 import 'today_screen.dart' show showAddInspirationSheet;
+import '../widgets/sheet_fields.dart' show nearLimitCounter;
 
 class MeScreen extends ConsumerWidget {
   const MeScreen({super.key});
@@ -414,7 +417,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(controller: _usernameCtrl, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: s.usernameLabel)),
+            TextField(controller: _usernameCtrl, maxLength: InputLimits.username, buildCounter: nearLimitCounter, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: s.usernameLabel)),
             const SizedBox(height: 12),
             _PickerTile(label: s.school, value: _school, onTap: _pickSchool),
             const SizedBox(height: 12),
@@ -631,6 +634,8 @@ void _showEditInspirationSheet(
           TextField(
             controller: titleCtrl,
             autofocus: true,
+            maxLength: InputLimits.title,
+            buildCounter: nearLimitCounter,
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(labelText: s.titleField),
           ),
@@ -638,6 +643,8 @@ void _showEditInspirationSheet(
           TextField(
             controller: contentCtrl,
             maxLines: 3,
+            maxLength: InputLimits.body,
+            buildCounter: nearLimitCounter,
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(labelText: s.inspirationDetails),
           ),
@@ -1128,6 +1135,9 @@ Future<String?> _openSearchPicker(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: TextField(
                     autofocus: true,
+                    inputFormatters: [
+                      LengthLimitingTextInputFormatter(InputLimits.search),
+                    ],
                     decoration: InputDecoration(
                       hintText: s.pickerSearchHint(field),
                       prefixIcon: const Icon(Icons.search),
@@ -1183,6 +1193,8 @@ Future<String?> _showCustomInputDialog(
       content: TextField(
         controller: ctrl,
         autofocus: true,
+        maxLength: InputLimits.customPicker,
+        buildCounter: nearLimitCounter,
         textCapitalization: TextCapitalization.words,
         decoration: InputDecoration(labelText: field),
       ),

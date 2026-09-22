@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.RequiresApi
@@ -35,8 +36,39 @@ class TaskWidgetProvider : HomeWidgetProvider() {
         render(context, appWidgetManager, appWidgetIds, widgetData)
     }
 
+    /** Resizing crosses the compact threshold, so the layout is picked again. */
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        render(context, appWidgetManager, intArrayOf(appWidgetId), HomeWidgetPlugin.getData(context))
+    }
+
     companion object {
         private const val ROW_ACTION = "com.octofield.urniversity.WIDGET_ROW"
+
+        /**
+         * Narrower than this (in dp) and the full header no longer fits, which is
+         * where a four-column widget becomes a three-column one on most launchers.
+         */
+        private const val COMPACT_BELOW_DP = 250
+
+        /**
+         * The layout for one instance. The launcher reports its current minimum
+         * width; 0 means it has not said yet, which gets the full layout.
+         */
+        private fun layoutFor(manager: AppWidgetManager, widgetId: Int): Int {
+            val minWidth = manager.getAppWidgetOptions(widgetId)
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+            return if (minWidth in 1 until COMPACT_BELOW_DP) {
+                R.layout.widget_task_list_compact
+            } else {
+                R.layout.widget_task_list
+            }
+        }
 
         /** Redraws every instance from what is on disk. What a tab switch calls. */
         fun redrawAll(context: Context) {
@@ -75,7 +107,7 @@ class TaskWidgetProvider : HomeWidgetProvider() {
             val state = WidgetData.readState(prefs)
 
             for (widgetId in ids) {
-                val views = RemoteViews(context.packageName, R.layout.widget_task_list)
+                val views = RemoteViews(context.packageName, layoutFor(manager, widgetId))
 
                 bindChoice(context, views, R.id.tab_tasks, state.mode == WidgetData.MODE_TASKS,
                     action("mode", "value" to WidgetData.MODE_TASKS))

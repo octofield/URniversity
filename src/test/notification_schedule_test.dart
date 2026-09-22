@@ -135,11 +135,78 @@ void main() {
       expect(scheduled, isEmpty);
     });
 
-    test('a task with no due time has no moment to remind about', () {
+    test('a one-off task with no due time has no moment to remind about', () {
       final scheduled = build(
         tasks: [task()],
         settings: allOn.copyWith(
             dailySummaryEnabled: false, goalDeadlineEnabled: false),
+      );
+      expect(scheduled, isEmpty);
+    });
+
+    test('a repeating task with no due time fires at the chosen time of day', () {
+      final scheduled = build(
+        tasks: [
+          task(recurrence: const RecurrenceRule(type: RecurrenceType.daily)),
+        ],
+        settings: allOn.copyWith(
+          dailySummaryEnabled: false,
+          goalDeadlineEnabled: false,
+          // The lead is about a due time, which this task does not have
+          taskLeadMinutes: 60,
+          recurringMinuteOfDay: 21 * 60 + 15,
+        ),
+      );
+      expect(scheduled, hasLength(NotificationConstants.scheduleHorizonDays));
+      expect(scheduled.first.when, DateTime(2026, 9, 14, 21, 15));
+      expect(scheduled.first.kind, NotificationKind.taskDue);
+      // Carries the day, so "done" ticks off that occurrence only
+      final payload = TaskNotificationPayload.decode(scheduled.first.payload)!;
+      expect(payload.taskId, 't1');
+      expect(payload.date, DateTime(2026, 9, 14));
+    });
+
+    test('an untimed repeating task skips today once the time has passed', () {
+      // 08:00 by default, with now at 10:00
+      final scheduled = build(
+        tasks: [
+          task(recurrence: const RecurrenceRule(type: RecurrenceType.daily)),
+        ],
+        settings: allOn.copyWith(
+            dailySummaryEnabled: false, goalDeadlineEnabled: false),
+      );
+      expect(scheduled.first.when,
+          DateTime(2026, 9, 15, NotificationConstants.defaultRecurringMinuteOfDay ~/ 60));
+    });
+
+    test('an untimed repeating task skips days already completed', () {
+      final scheduled = build(
+        tasks: [
+          task(
+            recurrence: const RecurrenceRule(type: RecurrenceType.daily),
+            completedDates: const ['2026-09-15'],
+          ),
+        ],
+        settings: allOn.copyWith(
+          dailySummaryEnabled: false,
+          goalDeadlineEnabled: false,
+          recurringMinuteOfDay: 21 * 60,
+        ),
+      );
+      expect(scheduled.map((n) => n.when.day), isNot(contains(15)));
+      expect(scheduled, hasLength(NotificationConstants.scheduleHorizonDays - 1));
+    });
+
+    test('an untimed repeating task follows the task reminder switch', () {
+      final scheduled = build(
+        tasks: [
+          task(recurrence: const RecurrenceRule(type: RecurrenceType.daily)),
+        ],
+        settings: allOn.copyWith(
+          taskDueEnabled: false,
+          dailySummaryEnabled: false,
+          goalDeadlineEnabled: false,
+        ),
       );
       expect(scheduled, isEmpty);
     });
@@ -363,6 +430,19 @@ void main() {
         expect(n.id, greaterThanOrEqualTo(base));
         expect(n.id, lessThan(base + NotificationConstants.maxScheduled));
       }
+    });
+  });
+  group('the stored settings', () {
+    test('keep the untimed repeating time across a round trip', () {
+      const settings = NotificationSettings(recurringMinuteOfDay: 7 * 60 + 30);
+      final back = NotificationSettings.fromJson(settings.toJson());
+      expect(back.recurringMinuteOfDay, 7 * 60 + 30);
+    });
+
+    test('fall back to the default when an older build wrote them', () {
+      final back = NotificationSettings.fromJson({'enabled': true});
+      expect(back.recurringMinuteOfDay,
+          NotificationConstants.defaultRecurringMinuteOfDay);
     });
   });
 }

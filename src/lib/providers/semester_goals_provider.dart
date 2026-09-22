@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/semester_goal.dart';
+import 'sort_prefs.dart';
 import 'synced_list_notifier.dart';
 import 'future_goals_provider.dart';
 import 'settings_provider.dart';
@@ -241,9 +242,24 @@ class SemesterGoalsNotifier extends SyncedListNotifier<SemesterGoal> {
       final goal = state.where((g) => g.id == goalId).firstOrNull;
       if (goal == null || goal.parentId != null) return;
     }
+    // A target with no category of its own takes the vision's, so the link
+    // also carries the vision's grouping. One the user already categorised
+    // keeps what they chose
+    final visionCategories = futureGoalId == null
+        ? null
+        : ref
+            .read(futureGoalsProvider)
+            .where((g) => g.id == futureGoalId)
+            .firstOrNull
+            ?.categories;
     state = [
       for (final g in state)
-        if (g.id == goalId) g.copyWith(futureGoalId: futureGoalId) else g,
+        if (g.id == goalId)
+          g.copyWith(
+            futureGoalId: futureGoalId,
+            categories: g.categories.isEmpty ? visionCategories : null,
+          )
+        else g,
     ];
     final updated = state.where((g) => g.id == goalId).firstOrNull;
     if (updated != null) upsert(updated);
@@ -255,3 +271,57 @@ final semesterGoalsProvider =
     StateNotifierProvider<SemesterGoalsNotifier, List<SemesterGoal>>(
   (ref) => SemesterGoalsNotifier(ref),
 );
+
+// How the targets page is ordered. Manual is the drag order; the rest switch
+// dragging off, the same way the task list does
+enum TargetSort { manual, title, vision, undoneFirst }
+
+final targetSortProvider =
+    StateNotifierProvider<EnumPrefNotifier<TargetSort>, TargetSort>(
+  (ref) => EnumPrefNotifier('target_sort', TargetSort.values, TargetSort.manual),
+);
+
+// Whether the targets page shows drag handles. Memory only, like the task one
+final targetSortModeProvider = StateProvider<bool>((ref) => false);
+
+// Orders one level of the tree: the top-level targets of a semester, or the
+// milestones under one parent. Ties keep the drag order, so rows sharing a key
+// do not swap about on every rebuild
+List<SemesterGoal> applyTargetSort(
+  List<SemesterGoal> siblings,
+  TargetSort sort, {
+  Map<String, String> visionTitles = const {},
+}) {
+  final byOrder = [...siblings]
+    ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  if (sort == TargetSort.manual) return byOrder;
+
+  final index = {for (var i = 0; i < byOrder.length; i++) byOrder[i].id: i};
+
+  int compare(SemesterGoal a, SemesterGoal b) {
+    switch (sort) {
+      case TargetSort.title:
+        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      case TargetSort.vision:
+        // Grouped by the linked vision's name; unlinked ones go last
+        final av = visionTitles[a.futureGoalId];
+        final bv = visionTitles[b.futureGoalId];
+        if (av == null || bv == null) {
+          if (av == null && bv == null) return 0;
+          return av == null ? 1 : -1;
+        }
+        return av.toLowerCase().compareTo(bv.toLowerCase());
+      case TargetSort.undoneFirst:
+        if (a.isDone == b.isDone) return 0;
+        return a.isDone ? 1 : -1;
+      case TargetSort.manual:
+        return 0;
+    }
+  }
+
+  return byOrder
+    ..sort((a, b) {
+      final byKey = compare(a, b);
+      return byKey != 0 ? byKey : index[a.id]!.compareTo(index[b.id]!);
+    });
+}

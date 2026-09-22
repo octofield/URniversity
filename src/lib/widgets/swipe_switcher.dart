@@ -23,11 +23,16 @@ class SwipeSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nowhere to go: no horizontal recogniser at all, so nothing competes with
+    // the rows' own drags. The detector itself stays, keeping the tree shape
+    // (and the list's scroll position) when this toggles
+    final canSwipe = onNext != null || onPrevious != null;
+
     return GestureDetector(
       // Translucent, not opaque: the rows underneath keep their own taps and
       // long-press drags
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragEnd: (details) {
+      onHorizontalDragEnd: !canSwipe ? null : (details) {
         final velocity = details.primaryVelocity ?? 0;
         if (velocity.abs() < _minVelocity) return;
         // Dragging leftwards moves forward, the way a page turns

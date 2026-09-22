@@ -23,6 +23,9 @@ class NotificationConstants {
   static const defaultTaskLeadMinutes = 30;
   // Minutes since midnight. 8:00 is before most first periods
   static const defaultSummaryMinuteOfDay = 8 * 60;
+  // When a repeating task with no due time is reminded about, on each day it
+  // lands on. Minutes since midnight
+  static const defaultRecurringMinuteOfDay = 8 * 60;
   static const defaultGoalLeadDays = 7;
 
   // ── Choices offered in the settings screen ────────────────────────────────
