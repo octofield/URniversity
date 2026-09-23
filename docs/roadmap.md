@@ -1,7 +1,7 @@
 # 開發路線圖
 
 > 這份文件記錄**接下來要做什麼、為什麼是這個順序**。
-> 資料結構請見 [DD.md](./DD.md) 與 [DFD.md](./DFD.md)；功能行為請見
+> 資料結構請見 [data_dictionary.md](./data_dictionary.md) 與 [data_flow_diagram.md](./data_flow_diagram.md)；功能行為請見
 > [system_design.md](./system_design.md)；測試方法請見 [testing.md](./testing.md)。
 
 ## 目標
@@ -99,7 +99,7 @@
 `services/notification_service.dart`（唯一碰 platform channel 的地方）、
 `providers/notification_provider.dart`、`screens/notification_settings_screen.dart`、
 `utils/semester_helpers.dart` 新增 `semesterStart()` / `semesterEnd()`。
-文件：DD.md D13、DFD.md 1-F、system_design.md UC13 與 §3-K。
+文件：data_dictionary.md D13、data_flow_diagram.md 1-F、system_design.md UC13 與 §3-K。
 
 **追加**（2026-09-13）：任務提醒移除內文的到期時間，改為兩顆動作按鈕——
 「標示為已完成」**不開 App** 直接寫入（背景 isolate），「重新安排時間」跳進該任務的編輯頁。
@@ -131,7 +131,7 @@
 `services/home_widget_background.dart`、`services/background_task_writer.dart`
 （從通知抽出來共用）、`providers/home_widget_provider.dart`，
 以及原生的 `TaskWidgetProvider.kt` / `WidgetListService.kt` / `WidgetActionReceiver.kt` 與 layout。
-文件：DD.md D15、DFD.md 1-G、system_design.md UC14 與 §3-M。
+文件：data_dictionary.md D15、data_flow_diagram.md 1-G、system_design.md UC14 與 §3-M。
 
 **V1 的取捨**（都寫進文件了）：篩選是單選；**沒有定時的雲端輪詢**
 （在另一台裝置改了資料而這台 App 完全沒開過，小工具會是舊的）；只做一種尺寸；
@@ -165,7 +165,7 @@ Phase 3 才補。
 
 | 面向 | 影響 |
 |---|---|
-| 資料 | `inspirations` 新增歸檔欄位（DD.md D4、DFD.md 要同步）；模板本身可能不需要新資料表，直接批次呼叫既有的 `addGoal`／`add` |
+| 資料 | `inspirations` 新增歸檔欄位（data_dictionary.md D4、data_flow_diagram.md 要同步）；模板本身可能不需要新資料表，直接批次呼叫既有的 `addGoal`／`add` |
 | 行為 | system_design.md 新增使用案例（首次使用引導、套用模板、歸檔靈感）；§2 輸入輸出格式 |
 | l10n | 四個檔案（`app_strings.dart` + 三個實作）。模板內容本身要不要在地化是個待決定的問題 |
 | 測試 | 新測試計畫；模板的批次建立適合寫成單元測試（驗證 N 筆資料的 id 全不相同）。**做完要回頭重測 Phase 1 的通知**（見上方代價） |

@@ -57,7 +57,7 @@
    每一行改動都要能追溯到本階段目標。
 3. **不要為只用一次的東西建抽象**（CLAUDE.md §2）。重複 < 3 次就不要抽常數、不要開 helper。
 4. 註解一律英文、首字大寫、句尾不加句號；K&R 大括號；`lowerCamelCase`。
-5. 改到持久化欄位或資料流 → 同步更新 `docs/DD.md`、`docs/DFD.md`。
+5. 改到持久化欄位或資料流 → 同步更新 `docs/data_dictionary.md`、`docs/data_flow_diagram.md`。
    改到導覽、輸入輸出格式或演算法 → 同步更新 `docs/system_design.md`（含重畫 Mermaid 圖）。
 6. **每階段結束都必須通過驗收才進下一階段**，每階段自成一個 commit。
    收尾執行 `cd src && flutter analyze && flutter test`，並在回報中貼出實際輸出。

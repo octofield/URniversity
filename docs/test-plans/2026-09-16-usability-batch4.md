@@ -2,7 +2,7 @@
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
 > [../system_design.md](../system_design.md)（§3-A、§3-M、UC14）；資料細節請見
-> [../DD.md](../DD.md)（D15、D16、D17）。
+> [../data_dictionary.md](../data_dictionary.md)（D15、D16、D17）。
 
 ## 基本資訊
 
@@ -16,7 +16,7 @@
   5. 啟動畫面改為底色＋圖示＋App 名稱；桌面圖示改成 adaptive icon（消除白邊）
   6. 已完成任務區塊**預設收合**
   7. 完成動畫，設定頁可切換三段（關閉／基本／基本＋彩帶）
-- 對應章節：§3-A、§3-M、UC14；DD.md D15（多一個 view）、D16、D17（新增）
+- 對應章節：§3-A、§3-M、UC14；data_dictionary.md D15（多一個 view）、D16、D17（新增）
 
 ## 採用的測試類型
 

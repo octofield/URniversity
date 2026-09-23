@@ -1,7 +1,7 @@
 # 測試計畫：桌面小工具改版（版面、即時切換、完成動畫）
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
-> [../system_design.md](../system_design.md)（UC14、§3-M）；資料細節請見 [../DD.md](../DD.md)（D15）。
+> [../system_design.md](../system_design.md)（UC14、§3-M）；資料細節請見 [../data_dictionary.md](../data_dictionary.md)（D15）。
 > 前一版的案例與已修問題見 [2026-09-13-home-widget.md](2026-09-13-home-widget.md)。
 
 ## 基本資訊
@@ -13,7 +13,7 @@
      沒副標的列上下置中、不再出現 `null`、跟隨系統深淺色
   2. 切換分頁／期間／篩選改由原生端處理，**不再經過 Dart 背景引擎**
   3. 勾選完成的動畫（框的轉場＋刪除線），寫入失敗時取回勾選
-- 對應章節：UC14、§3-M、DD.md D15、DFD.md 1-G
+- 對應章節：UC14、§3-M、data_dictionary.md D15、data_flow_diagram.md 1-G
 
 ## 採用的測試類型
 

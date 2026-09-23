@@ -2,7 +2,7 @@
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
 > [../system_design.md](../system_design.md)（UC14、§3-M）；
-> 資料細節請見 [../DD.md](../DD.md)（D15、D14）。
+> 資料細節請見 [../data_dictionary.md](../data_dictionary.md)（D15、D14）。
 
 ## 基本資訊
 
@@ -13,7 +13,7 @@
   - 右上依目標或願景篩選，挑選器**依學期分組、可滑動**
   - 勾選任務完成**與通知共用同一套背景寫入**（`toggleTaskFromBackground()` + D14）
   - 顯示內容由純函式 `buildWidgetSnapshot()` 決定，原生 Kotlin 只負責渲染
-- 對應章節／使用案例：UC14（新增）、§3-M（新增）、DD.md D15（新增）、D14（補寫入者）、DFD.md 1-G（新增）
+- 對應章節／使用案例：UC14（新增）、§3-M（新增）、data_dictionary.md D15（新增）、D14（補寫入者）、data_flow_diagram.md 1-G（新增）
 
 ## 採用的測試類型
 

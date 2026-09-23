@@ -1,7 +1,7 @@
 # 測試計畫：Phase 0 可靠度收尾（發布給同學前）
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
-> [../system_design.md](../system_design.md)；資料細節請見 [../DD.md](../DD.md)。
+> [../system_design.md](../system_design.md)；資料細節請見 [../data_dictionary.md](../data_dictionary.md)。
 
 ## 基本資訊
 
@@ -13,7 +13,7 @@
   - **新增忘記密碼流程**（先前完全不存在，忘記密碼＝永久鎖死）
   - **修好訪客合併的外鍵順序**（先前順序完全相反，有連結的資料必定遺失）
   - **修好列 id 碰撞**（同一毫秒建立的多列會互相覆蓋）
-- 對應章節／使用案例：UC2、**UC2-B（新增）**、UC10、§3-I、DD.md D0（新增）
+- 對應章節／使用案例：UC2、**UC2-B（新增）**、UC10、§3-I、data_dictionary.md D0（新增）
 
 ## 採用的測試類型
 

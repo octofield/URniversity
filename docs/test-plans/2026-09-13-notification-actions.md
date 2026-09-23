@@ -2,7 +2,7 @@
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
 > [../system_design.md](../system_design.md)（UC13-B、§3-K、§3-L）；
-> 資料細節請見 [../DD.md](../DD.md)（D14）。
+> 資料細節請見 [../data_dictionary.md](../data_dictionary.md)（D14）。
 
 ## 基本資訊
 
@@ -13,7 +13,7 @@
   - 「重新安排時間」——開啟 App 並跳出**該任務**的編輯 sheet
   - 新增 D14 `notification_action_log`：背景寫入的結果（含失敗）留給主 isolate 收
   - `Task.toggledOn()` 抽成純函式，UI 與背景共用同一份完成邏輯
-- 對應章節／使用案例：UC13-B（新增）、§3-K（擴充）、§3-L（新增）、DD.md D14（新增）、DFD.md 1-F（重畫）
+- 對應章節／使用案例：UC13-B（新增）、§3-K（擴充）、§3-L（新增）、data_dictionary.md D14（新增）、data_flow_diagram.md 1-F（重畫）
 
 ## 採用的測試類型
 

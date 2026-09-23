@@ -2,7 +2,7 @@
 
 > 複製本檔案為 `docs/test-plans/YYYY-MM-DD-主題.md` 後填寫。
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
-> [../system_design.md](../system_design.md)；資料細節請見 [../DD.md](../DD.md)。
+> [../system_design.md](../system_design.md)；資料細節請見 [../data_dictionary.md](../data_dictionary.md)。
 
 ## 基本資訊
 

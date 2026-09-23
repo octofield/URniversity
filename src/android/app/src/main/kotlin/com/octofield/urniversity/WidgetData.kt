@@ -76,8 +76,10 @@ object WidgetData {
     /**
      * Ticks or unticks every row carrying [action], ahead of the write that
      * makes it true, so the row reacts on the tap instead of a second later.
-     * Dart's next snapshot replaces this either way. Returns whether any row
-     * changed.
+     * A ticked task row also leaves the list at once (see [visibleRows]), the
+     * way it does inside the app. Dart's next snapshot replaces this either
+     * way, and takes the tick back if the write failed. Returns whether any
+     * row changed.
      */
     fun setCheck(prefs: SharedPreferences, action: String, checked: Boolean): Boolean {
         val snapshot = snapshot(prefs) ?: return false
@@ -96,13 +98,24 @@ object WidgetData {
         return changed
     }
 
-    /** The rows to draw right now: the current view, filtered when it is the task list. */
+    /**
+     * The rows to draw right now: the current view, filtered when it is the
+     * task list.
+     *
+     * A ticked task row is dropped. Dart only ever puts outstanding tasks in a
+     * task view, so a ticked one is always the row the user just tapped — and
+     * it should leave the list there and then, as it does in the app, rather
+     * than sit struck through until the write comes back. Target and vision
+     * rows keep theirs: a finished target stays on the list, ticked.
+     */
     fun visibleRows(snapshot: JSONObject?, state: State): List<JSONObject> {
         val array = snapshot?.optJSONObject("views")?.optJSONArray(viewKey(state))
             ?: return emptyList()
-        val filterId = state.filterId.takeIf { state.mode == MODE_TASKS }
+        val isTaskList = state.mode == MODE_TASKS
+        val filterId = state.filterId.takeIf { isTaskList }
         return (0 until array.length())
             .mapNotNull { array.optJSONObject(it) }
+            .filter { !isTaskList || it.str("check") != CHECK_CHECKED }
             .filter { filterId == null || it.optJSONArray("filters").has(filterId) }
     }
 

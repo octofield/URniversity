@@ -3,10 +3,10 @@
 本文件描述 **URniversity** 前端（Flutter + Riverpod）與後端資料來源（Supabase／裝置本機儲存）之間的資料流動關係，
 供開發者在新增功能或修改資料結構前快速掌握「資料從哪裡來、要更新到哪裡去」。
 
-搭配閱讀：[資料字典 DD.md](./DD.md)（每個資料儲存的詳細欄位定義）。
+搭配閱讀：[資料字典 data_dictionary.md](./data_dictionary.md)（每個資料儲存的詳細欄位定義）。
 
 > **維護規則**：任何新增／修改「讀取或寫入持久化資料」的程式碼（Provider、Model、Supabase 資料表欄位、
-> SharedPreferences key）時，都必須同步更新本文件與 `DD.md`。詳見專案根目錄 `CLAUDE.md`。
+> SharedPreferences key）時，都必須同步更新本文件與 `data_dictionary.md`。詳見專案根目錄 `CLAUDE.md`。
 
 ---
 
@@ -45,7 +45,7 @@ flowchart LR
 
 - **登入模式**：資料完全存放在 Supabase（PostgreSQL 資料表），由 `user_id` 區分每位使用者。
 - **訪客模式**：資料存放在裝置本機的 SharedPreferences，不需要註冊帳號；部分資料（回收桶、自訂分類、
-  App 設定）在訪客模式下**不提供本機持久化**，只存在於當次執行的記憶體中（詳見 [DD.md](./DD.md) 附註）。
+  App 設定）在訪客模式下**不提供本機持久化**，只存在於當次執行的記憶體中（詳見 [data_dictionary.md](./data_dictionary.md) 附註）。
 - 兩種模式的切換與資料搬遷由 `sync_provider.dart` 統一協調（見 Diagram 1-A）。
 
 ---
@@ -136,7 +136,7 @@ flowchart TD
 - 三張表彼此以「邏輯外鍵」（欄位存 ID 字串，資料庫層級**未**建立實體外鍵約束）串連，形成
   `任務 → 學期目標 → 未來願景` 的三層關聯，這也是 [關聯圖頁面](../src/lib/screens/overview_graph_screen.dart)
   視覺化的資料來源。任務**只**連學期目標：`tasks.linked_goal_id`（任務直接連願景）已於 2026-09 移除，
-  欄位保留但不再讀寫（見 DD.md D1）。
+  欄位保留但不再讀寫（見 data_dictionary.md D1）。
 - 刪除學期目標／未來願景時（`remove()`）會遞迴刪除所有子孫節點；刪除前會先呼叫
   `trash_provider` 的 `addSemesterGoal()` / `addFutureGoal()` 做「軟刪除」備份（見 Diagram 1-C）。
 - `reparent()` 會檢查 `isAncestor()` 避免把節點移到自己的子孫底下，形成循環。
@@ -381,7 +381,7 @@ flowchart LR
 
 ---
 
-## 資料儲存清單（詳細欄位請見 [DD.md](./DD.md)）
+## 資料儲存清單（詳細欄位請見 [data_dictionary.md](./data_dictionary.md)）
 
 | 代號 | 名稱 | 媒介 |
 |---|---|---|

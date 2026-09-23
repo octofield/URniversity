@@ -1,7 +1,7 @@
 # 測試計畫：兩個同步失敗的診斷與修正
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
-> [../system_design.md](../system_design.md)；資料細節請見 [../DD.md](../DD.md)。
+> [../system_design.md](../system_design.md)；資料細節請見 [../data_dictionary.md](../data_dictionary.md)。
 
 ## 基本資訊
 
@@ -12,7 +12,7 @@
   2. PGRST303 —— Supabase 平台的 PostgREST bug（加上有限度的重試緩解）
   3. `restore()` 沒有清掉失效的參照——父節點那條由 `9e7d6a6` 的 A-3 變成可觸發，
      跨表連結那條（見 3-B）則是全表稽核才發現
-- 對應章節／使用案例：§3-I、UC6、UC11、DD.md D6／D7
+- 對應章節／使用案例：§3-I、UC6、UC11、data_dictionary.md D6／D7
 
 > ⚠️ **前提澄清**：問題 1 與 2 都不是重構造成的。階段 3 把 `catchError((_) {})` 換成會顯示的
 > 錯誤，才讓它們現形。問題 3 則確實是 A-3 引入的，而 A-3 已隨 `9e7d6a6` 出去了——
@@ -121,7 +121,7 @@ A-3 讓子節點也進回收桶之後才變成可觸發。
    主鍵全部是單欄且與 upsert 的衝突目標吻合（`user_categories`／`user_settings` 是
    `user_id`，其餘是 `id`），**沒有第二個 42P10**。
    稽核順帶揪出兩個問題，都已在本次修掉：
-   - `DD.md` 把 `tasks.linked_target_id`／`linked_goal_id` 寫成「邏輯 FK」，實際是真實外鍵
+   - `data_dictionary.md` 把 `tasks.linked_target_id`／`linked_goal_id` 寫成「邏輯 FK」，實際是真實外鍵
    - `sanitizeForRestore()` 原本只處理 `parent_id`，漏了這三個連結欄位（見案例 21–26）
 4. **舊備註（保留備查）**：`user_categories` 的問題藏了不知道多久，
    建議在 Dashboard 跑一次（唯讀），比對每張表的 `toJson()` 有無漏掉 NOT NULL 且無預設值的欄位：
@@ -138,5 +138,5 @@ A-3 讓子節點也進回收桶之後才變成可觸發。
    where conrelid::regclass::text in ('tasks','journals','inspirations','trash_items','user_settings','profiles')
    order by 1, 2;
    ```
-5. **教訓已寫進 `docs/DD.md` D7**：靜默 catch 讓一個壞掉的寫入路徑，在文件裡被記載成
+5. **教訓已寫進 `docs/data_dictionary.md` D7**：靜默 catch 讓一個壞掉的寫入路徑，在文件裡被記載成
    「已修好」長達數月。
