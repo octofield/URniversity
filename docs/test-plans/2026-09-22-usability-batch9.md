@@ -2,7 +2,7 @@
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
 > [../system_design.md](../system_design.md)（§2-B、§2-C、§2-H、§3-A、UC6-B）；
-> 資料細節請見 [../DD.md](../DD.md)（D19）。
+> 資料細節請見 [../data_dictionary.md](../data_dictionary.md)（D19）。
 
 ## 基本資訊
 

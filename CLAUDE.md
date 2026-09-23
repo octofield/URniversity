@@ -68,14 +68,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 6. Data Documentation Sync
 
-**`docs/DFD.md` (Data Flow Diagram) and `docs/DD.md` (Data Dictionary) are the source of truth for persisted data.**
+**`docs/data_flow_diagram.md` (Data Flow Diagram) and `docs/data_dictionary.md` (Data Dictionary) are the source of truth for persisted data.**
 
 - Before reading or reasoning about how data is stored, loaded, or flows between the app and
-  Supabase / SharedPreferences, consult `docs/DFD.md` and `docs/DD.md` first instead of
+  Supabase / SharedPreferences, consult `docs/data_flow_diagram.md` and `docs/data_dictionary.md` first instead of
   re-deriving it from provider code alone.
 - Whenever you change persisted data — adding/removing/renaming a Supabase table column, a
   SharedPreferences key, a model field, or the read/write flow of a Provider in
-  `src/lib/providers/` — update `docs/DFD.md` and `docs/DD.md` in the same change so they stay
+  `src/lib/providers/` — update `docs/data_flow_diagram.md` and `docs/data_dictionary.md` in the same change so they stay
   accurate. Treat this as part of the task, not a follow-up.
 - If a change is UI-only and touches no persisted field or data flow, no doc update is needed.
 
@@ -97,10 +97,10 @@ formats, core algorithms, operation steps, and program flowcharts.**
 ## 8. Testing Discipline
 
 **`docs/testing.md` defines the test types and methodology this project uses; `docs/system_design.md`,
-`docs/DFD.md`, and `docs/DD.md` are the source material test cases must be derived from.**
+`docs/data_flow_diagram.md`, and `docs/data_dictionary.md` are the source material test cases must be derived from.**
 
 - Before writing or running any test, read `docs/testing.md` to pick the applicable test type(s),
-  and read the relevant sections of `docs/system_design.md` / `docs/DFD.md` / `docs/DD.md` for the
+  and read the relevant sections of `docs/system_design.md` / `docs/data_flow_diagram.md` / `docs/data_dictionary.md` for the
   behavior, flow, or data being tested — don't invent test cases from assumptions.
 - Every testing session (new-feature testing or regression testing) must have a written test plan.
   Copy `docs/test-plans/TEMPLATE.md` to `docs/test-plans/YYYY-MM-DD-topic.md`, fill it in before
@@ -150,6 +150,15 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
    and `pumpApp()` reloads every provider from SharedPreferences, so seed data
    *after* the pump. Assert UI text through `StringsZhTw()` and friends, never
    as a literal. No golden tests.
+9. **Text length caps live in two places that must agree.** `InputLimits`
+   (`src/lib/core/input_limits.dart`) caps what can be typed; the columns that
+   reach Supabase carry the same cap as a `CHECK (char_length(col) <= N)` in
+   `supabase/input_length_limits.sql`, which the user runs by hand. Change a
+   number in one and change it in the other, and add both when a new free-text
+   field appears — a cap only in the app lets old builds write over-long rows,
+   and one only in the database shows up as a sync failure (`23514`) after the
+   user has typed. `SheetTextField`'s `maxLength` is required for this reason.
+   See `docs/data_dictionary.md` D0.
 
 ---
 

@@ -1,10 +1,10 @@
 # 資料字典（Data Dictionary, DD）
 
 本文件列出 **URniversity** 所有持久化資料儲存（Supabase 資料表、裝置本機 SharedPreferences）
-的欄位定義，是 [DFD.md](./DFD.md) 中每個資料儲存代號（D1～D11）的詳細展開。
+的欄位定義，是 [data_flow_diagram.md](./data_flow_diagram.md) 中每個資料儲存代號（D1～D11）的詳細展開。
 
 > **維護規則**：修改資料模型（`src/lib/models/*.dart`）、Supabase 欄位，或 SharedPreferences
-> key 時，都必須同步更新本文件與 `DFD.md`。詳見專案根目錄 `CLAUDE.md`。
+> key 時，都必須同步更新本文件與 `data_flow_diagram.md`。詳見專案根目錄 `CLAUDE.md`。
 
 ## 使用說明
 

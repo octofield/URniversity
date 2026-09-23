@@ -1,7 +1,7 @@
 # 測試計畫：使用回饋第三批（新項目置頂、依學期的連結選單、列高、任務計數）
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
-> [../system_design.md](../system_design.md)（§3-C、UC4）；資料細節請見 [../DD.md](../DD.md)。
+> [../system_design.md](../system_design.md)（§3-C、UC4）；資料細節請見 [../data_dictionary.md](../data_dictionary.md)。
 
 ## 基本資訊
 
@@ -13,7 +13,7 @@
   3. 任務／目標／願景的備註欄與任務優先度列變矮
   4. 今日頁「任務（N）」「已完成的任務（N）」
   5. 週任務頁改版：**這次只出設計稿**，實作另立計畫
-- 對應章節：§3-C、UC4；DD.md 三張表的 `sort_order`
+- 對應章節：§3-C、UC4；data_dictionary.md 三張表的 `sort_order`
 
 ## 採用的測試類型
 

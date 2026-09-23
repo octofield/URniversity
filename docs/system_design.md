@@ -4,11 +4,11 @@
 處理過程、使用者操作步驟，以及關鍵邏輯的程式流程圖。
 
 搭配閱讀：
-- [DFD.md](./DFD.md) — 資料「從哪裡來、到哪裡去」（各 Provider 與資料儲存之間的流動）
-- [DD.md](./DD.md) — 每個資料儲存的欄位定義
+- [data_flow_diagram.md](./data_flow_diagram.md) — 資料「從哪裡來、到哪裡去」（各 Provider 與資料儲存之間的流動）
+- [data_dictionary.md](./data_dictionary.md) — 每個資料儲存的欄位定義
 
 本文件回答的是「**系統怎麼運作**」，DFD／DD 回答的是「**系統存了什麼資料**」，三份文件互補，
-請勿在本文件重複抄一份欄位定義，遇到欄位細節一律連結回 DD.md。
+請勿在本文件重複抄一份欄位定義，遇到欄位細節一律連結回 data_dictionary.md。
 
 > **維護規則**：修改畫面流程、新增／調整核心演算法（任務判定、樹狀結構操作、學期計算、
 > 響應式斷點、關聯圖佈局等）時，必須同步更新本文件，包含程式流程圖。詳見專案根目錄 `CLAUDE.md`。
@@ -34,7 +34,7 @@ flowchart TD
 ```
 
 - 沒有獨立後端服務層：Riverpod 的 `StateNotifier` 同時扮演「處理程序」與「資料存取物件」，
-  細節見 [DFD.md](./DFD.md) 的圖例說明。
+  細節見 [data_flow_diagram.md](./data_flow_diagram.md) 的圖例說明。
 - 目前僅發行 Web 版本（`flutter run/build -d chrome`），行動裝置與桌面版尚未發行（見
   `README.md`「Next」小節）。
 
@@ -94,7 +94,7 @@ flowchart TD
 | Email 登入 | Email（文字）、密碼（文字，遮蔽） | 兩欄皆非空才觸發登入 | 成功→依 `_AuthGate` 導向 Home／Setup；失敗→`SnackBar` 顯示 Supabase 錯誤訊息 |
 | Google 登入 | 無（OAuth 彈出視窗） | 由 Google 端驗證 | 同上；Web 用 `Uri.base.origin` 作為 redirect，行動裝置用自訂 URL scheme |
 | 註冊 | Email、密碼、確認密碼 | 密碼需與確認密碼相同；密碼長度 ≥ 6 | 成功且需信箱驗證→提示「請確認驗證信」；成功且免驗證→直接可登入 |
-| 訪客模式 | 無 | 無 | 立即進入 `HomeScreen`，資料存本機（見 DD.md D11） |
+| 訪客模式 | 無 | 無 | 立即進入 `HomeScreen`，資料存本機（見 data_dictionary.md D11） |
 | 首次登入設定暱稱 | 使用者名稱（文字，必填）、頭像（10 選 1 或不選） | 名稱非空才能按「完成」 | 寫入 `user_settings`，之後導向 Home |
 
 **登入與註冊的版面（2026-09-23，設計稿 A）**：兩頁共用 `screens/auth/auth_layout.dart`——
@@ -176,7 +176,7 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 **拖曳排序**：任務列表與兩個目標頁共用同一套命中判定（`widgets/drag_reorder.dart`
 的 `dropZoneFor()`）——詳見 §3-C，但任務是**單層清單**，呼叫時帶 `canNest: false`，只認
 「插入到某列之前」。**子任務功能已於 2026-09-19 移除**（沒有人用；`tasks.parent_task_id`
-欄位保留但不再讀寫，見 DD.md D1）。
+欄位保留但不再讀寫，見 data_dictionary.md D1）。
 
 **欄位元件（`widgets/sheet_fields.dart`，2026-09-20 設計稿）**：四張 sheet（任務／目標／願景／
 靈感）都用同一組欄位，不再各自拼 Material 元件——
@@ -214,7 +214,7 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 | 欄位 | 輸入元件 | 格式 | 必填 |
 |---|---|---|---|
 | 標題 | 文字輸入框 | 任意字串 | ✓ |
-| 分類 | 多選 `FilterChip` | 見 DD.md `FutureCategories` 列舉 + 使用者自訂分類（顏色/圖示可自訂，見 §2-I） | ✗（預設 `other`） |
+| 分類 | 多選 `FilterChip` | 見 data_dictionary.md `FutureCategories` 列舉 + 使用者自訂分類（顏色/圖示可自訂，見 §2-I） | ✗（預設 `other`） |
 | 備註 | 文字輸入框（多行） | 任意字串 | ✗ |
 | 學期目標專屬：所屬學期 | **新增時**由目前檢視的學期分頁決定；**編輯時**為下拉選單（僅頂層目標，子目標繼承父節點學期） | `"YYY-N"` 或假期 `"YYY-Bk"`（見 §3-D） | ✓ |
 | 學期目標專屬：連結未來願景 | 清單選擇對話框 | 未來願景 id | ✗ |
@@ -290,19 +290,19 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 | 欄位 | 輸入元件 | 格式 |
 |---|---|---|
 | 語言 | 單選清單 | 繁中／English／日本語 |
-| 日期顯示格式 | 單選清單（附即時預覽） | 4 種格式，見 DD.md |
+| 日期顯示格式 | 單選清單（附即時預覽） | 4 種格式，見 data_dictionary.md |
 | 預設任務檢視 | 單選清單 | 全部／每日／每週 |
 | 學期制度 | 數字選擇 + 每學期起始月 | 每年 2/3/4 學期，起始月 1–12 |
 | 日記天數徽章開關 | `Switch` | 開／關 |
 | 開發者模式時間覆寫 | 日期選擇器 | 覆寫「現在時間」，僅供測試用（見 §4-J） |
 
-輸出：即時套用到對應畫面；非訪客模式會非同步寫回 `user_settings`（見 DFD.md Diagram 1-D）。
+輸出：即時套用到對應畫面；非訪客模式會非同步寫回 `user_settings`（見 data_flow_diagram.md Diagram 1-D）。
 
 ### 2-F 意見回饋（設定頁）
 
 輸入：類型（bug／建議，`SegmentedButton`）、內容（文字，10～1000 字）。
 輸出：成功→關閉對話框；失敗（低於 10 字／5 分鐘內重複送出／網路錯誤）→在輸入框下方顯示對應
-錯誤訊息，不關閉對話框。完全匿名，無法在 App 內查看歷史紀錄（見 DD.md D9）。
+錯誤訊息，不關閉對話框。完全匿名，無法在 App 內查看歷史紀錄（見 data_dictionary.md D9）。
 
 ### 2-G 關聯圖（OverviewGraphScreen）
 
@@ -361,7 +361,7 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 | 刪除 | 垃圾桶 icon（僅自訂分類） | 內建 6 分類無法刪除 |
 
 輸出：即時套用到所有顯示該分類的畫面（目標/願景卡片色條、關聯圖節點、任務左側連結色條等），
-非訪客模式非同步寫回 `user_categories.styles`（見 DD.md D7；需要先手動執行一次資料庫 migration
+非訪客模式非同步寫回 `user_categories.styles`（見 data_dictionary.md D7；需要先手動執行一次資料庫 migration
 才會生效）。
 
 ### 2-J 我的頁（MeScreen）
@@ -411,7 +411,7 @@ B 的數字卡）：
 **計數器只在達到上限 80% 時出現**（`nearLimitCounter`，`widgets/sheet_fields.dart`）：常駐會讓每張
 sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說得出「為什麼打不進去」。`SheetTextField`
 的 `maxLength` 是**必填**，新增 sheet 欄位時不會忘了設。
-會存進資料庫的欄位**資料庫端也有同樣的 CHECK**（`supabase/input_length_limits.sql`，見 DD.md D0）。
+會存進資料庫的欄位**資料庫端也有同樣的 CHECK**（`supabase/input_length_limits.sql`，見 data_dictionary.md D0）。
 
 ## 3. 處理過程（核心演算法）
 
@@ -618,7 +618,7 @@ IconButton 的觸控範圍，也放得下 headlineSmall），三條線在左、�
 
 ### 3-I 身分驗證與資料同步協調
 
-由 `sync_provider.dart` 統籌，完整流程與時序見 [DFD.md](./DFD.md) Diagram 1-A，本文件不重複。
+由 `sync_provider.dart` 統籌，完整流程與時序見 [data_flow_diagram.md](./data_flow_diagram.md) Diagram 1-A，本文件不重複。
 
 **寫入失敗的處理**（`synced_list_notifier.dart`）：本 App 的寫入是「本地樂觀更新 +
 雲端 fire-and-forget」，一旦推送失敗就不會再回頭補，本地與雲端會永久分歧。因此
@@ -855,7 +855,7 @@ flowchart TD
 2. 輸入 Email／密碼／確認密碼 → 前端檢查兩次密碼相同、長度 ≥ 6。
 3. 送出 → Supabase `signUp()`；若需信箱驗證，提示後返回登入頁；否則可直接登入。
 4. 返回 `LoginScreen` 輸入帳密登入 → `authStateProvider` 偵測到 session → `sync_provider` 依
-   序載入 8 種資料（見 DFD.md Diagram 1-A）。
+   序載入 8 種資料（見 data_flow_diagram.md Diagram 1-A）。
 5. 若為 Email 帳號且尚未設定暱稱 → 導向 `SetupProfileScreen`，輸入暱稱與頭像後才進首頁。
 
 **驗證信的寄送機制：**
@@ -1110,9 +1110,13 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
    （沒有篩選時顯示「篩選」）。點篩選 → 清單換成挑選器：
    第一列固定是「全部」，接著是**依學期分組**的頂層目標，再接著是願景（不分組，
    因為願景跨學期、沒有單一歸屬）。選一個就回到任務清單並套用。
-4. 勾選任務的勾選框 → 框當下播放勾選動畫、標題加刪除線 → **App 不會打開**，
-   背景引擎直接寫入（已登入寫 Supabase、訪客寫本機）→ 寫完該列從清單消失。
-5. 若那次寫入失敗 → 勾選被取回 → 記進 D14 → **下次開 App 時跳出同步失敗提示**（與通知同一條路徑）。
+4. 勾選任務的勾選框 → **該列當下就從清單消失**（和 App 裡一樣，不等寫入回來；2026-09 第十一批，
+   先前是先加刪除線、等寫完才消失）→ **App 不會打開**，背景引擎直接寫入（已登入寫 Supabase、訪客寫本機）。
+   原生端先把該列標成已勾（`WidgetData.setCheck()`），畫的時候跳過**任務檢視裡已勾的列**
+   （`visibleRows()`）——Dart 的 snapshot 只會放未完成的任務，所以已勾的列必定就是剛剛點的那一列。
+   目標／願景檢視不套這條：完成的目標要留在清單上打勾。
+5. 若那次寫入失敗 → 勾選被取回（`untickInSnapshot()`，該列重新出現）→ 記進 D14 →
+   **下次開 App 時跳出同步失敗提示**（與通知同一條路徑）。
 6. 點一列的本體 → 開啟 App 並跳到該任務的編輯 sheet，或該目標／願景的詳情頁。
 7. App 在前景時的任何資料變動都會即時推給小工具。
    ⚠️ **但沒有定時的雲端輪詢**：在另一台裝置改了資料，而這台的 App 完全沒開過、
@@ -1268,7 +1272,7 @@ flowchart TD
 
 ## 6. 畫面 → Provider → 資料儲存 對照表
 
-| 畫面 | 主要 Provider | 對應資料儲存（見 DD.md） |
+| 畫面 | 主要 Provider | 對應資料儲存（見 data_dictionary.md） |
 |---|---|---|
 | `TodayScreen` / `TaskHistoryScreen` | `tasksProvider` | D1 `tasks` |
 | `SemesterScreen` / `SemesterGoalDetailScreen` | `semesterGoalsProvider` | D2 `semester_goals` |

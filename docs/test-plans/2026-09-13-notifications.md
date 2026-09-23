@@ -1,7 +1,7 @@
 # 測試計畫：Phase 1 通知功能
 
 > 測試方法定義請見 [../testing.md](../testing.md)；使用案例與流程圖請見
-> [../system_design.md](../system_design.md)（UC13、§3-K）；資料細節請見 [../DD.md](../DD.md)（D13）。
+> [../system_design.md](../system_design.md)（UC13、§3-K）；資料細節請見 [../data_dictionary.md](../data_dictionary.md)（D13）。
 
 ## 基本資訊
 
@@ -13,7 +13,7 @@
   - 排程計算做成純函式（`core/notification_schedule.dart`），與平台層完全分離
   - 所有通知常數集中在 `core/notification_constants.dart`
   - 新增 `semesterStart()` / `semesterEnd()`，並讓 `currentSemester()` 改用前者
-- 對應章節／使用案例：UC13（新增）、§3-D（擴充）、§3-K（新增）、DD.md D13（新增）、DFD.md 1-F（新增）
+- 對應章節／使用案例：UC13（新增）、§3-D（擴充）、§3-K（新增）、data_dictionary.md D13（新增）、data_flow_diagram.md 1-F（新增）
 
 ## 採用的測試類型
 
