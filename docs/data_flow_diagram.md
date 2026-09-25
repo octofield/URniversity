@@ -127,6 +127,11 @@ flowchart TD
     User -- "新增/編輯/拖曳排序/刪除未來願景" --> PF
     PF <--> DF
 
+    TPL["goal_templates\n靜態常數（非資料儲存）"]
+    User -- "目標頁 ✨ 套用範本" --> TPL
+    TPL -- "批次 addGoal()／add()\n父節點先於子節點" --> PS
+    TPL -- " " --> PT
+
     PT -. "linked_target_id → semester_goals.id" .-> DS
     PS -. "future_goal_id → future_goals.id" .-> DF
     PS -. "parent_id → 自身（子目標樹）" .-> DS
@@ -139,6 +144,9 @@ flowchart TD
   欄位保留但不再讀寫（見 data_dictionary.md D1）。
 - 刪除學期目標／未來願景時（`remove()`）會遞迴刪除所有子孫節點；刪除前會先呼叫
   `trash_provider` 的 `addSemesterGoal()` / `addFutureGoal()` 做「軟刪除」備份（見 Diagram 1-C）。
+- 目標範本（`core/goal_templates.dart`）**不是一個資料儲存**，是編進 App 的靜態常數；
+  套用時走的完全是既有的 `addGoal()` / `add()` 寫入路徑，產生的列與手動建立的沒有任何差別
+  （沒有「來自範本」的欄位）。寫入順序與 id 不碰撞的理由見 system_design.md §3-N。
 - `reparent()` 會檢查 `isAncestor()` 避免把節點移到自己的子孫底下，形成循環。
 
 ---
@@ -159,7 +167,7 @@ flowchart TD
     DTr[("D6 trash_items")]
     DC[("D7 user_categories")]
 
-    User -- "新增/完成/編輯/刪除靈感" --> PI --> DI
+    User -- "新增/完成/封存/編輯/刪除靈感" --> PI --> DI
     User -- "撰寫/編輯/刪除日記" --> PJ --> DJ
     PJ -- "_fillMissingDays()\n自動補齊未寫日記的天數" --> DJ
 
@@ -180,6 +188,9 @@ flowchart TD
   的日記（`id` 以 `auto_` 開頭），並寫回資料儲存。
 - 回收桶（`trash_items`）與自訂分類（`user_categories`）**只在登入模式下持久化**；訪客模式下這兩者
   仍可在畫面上操作，但只存在記憶體中，重新整理或結束訪客模式後即消失。
+- 靈感的「封存」（`is_archived`，見 data_dictionary.md D4）走的是與「完成」完全相同的寫入路徑
+  （`toggleArchived()` → `update()` → `upsert()`），沒有另一條資料流；差別只在讀取端的過濾條件，
+  Today 頁與「我的」頁的靈感區塊都排除已封存的筆數。
 - 分類管理有兩個入口都會操作同一個 `categories_provider`：願景頁「更多分類」對話框，以及
   設定頁「分類設定」（`CategorySettingsScreen`）。兩者共用 `src/lib/widgets/category_manager.dart`
   裡的同一份列表項目／顏色選擇器／圖示選擇器邏輯，避免分類管理規則寫兩份。
@@ -406,3 +417,4 @@ flowchart LR
 | D19 | `task_sort` | 裝置本機 SharedPreferences（任務清單的排序方式） |
 | D20 | `target_sort` | 裝置本機 SharedPreferences（目標頁的排序方式；只影響顯示順序，不寫回 D2） |
 | D21 | `vision_sort` | 裝置本機 SharedPreferences（願景頁的排序方式；只影響顯示順序，不寫回 D3） |
+| D22 | `onboarding_done` | 裝置本機 SharedPreferences（新手導覽哪幾章跑過，StringList；不上雲、不進訪客資料清單） |

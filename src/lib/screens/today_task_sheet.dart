@@ -381,7 +381,7 @@ void showTaskSheet(
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
-                SheetTextField(
+                TourAnchor(id: 'task.title', child: SheetTextField(
                   label: s.titleField,
                   controller: titleController,
                   maxLength: InputLimits.title,
@@ -397,7 +397,7 @@ void showTaskSheet(
                             recurrence,
                             linkedTargetId,
                           ),
-                ),
+                )),
                 const SizedBox(height: AppSpacing.sm),
                 // One short line at rest, growing to three
                 SheetTextField(
@@ -407,7 +407,7 @@ void showTaskSheet(
                   maxLines: 3,
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _linkRow(
+                TourAnchor(id: 'task.due', child: _linkRow(
                   icon: Icons.calendar_today_outlined,
                   label: dueTime != null ? _formatDueTime(dueTime!) : s.dueTime,
                   active: dueTime != null,
@@ -416,7 +416,7 @@ void showTaskSheet(
                     if (result != null) setState(() => dueTime = result);
                   },
                   onClear: () => setState(() => dueTime = null),
-                ),
+                )),
                 _suggestionChips(sheetCtx, [
                   // "In a few minutes" first: a task being written down now is
                   // usually about to be done now. Remembered clock times follow
@@ -430,7 +430,7 @@ void showTaskSheet(
                     (clock, () => setState(() => dueTime = suggestedDueDate(clock, DateTime.now()))),
                 ]),
                 const SizedBox(height: 2),
-                _linkRow(
+                TourAnchor(id: 'task.repeat', child: _linkRow(
                   icon: Icons.repeat,
                   label: (recurrence == null || recurrence!.isNone)
                       ? s.repeatNone
@@ -442,9 +442,9 @@ void showTaskSheet(
                   },
                   onClear: () =>
                       setState(() => recurrence = const RecurrenceRule(type: RecurrenceType.none)),
-                ),
+                )),
                 const SizedBox(height: 2),
-                _linkRow(
+                TourAnchor(id: 'task.link', child: _linkRow(
                   accent: taskLinkColor(
                     ref.read(categoriesProvider),
                     linkedTarget,
@@ -464,13 +464,13 @@ void showTaskSheet(
                     (id) => setState(() => linkedTargetId = id),
                   ),
                   onClear: () => setState(() => linkedTargetId = null),
-                ),
+                )),
                 _suggestionChips(sheetCtx, [
                   for (final target in targetSuggestions)
                     (target.title, () => setState(() => linkedTargetId = target.id)),
                 ]),
                 const SizedBox(height: AppSpacing.md),
-                SizedBox(
+                TourAnchor(id: 'task.submit', child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () {
@@ -509,7 +509,7 @@ void showTaskSheet(
                     },
                     child: Text(isEdit ? s.save : s.add),
                   ),
-                ),
+                )),
               ],
             ),
           );
@@ -564,12 +564,12 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
         children: [
           Text(s.addInspiration, style: Theme.of(sheetCtx).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
-          SheetTextField(
+          TourAnchor(id: 'insp.title', child: SheetTextField(
             label: s.titleField,
             controller: titleController,
             maxLength: InputLimits.title,
             autofocus: true,
-          ),
+          )),
           const SizedBox(height: 12),
           SheetTextField(
             label: s.inspirationDetails,
@@ -578,7 +578,7 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
             maxLines: 3,
           ),
           const SizedBox(height: AppSpacing.md),
-          SizedBox(
+          TourAnchor(id: 'insp.submit', child: SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: () {
@@ -596,7 +596,7 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
               },
               child: Text(s.add),
             ),
-          ),
+          )),
         ],
       ),
     ),

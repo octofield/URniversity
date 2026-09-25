@@ -11,6 +11,7 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/sheet_fields.dart' show nearLimitCounter;
+import '../widgets/coach_mark.dart';
 
 class JournalEditScreen extends ConsumerStatefulWidget {
   // null = add mode, non-null = edit mode
@@ -161,7 +162,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                               ],
                             ),
                             const SizedBox(height: AppSpacing.xs),
-                            TextField(
+                            TourAnchor(id: 'journal.content', child: TextField(
                               controller: _contentCtrl,
                               autofocus: true,
                               minLines: 6,
@@ -183,7 +184,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                                 isDense: true,
                                 contentPadding: EdgeInsets.zero,
                               ),
-                            ),
+                            )),
                           ],
                         ),
                       ),
@@ -209,7 +210,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                       ),
                     ),
                     const Spacer(),
-                    FilledButton(
+                    TourAnchor(id: 'journal.save', child: FilledButton(
                       onPressed: _save,
                       style: FilledButton.styleFrom(
                         shape: RoundedRectangleBorder(
@@ -222,7 +223,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                         _isEdit ? s.save : s.add,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    ),
+                    )),
                   ],
                 ),
               ),

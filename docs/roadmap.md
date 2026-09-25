@@ -29,7 +29,7 @@
 | [Phase 0.5](#phase-05驗證地基) | 自動化測試 + 手動 P0 清單 | ⏳ 自動測試完成（78 → 135）／手動待跑 |
 | [Phase 1](#phase-1通知) | ① 通知功能 | ✅ 程式碼完成／⏳ 實機驗證待跑 |
 | [Phase 2](#phase-2android-widget) | ② Android widget | ✅ 程式碼完成／⏳ 實機驗證待跑 |
-| [Phase 3](#phase-3新手留存) | ⑩ 新手教學與模板、⑨ 靈感歸檔 | |
+| [Phase 3](#phase-3新手留存) | ⑩ 新手教學與模板、⑨ 靈感歸檔 | ✅ 程式碼完成／⏳ SQL 待執行、手動驗證待跑 |
 | [Phase 4](#phase-4回顧系統) | ⑥ 回顧系統 | |
 | [Phase 5](#phase-5課表) | ③ 課表 | |
 | [Phase 6](#phase-6學分與-gpa) | ④ 學分與 GPA 追蹤 | |
@@ -170,8 +170,32 @@ Phase 3 才補。
 | l10n | 四個檔案（`app_strings.dart` + 三個實作）。模板內容本身要不要在地化是個待決定的問題 |
 | 測試 | 新測試計畫；模板的批次建立適合寫成單元測試（驗證 N 筆資料的 id 全不相同）。**做完要回頭重測 Phase 1 的通知**（見上方代價） |
 
-**待決定**（開工前要先問）：模板是「一鍵建立一整組目標」還是「範例資料可編輯」？
-新手教學是逐步導覽（coach mark）還是一次性的說明頁？
+**已決定**（2026-09-25 開工前問過）：模板是**一鍵建立一整組目標**（寫進使用者自己的真實資料，
+之後可任意編輯／刪除，不是唯讀範例）；新手教學是**逐步導覽（coach mark）**，不是一次性說明頁。
+
+**產出**（2026-09-25）：`core/goal_templates.dart`（三個範本，內容走 l10n）、
+`widgets/goal_template_sheet.dart`（`applyGoalTemplate()` + 挑選 sheet）、
+`widgets/coach_mark.dart`（聚光燈導覽元件）、`providers/onboarding_provider.dart`、
+`supabase/inspiration_archive.sql`。
+文件：data_dictionary.md D4／D22、data_flow_diagram.md Diagram 1-B／1-C、
+system_design.md §2-L／§3-N／§3-O／UC15／UC16。
+自動測試 395 → 417。
+
+**導覽重做**（2026-09-25，同日）：第一版只有 5 步、只指向導覽列與新增鈕，你評為太粗糙。
+改成**每個分頁一章、第一次進到該分頁才播放**，而且是**親手操作**：光圈打在真的＋上、跟進真的
+sheet 逐欄標示，使用者按下「新增」才前進（關掉沒存就倒回）。設定頁有常駐的「新手指南」可重播
+任何一章。新增 `screens/home_tour.dart`（四章內容）、`widgets/tour_guide_sheet.dart`；
+`coach_mark.dart` 改寫為錨點＋路由感知的引擎；D22 由 `onboarding_seen`（bool）改為
+`onboarding_done`（每章一個 id）。自動測試 417 → 430。
+**代價**：重播章節時新增的內容會真的存下來（指南頁有註明）；鍵盤、返回手勢、螢幕報讀
+這幾類行為只能實機驗（見測試計畫）。
+
+**未完成**：[test-plans/2026-09-25-phase3-onboarding-chapters.md](./test-plans/2026-09-25-phase3-onboarding-chapters.md)
+的手動案例（導覽）；以及 [test-plans/2026-09-25-phase3-onboarding-templates.md](./test-plans/2026-09-25-phase3-onboarding-templates.md)
+的手動案例 21–24、27–33（封存、範本、通知），其中：
+- **前置作業 P1**：`supabase/inspiration_archive.sql` 要在 Supabase SQL 編輯器手動跑過，
+  否則登入帳號封存靈感會寫入失敗。
+- 案例 31–33 就是上面那筆**通知的欠款**（範本產生一批資料後回頭重測 Phase 1）。
 
 ---
 
@@ -241,3 +265,4 @@ Phase 3 才補。
 |---|---|---|---|
 | 2026-09-12 | ② Android widget：Phase 5 → 3 | 我自己要先用 | ⑥ 回顧往後挪 |
 | 2026-09-12 | ① 通知 → Phase 1、② widget → Phase 2、⑩⑨ 新手留存 → Phase 3 | 我自己要先用 | 通知只會用手動建立的資料驗證過，Phase 3 後要回頭重測；Phase 3 完成前發給同學，開場是空白畫面 |
+| 2026-09-25 | Phase 3 程式碼完成 | — | 導覽只介紹四個分頁的分工，沒有逐一介紹每頁內部的功能（理由見 §3-O）；靈感封存要先手動跑一次 SQL 才能在登入帳號下使用 |

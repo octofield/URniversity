@@ -18,11 +18,13 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/link_color_bar.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/goal_template_sheet.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
 import '../widgets/swipe_switcher.dart';
 import '../widgets/semester_list_dialog.dart';
 import '../widgets/sort_sheet.dart';
+import '../widgets/coach_mark.dart';
 import 'overview_graph_screen.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
@@ -357,9 +359,10 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
             itemCount: groups.length + 1,
             itemBuilder: (ctx, i) {
               if (i == groups.length) return _endGapZone(groups);
+              final card = _buildGroupCard(groups[i], allGoals, i, groups);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _buildGroupCard(groups[i], allGoals, i, groups),
+                child: i == 0 ? TourAnchor(id: 'semester.firstCard', child: card) : card,
               );
             },
           );
@@ -397,6 +400,12 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
               onDone: () =>
                   ref.read(targetSortModeProvider.notifier).state = false,
             ),
+            TourAnchor(id: 'semester.templates', child: IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: s.goalTemplates,
+              visualDensity: VisualDensity.compact,
+              onPressed: () => showGoalTemplateSheet(context, ref),
+            )),
             IconButton(
               icon: const Icon(Icons.hub_outlined),
               tooltip: s.overview,
@@ -417,7 +426,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
-        const _SemesterPicker(),
+        const TourAnchor(id: 'semester.picker', child: _SemesterPicker()),
         const SizedBox(height: AppSpacing.sm),
         Expanded(
           child: isDesktop

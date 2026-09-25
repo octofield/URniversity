@@ -11,16 +11,25 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/sheet_fields.dart' show nearLimitCounter;
+import '../widgets/coach_mark.dart';
 
-class InspirationsScreen extends ConsumerWidget {
+class InspirationsScreen extends ConsumerStatefulWidget {
   const InspirationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InspirationsScreen> createState() => _InspirationsScreenState();
+}
+
+class _InspirationsScreenState extends ConsumerState<InspirationsScreen> {
+  bool _archivedExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final all = ref.watch(inspirationsProvider);
-    final active = all.where((i) => !i.isCompleted).toList();
-    final done = all.where((i) => i.isCompleted).toList();
+    final active = all.where((i) => !i.isCompleted && !i.isArchived).toList();
+    final done = all.where((i) => i.isCompleted && !i.isArchived).toList();
+    final archived = all.where((i) => i.isArchived).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text(s.allInspirations)),
@@ -36,7 +45,9 @@ class InspirationsScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               ...active.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _InspirationCard(item: item),
+                child: item == active.first
+                    ? TourAnchor(id: 'inspirations.list', child: _InspirationCard(item: item))
+                    : _InspirationCard(item: item),
               )),
               const SizedBox(height: AppSpacing.lg),
             ],
@@ -50,6 +61,43 @@ class InspirationsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _InspirationCard(item: item),
               )),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            if (archived.isNotEmpty) ...[
+              InkWell(
+                onTap: () => setState(() => _archivedExpanded = !_archivedExpanded),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Row(
+                    children: [
+                      Text(s.archived, style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textTertiary,
+                      )),
+                      const SizedBox(width: AppSpacing.xs),
+                      AnimatedRotation(
+                        turns: _archivedExpanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: !_archivedExpanded
+                    ? const SizedBox(width: double.infinity)
+                    : Column(
+                        children: archived.map((item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _InspirationCard(item: item),
+                        )).toList(),
+                      ),
+              ),
             ],
             if (all.isEmpty)
               Center(
@@ -115,6 +163,11 @@ class _InspirationCard extends ConsumerWidget {
                 ),
               ),
             ),
+          ),
+          IconButton(
+            icon: Icon(item.isArchived ? Icons.unarchive_outlined : Icons.archive_outlined, size: 18),
+            tooltip: item.isArchived ? s.unarchive : s.archive,
+            onPressed: () => ref.read(inspirationsProvider.notifier).toggleArchived(item.id),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 18),

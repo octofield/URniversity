@@ -379,7 +379,7 @@ B 的數字卡）：
 | 任務 | `tasksProvider` 中今天**尚未完成**的筆數 | 只算還開著的：一個永遠往上加的總數說不出這學期過得如何 |
 | 目標 | `semesterGoalsProvider` 中目前學期、**頂層、未完成**的筆數 | 不含里程碑；跟著目標頁目前選的學期走 |
 | 願景 | `futureGoalsProvider` 中**頂層、未完成**的筆數 | 不含子願景 |
-| 靈感 | `inspirationsProvider` 中**尚未完成**的筆數 | 已完成的不算 |
+| 靈感 | `inspirationsProvider` 中**尚未完成且未封存**的筆數 | 已完成的、已封存的都不算 |
 
 連續寫日記天數（`journalStreak()`，`core/me_stats.dart`）**移到日記區塊的標題旁**（`_StreakChip`，
 只在大於 0 時出現）：那個數字只有在日記旁邊才說得通。計算方式不變——從今天往回數，
@@ -412,6 +412,29 @@ B 的數字卡）：
 sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說得出「為什麼打不進去」。`SheetTextField`
 的 `maxLength` 是**必填**，新增 sheet 欄位時不會忘了設。
 會存進資料庫的欄位**資料庫端也有同樣的 CHECK**（`supabase/input_length_limits.sql`，見 data_dictionary.md D0）。
+
+---
+
+### 2-L 靈感封存（Phase 3）
+
+`InspirationsScreen` 把清單分成**三段**，依序排列：
+
+| 區塊 | 條件 | 預設狀態 |
+|---|---|---|
+| 進行中 | `!isCompleted && !isArchived` | 展開 |
+| 已完成 | `isCompleted && !isArchived` | 展開 |
+| 已封存 | `isArchived`（不論完成與否） | **收合**，點標題展開 |
+
+**輸入**：每張靈感卡片的封存鈕（`Icons.archive_outlined`／已封存時 `Icons.unarchive_outlined`）
+呼叫 `InspirationsNotifier.toggleArchived(id)`。**沒有確認對話框**——封存是可逆的，
+確認框只留給刪除（`confirmDelete`）。
+
+**為什麼是獨立的一軸而不是第三種完成狀態**：一個還沒動手、也不打算動手的點子需要一個去處，
+但把它標成「已完成」是謊話。所以 `is_archived` 與 `is_completed` 互不影響，取消封存後回到
+原本該在的區塊。
+
+**連帶影響**：Today 頁靈感區塊、「我的」頁靈感區塊與 §2-J 的靈感計數都排除已封存的筆數；
+否則封存等於什麼都沒發生。
 
 ## 3. 處理過程（核心演算法）
 
@@ -843,6 +866,127 @@ flowchart TD
 
 ---
 
+### 3-N 目標範本的批次建立（`widgets/goal_template_sheet.dart`）
+
+範本本身是**純資料**（`core/goal_templates.dart`）：`GoalTemplate` → `TemplateGoal` →
+`TemplateMilestone` → 任務字串。每個文字欄位都是 `String Function(AppStrings)`，
+所以範本內容跟著 App 語言走，而不是寫死的中文。
+
+`applyGoalTemplate(ref, template, s, semester)` 的寫入順序：
+
+```
+for 每個 TemplateGoal:
+    goalId ← addGoal(title, semester, categories)          // 頂層目標
+    for 每個 TemplateMilestone:
+        msId ← addGoal(title, semester, parentId: goalId,  // 里程碑
+                       categories: 該目標的 categories)     // 分類跟著父目標
+        for 每個任務字串:
+            add(title, linkedTargetId: msId)               // 任務掛在里程碑上
+```
+
+三件事是刻意的：
+
+1. **父節點先於子節點**。`parent_id` 是真的外鍵，先送子節點會被拒絕——與
+   `mergeOrder()`（§3-I）擋的是同一個坑。
+2. **里程碑帶走父目標的分類**，與手動新增里程碑的行為一致（`semester_goal_detail_screen.dart`
+   也是這樣傳 `categories`）。
+3. **沒有任何一列帶 `future_goal_id`**。只有手動連結的頂層目標才有（§9 rule 7 / UC4）。
+
+`goalCount`（頂層＋里程碑）與 `taskCount` 由範本自己算出來，sheet 的預覽數字與 SnackBar
+的回報數字都讀同一個來源，不會與實際建立的筆數不一致。
+
+**id 不會碰撞**：每次 `addGoal()` / `add()` 都各自呼叫一次 `newRowId()`，而它每次重新取亂數
+（見 D0 與 `test/row_id_test.dart`）。這正是 Phase 0 修掉的那個問題最容易復發的場景，
+所以 `test/goal_template_test.dart` 直接斷言「連續套用全部範本兩次，所有 id 互不相同」。
+
+---
+
+### 3-O 新手導覽：分頁章節與親手操作（`widgets/coach_mark.dart`、`screens/home_tour.dart`）
+
+**章節**：四個分頁各一章（`kTourChapters = today / semester / future / me`），內容寫在
+`tourChapter(id, ref, s)`。`HomeScreen` 在「第一次顯示該分頁」時播放該章（見 UC16），
+章節不會自己切分頁——最後一步是「點下一個分頁」，點下去就落到下一章的起點。
+
+**光圈是真的洞**：遮罩只在光圈**四周**放四塊擋板，光圈本身是空的，點擊直接落到底下的真元件；
+使用者是親手點＋、親手在 sheet 裡打字、親手按「新增」。畫遮罩的 `CustomPaint` 必須包
+`IgnorePointer`——有 painter 的 `CustomPaint` 預設算「有點到」，會把應該穿透的點擊吃掉
+（`custom_paint.dart` 的 `hitTestSelf`）。**點遮罩不再前進**：動作步驟上，誤點不能算完成。
+
+**錨點**：`TourAnchor(id: 'task.title', child: …)` 標在要指的元件上，登記進一個靜態表；
+同一個 id 可以同時存在多份（上一個 sheet 還在退場、新的已經打開；手機的篩選 chip 列與桌面的
+側欄），量測時取**最後登記且已排版**的那一份。用字串 id 而不是 `GlobalKey`：sheet builder
+內的欄位不需要把狀態搬到 builder 外（CLAUDE.md 規則 3），也不會撞 duplicate key。
+
+**步驟種類**（`TourStepKind`）決定光圈放行什麼、什麼讓它前進：
+
+| 種類 | 光圈內可操作 | 前進的條件 | 卡片按鈕 |
+|---|---|---|---|
+| `info` | 否（只是標示） | 按「知道了」 | 知道了／完成 |
+| `field` | 是（打字、點開選擇器） | 按「知道了」 | 知道了 |
+| `tap` | 是 | 光圈內有 pointer up | 先跳過這步 |
+| `open` | 是 | **有路由被 push**（sheet 或頁面打開了） | 先跳過這步 |
+| `close`（有 `count`） | 是 | 該路由 pop，且**筆數有增加** | 先跳過這步 |
+| `close`（沒有 `count`，逛頁面） | 否 | 該路由 pop | 回去 |
+
+```mermaid
+stateDiagram-v2
+    [*] --> Open: 進入 open 步驟
+    Open --> Inside: 使用者點光圈，路由 push<br/>記下 (route, 筆數)
+    Open --> After: 先跳過這步（跳過整段）
+    Inside --> Inside: field 步驟「知道了」／上一步
+    Inside --> Hidden: 欄位打開日期選擇器、下拉選單<br/>（最上層不是這一段的路由）
+    Hidden --> Inside: 選擇器關閉
+    Inside --> After: 路由 pop 且筆數增加<br/>下一張卡顯示「✓ 完成」
+    Inside --> Open: 路由 pop 但筆數沒增加<br/>卡片顯示「沒存到也沒關係」
+    Inside --> After: close 上「先跳過這步」<br/>導覽自己關掉 sheet、不存檔
+    After --> [*]
+```
+
+**路由感知**：`tourRouteObserver`（`NavigatorObserver`，註冊在 `MaterialApp.navigatorObservers`）
+回報最上層路由與 push／pop。每一步屬於某一層路由（`_routes` 堆疊：起點是 HomeScreen，
+每個完成的 `open` 推一層）；**最上層不是當前步驟的路由時，導覽整個不畫**（連 hit-test 都不參與），
+所以欄位打開的日期選擇器、重複設定對話框、下拉選單都能正常操作，關掉後卡片自動回來。
+這個判斷之所以必要，是因為 `Navigator` 每次 push 都會 `overlay.rearrange()`，把非路由的
+overlay entry（導覽）**留在最上層**（`navigator.dart` 的 `_flushHistoryUpdates`、
+`overlay.dart` 的 `rearrange`）——不隱藏的話，對話框會被遮罩壓住。
+
+**怎麼知道使用者「真的存了」**：`open` 步驟在路由 push 的當下讀一次 `count()`
+（例如 `tasksProvider.length`），路由 pop 時再讀一次。每個新增函式都是**先同步改 state、
+再 `Navigator.pop`**，所以 pop 的當下筆數已經增加。日記的計數只算 `isWrittenByUser`
+的筆數，避開自動補齊的列。
+
+**上一步**只在前一步是 `info`／`field` 而且在同一層路由時出現（`_backFloor`）：
+絕不跨越已完成的動作——不會把 sheet 退回去、也不會刪掉剛存的資料。
+
+**`when`**：進入步驟時為 false 就跳過；`open` 會連整段一起跳過。例如使用者沒建學期目標，
+「打開目標 → 新增里程碑」整段自動略過；沒有願景時，「連到願景」那一格不介紹。
+
+**量測**：進入步驟先 `Scrollable.ensureVisible`（把「我的」頁下方的日記區、被鍵盤擋住的欄位
+捲進畫面），再**每一幀量一次，直到連續 2 幀不動**（上限 40 幀），涵蓋路由滑入、捲動與鍵盤升起。
+量不到時：`tap`／`open` 自動跳過（點不到不存在的東西）；其他步驟照常顯示卡片、不挖洞。
+轉向、改視窗大小（`didChangeMetrics`）與每次 pointer up（例如拖動新增鈕）都會重新量。
+
+**光圈的樣子**（參考 Intro.js、Driver.js 與 Flutter 的 showcaseview／tutorial_coach_mark）：
+
+- **目標以原本的亮度露出來**：遮罩用 even-odd 填色——整個畫面的矩形裡再加一個圓角矩形，
+  重疊的部分不上色。第一版用 `Path.combine(difference)` 挖洞，實機上目標跟四周一樣暗，
+  只剩一圈外框看得出被選到（2026-09-25 回報）。`coach_mark_test.dart` 把 painter 畫成點陣圖
+  讀像素，確認目標中央完全沒被蓋到。
+- **換步驟時光圈滑過去**（280 ms，easeOutCubic），不是閃掉再出現；量到新位置之前保留舊的光圈。
+- **要使用者點的步驟**（`tap`、`open`、要按「新增」的 `close`）光圈外會**擴散出一圈主色的脈動**，
+  每步三次後停下，不會一直閃。只是看的步驟（`info`、`field`、逛頁面）沒有脈動。
+- 光圈邊緣一圈白色細框；遮罩透明度 0.6。
+
+**卡片**：放在光圈上方或下方空間較大的一側，以「畫面高 − 鍵盤高」計算，最高佔 40%、
+內容可捲動；朝光圈那一邊有一個**小三角指向目標中心**。上方一列是「第幾站 / 共幾站」
+（一整個 open…close 段落算一站），段落內再加「· 2 / 5」；右上 ✕「略過這章」（視同看過）。
+
+**導覽必須跟著 `HomeScreen` 一起下台**：`OverlayEntry` 的壽命比插入它的 widget 長，所以
+`CoachMarkOverlay.show()` 回傳 dismiss 函式，由 `HomeScreen.dispose()` 呼叫；這條路徑
+**不**標記完成——使用者根本沒看完，下次還是要放。
+
+---
+
 ## 4. 系統操作步驟（主要使用案例）
 
 ### UC1　以訪客身分開始使用
@@ -1125,6 +1269,51 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 
 ---
 
+### UC15　套用目標範本（Phase 3）
+
+1. 目標頁頁首點 ✨（`Icons.auto_awesome_outlined`，常駐，不只在清單空的時候出現）→
+   開啟「目標範本」sheet。
+2. sheet 列出 `kGoalTemplates` 的每個範本：名稱、一句說明、以及**會建立幾個目標與幾個任務**
+   （`templateContents()`，數字由 `GoalTemplate.goalCount` / `taskCount` 當場算出，不是手寫的）。
+3. 點「套用範本」→ `applyGoalTemplate()` 依序寫入（見 §3-N）→ sheet 關閉 →
+   SnackBar 回報「已建立 N 個目標、M 個任務」。
+4. 建立出來的目標／里程碑／任務是**完全普通的資料**：沒有任何「來自範本」的旗標，
+   編輯、拖曳排序、連結願景、刪除進回收桶的行為與手動建立的完全一樣。
+5. 範本寫進的是**目標頁目前選取的那個學期**（`selectedSemesterProvider`），不是當前學期——
+   使用者先切到下學期再套用，資料就落在下學期。
+
+---
+
+### UC16　新手導覽（Phase 3，2026-09-25 改為分頁章節＋親手操作）
+
+1. **第一次切到某個分頁**時，`HomeScreen` 播放那一頁的章節（D22 `onboarding_done` 還沒有它、
+   沒有其他章節在跑、`HomeScreen` 是最上層路由）。第一次開 App 就是「任務」章。
+   冷啟動時若通知直接打開了任務 sheet，章節會等 sheet 關掉才開始。
+2. **任務章**：
+   1. 光圈打在右下角的＋，請使用者**自己點**；
+   2. 任務 sheet 打開，光圈依序標出「名稱」「截止時間（含下方快捷鍵）」「重複」「連結目標」，
+      每格一句說明與「知道了」；
+   3. 光圈落在「新增」上，使用者按下去才前進，下一張卡顯示「✓ 完成」；
+      若關掉 sheet 沒存，回到＋並說「沒存到也沒關係」；
+   4. 完成度卡：點它打開完成度頁，光圈標出日／週／月切換，按「回去」；
+   5. 檢視切換：點一下切換看看；
+   6. 靈感：點雲朵鈕、寫標題、按新增；
+   7. 「下一站：目標」——光圈落在導覽列的「目標」，點下去就進入下一章。
+3. **學期目標章**：✨ 範本（只標示）→ 新增目標（名稱、分類、學期、連到願景〔有願景時〕、新增）
+   → 點剛建好的目標卡進詳情頁 → 點「新增里程碑」→ 寫下第一個小步驟並新增 → 標出里程碑清單、
+   按「回去」→ 學期切換 →「下一站：願景」。沒建目標就自動跳過里程碑那一段。
+4. **未來願景章**：新增願景（名稱、分類、開始／結束學期、新增）→ 打開願景，標出「連結的學期目標」
+   區塊並說明怎麼從目標連過來 → 篩選（手機是 chip 列、桌面是側欄）→「下一站：我的」。
+5. **我的章**：你的累積 → 寫一篇日記（內容、新增）→ 打開所有靈感、標出清單 → 所有日記 →
+   「設定 › 新手指南」可以重看。
+6. 任何一步都能「先跳過這步」；右上 ✕「略過這章」直接結束並視同看過。
+7. **設定 › 新手指南**（一般可見，不在開發者模式）：四章各一列，顯示「已完成／還沒看」與
+   「重看／開始」；按下去會回到首頁、切到該分頁並重播。**重播時新增的內容會真的存下來**，
+   sheet 底部有註明。
+8. 導覽只跟**這台裝置**有關：訪客轉正式帳號、換一台裝置登入同一個帳號，都依各自裝置的 D22 判斷。
+
+---
+
 ## 5. 程式流程圖
 
 ### 5-A App 啟動與登入守門（`main.dart` `_AuthGate`）
@@ -1287,3 +1476,5 @@ flowchart TD
 | `OverviewGraphScreen` | `futureGoalsProvider` + `semesterGoalsProvider` + `tasksProvider`（唯讀彙整） | D1／D2／D3 |
 | `LoginScreen` / `RegisterScreen` | `authStateProvider` / `guestModeProvider` | D10 `auth.users` / D12 `is_guest_mode` |
 | 個人資料學校／系所選擇器 | `universitiesProvider` | 靜態常數，非持久化資料儲存 |
+| 目標頁「目標範本」sheet | `semesterGoalsProvider` + `tasksProvider`（只寫，見 §3-N） | D1 `tasks`／D2 `semester_goals`；範本本身是靜態常數 |
+| 新手導覽章節（`HomeScreen` 上的 overlay，見 §3-O）／設定頁「新手指南」 | `onboardingProvider`、`tourReplayProvider` | D22 `onboarding_done` |

@@ -12,6 +12,7 @@ import 'providers/future_goals_provider.dart';
 import 'providers/home_widget_provider.dart';
 import 'providers/notification_action_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/onboarding_provider.dart';
 import 'providers/semester_goals_provider.dart';
 import 'providers/tasks_provider.dart';
 import 'screens/future_goal_detail_screen.dart';
@@ -25,6 +26,7 @@ import 'providers/sync_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
+import 'widgets/coach_mark.dart';
 import 'screens/splash_screen.dart';
 import 'screens/setup_profile_screen.dart';
 
@@ -42,6 +44,10 @@ Future<void> _startUp() async {
     anonKey: AppConfig.supabaseAnonKey,
   );
   await preloadGuestMode();
+  // Same reason as guest mode: read before the first frame, or HomeScreen's
+  // first build sees a chapter as unseen and starts it for someone who has
+  // already been through it
+  await preloadOnboarding();
 }
 
 class _Bootstrap extends StatefulWidget {
@@ -172,6 +178,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      // Lets the first-run tour follow the user into sheets and pages
+      navigatorObservers: [tourRouteObserver],
       scaffoldMessengerKey: _messengerKey,
       title: 'URniversity',
       debugShowCheckedModeBanner: false,

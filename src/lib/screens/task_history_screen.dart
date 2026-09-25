@@ -17,6 +17,7 @@ import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../utils/category_helpers.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/coach_mark.dart';
 
 // One point on the history chart. rate is null when no task applied that
 // day/week/month — distinct from 0%, where tasks existed but none were done.
@@ -172,7 +173,7 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SegmentedButton<int>(
+              TourAnchor(id: 'history.summary', child: SegmentedButton<int>(
                 segments: [
                   ButtonSegment(value: 0, label: Text(s.historyDaily)),
                   ButtonSegment(value: 1, label: Text(s.historyWeekly)),
@@ -183,7 +184,7 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                   _range = v.first;
                   _selected = null;
                 }),
-              ),
+              )),
               const SizedBox(height: AppSpacing.md),
               _SummaryHead(
                 percent: avgPercent,

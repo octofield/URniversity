@@ -20,6 +20,7 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/tour_guide_sheet.dart';
 import 'category_settings_screen.dart';
 import 'notification_settings_screen.dart';
 import 'trash_screen.dart';
@@ -74,6 +75,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final list = ListView(
         children: [
+          // First, and outside developer mode: a tour that plays once and can
+          // never be found again leaves anyone who skipped it on their own
+          ListTile(
+            leading: const Icon(Icons.school_outlined),
+            title: Text(s.tourGuide),
+            subtitle: Text(s.tourGuideSubtitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showTourGuideSheet(context, ref),
+          ),
           ListTile(
             title: Text(s.language),
             subtitle: Text(languageLabel(currentLang, s)),
