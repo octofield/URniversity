@@ -23,6 +23,7 @@ import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/sheet_fields.dart';
 import '../widgets/semester_list_dialog.dart';
+import '../widgets/coach_mark.dart';
 import 'future_goal_detail_screen.dart';
 
 class SemesterGoalDetailScreen extends ConsumerWidget {
@@ -163,13 +164,13 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
             ),
           ),
-        SemMilestoneSubtreeView(parentId: goalId),
-        ListTile(
+        TourAnchor(id: 'detail.milestones', child: SemMilestoneSubtreeView(parentId: goalId)),
+        TourAnchor(id: 'detail.addMilestone', child: ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.add, color: AppColors.primary),
           title: Text(s.addMilestone, style: const TextStyle(color: AppColors.primary)),
           onTap: () => showSemesterGoalSheet(context, ref, parentId: goalId),
-        ),
+        )),
 
         const Divider(),
 
@@ -804,13 +805,13 @@ void showSemesterGoalSheet(
                 style: Theme.of(sheetCtx).textTheme.titleLarge,
               ),
               const SizedBox(height: AppSpacing.md),
-              SheetTextField(
+              TourAnchor(id: 'goal.title', child: SheetTextField(
                 label: s.titleField,
                 controller: titleCtrl,
                 maxLength: InputLimits.title,
                 autofocus: true,
                 onSubmitted: submit,
-              ),
+              )),
               const SizedBox(height: AppSpacing.sm),
               // One short line at rest, growing to three
               SheetTextField(
@@ -827,7 +828,7 @@ void showSemesterGoalSheet(
                 ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.xs),
-              SheetCategoryChips(
+              TourAnchor(id: 'goal.categories', child: SheetCategoryChips(
                 categories: ref.read(categoriesProvider),
                 selected: selectedCategories,
                 s: s,
@@ -838,12 +839,12 @@ void showSemesterGoalSheet(
                     selectedCategories.add(cat);
                   }
                 }),
-              ),
+              )),
               // Milestones inherit their parent's semester, so only top-level
               // goals get the picker
               if (isTopLevel) ...[
                 const SizedBox(height: AppSpacing.md),
-                SheetPickerBox(
+                TourAnchor(id: 'goal.semester', child: SheetPickerBox(
                   label: s.semester,
                   value: formatSemester(selectedSemester, settings, s),
                   onTap: () => _showSemesterPicker(
@@ -854,12 +855,12 @@ void showSemesterGoalSheet(
                     selectedSemester,
                     (sem) => setState(() => selectedSemester = sem),
                   ),
-                ),
+                )),
               ],
               // Only top-level goals carry a vision link, in both modes
               if (isTopLevel) ...[
                 const SizedBox(height: AppSpacing.md),
-                _goalLinkTile(
+                TourAnchor(id: 'goal.vision', child: _goalLinkTile(
                   sheetCtx,
                   s,
                   linked,
@@ -886,16 +887,16 @@ void showSemesterGoalSheet(
                     }),
                   ),
                   () => setState(() => selectedFutureGoalId = null),
-                ),
+                )),
               ],
               const SizedBox(height: AppSpacing.md),
-              SizedBox(
+              TourAnchor(id: 'goal.submit', child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: submit,
                   child: Text(isEdit ? s.save : s.add),
                 ),
-              ),
+              )),
             ],
           ),
         );

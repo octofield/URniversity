@@ -156,7 +156,16 @@
 | `title` | text | ✓ | — | 靈感標題；≤ 100 字 |
 | `content` | text | ✗ | `null` | 詳細內容；≤ 500 字 |
 | `is_completed` | bool | ✓ | `false` | 是否已被實現／處理 |
+| `is_archived` | bool | ✓ | `false` | 是否已封存（Phase 3）；與 `is_completed` 是**獨立的兩軸**，還沒完成的點子也能封存 |
 | `created_at` | timestamptz | ✓ | — | 建立時間；讀取時依此欄位新到舊排序 |
+
+**特別說明**：
+
+- 封存只影響顯示位置，不影響 `is_completed`。Today 頁靈感區塊、「我的」頁靈感區塊與其計數
+  都只算 `!is_completed && !is_archived`；已封存的筆數只出現在 `InspirationsScreen` 的
+  「已封存」區塊（預設收合）。
+- 欄位以 `ADD COLUMN IF NOT EXISTS ... DEFAULT false` 加入（`supabase/inspiration_archive.sql`），
+  `fromJson` 對缺欄位的舊資料退回 `false`，所以舊版 App 與新欄位可以並存。
 
 ---
 
@@ -563,3 +572,31 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 
 勾選任務時的動畫強度。與通知設定（D13）一樣是**這台裝置的體感設定**，不進 D8 `user_settings`，
 所以換裝置不會帶著走，也不需要動 Supabase 結構。
+
+---
+
+## D22. 裝置本機儲存 — `onboarding_done`（新手導覽章節）
+
+媒介：SharedPreferences，`List<String>`（StringList；預設空清單，即「一章都還沒看過」）。
+可能的值是 `kTourChapters` 的章節 id：`today`、`semester`、`future`、`me`，
+依序對應四個分頁（`src/lib/providers/onboarding_provider.dart`）。
+
+寫入／讀取處理程序：`onboardingProvider`（`StateNotifier<Set<String>>`）；
+與 D12 `is_guest_mode` 一樣，`main()` 會先 `preloadOnboarding()` 讀進一個 library 私有
+變數，Notifier 才有正確的初始值——否則 `HomeScreen` 的第一次 build 會對已經看過的人
+再開一次章節。
+
+哪幾章新手導覽已經跑過（system_design.md UC16）。某一章在清單裡，切到那個分頁就不再自動
+播放；走完或按 ✕「略過這章」都會 `markDone(id)`（先改記憶體狀態再寫磁碟）。
+設定頁的「新手指南」可以重播任何一章，重播**不會**把它移出清單。
+
+**2026-09-25 取代先前的 `onboarding_seen`（bool）**：那把 key 只存在於從未出貨的程式碼中，
+所以直接替換、沒有遷移。
+
+**為什麼不上雲、也不進訪客資料清單**：
+
+- 不進 D8 `user_settings`：它描述的是**這台裝置**，不是這個人。在手機上看過導覽，
+  換到桌面版應該還是要看一次（版面完全不同）。性質同 D13／D17／D18。
+- 不在 `guest_provider.dart` 的 `_dataKeys`（那份清單是「離開訪客模式要清掉的使用者資料」）：
+  訪客轉正式帳號的當下，這個人**剛剛才用完 App**，再放一次導覽是倒退。
+  所以合併帳號不會重播導覽——這是刻意的。

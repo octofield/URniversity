@@ -44,6 +44,11 @@ class InspirationsNotifier extends SyncedListNotifier<Inspiration> {
     update(item.copyWith(isCompleted: !item.isCompleted));
   }
 
+  void toggleArchived(String id) {
+    final item = state.firstWhere((i) => i.id == id);
+    update(item.copyWith(isArchived: !item.isArchived));
+  }
+
   void remove(String id) {
     state = state.where((i) => i.id != id).toList();
     deleteRow(id);

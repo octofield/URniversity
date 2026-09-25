@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../widgets/coach_mark.dart';
 import '../widgets/draggable_fab.dart';
 import '../providers/settings_provider.dart';
 import '../providers/date_provider.dart';
 import '../providers/home_tab_provider.dart';
+import '../providers/onboarding_provider.dart';
 import '../providers/synced_list_notifier.dart';
 import 'today_screen.dart' show TodayScreen, showTaskSheet, showAddInspirationSheet;
 
@@ -16,6 +18,7 @@ import 'semester_goal_detail_screen.dart' show showSemesterGoalSheet;
 import 'future_screen.dart';
 import 'me_screen.dart';
 import 'journal_edit_screen.dart';
+import 'home_tour.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -27,7 +30,55 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _index = 0;
 
-  void _onDestinationSelected(int i) => setState(() => _index = i);
+  // Set while a tour chapter is up. The overlay it inserts outlives this
+  // widget, so it has to come down with the screen it is explaining —
+  // otherwise signing out mid-tour leaves an unclickable scrim over the login page
+  VoidCallback? _dismissTour;
+
+  void _onDestinationSelected(int i) {
+    setState(() => _index = i);
+    _scheduleChapterCheck();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // A sheet or page closing is when a postponed chapter gets its turn — the
+    // task sheet a notification opened on a cold start, say
+    tourRouteObserver.addListener(_scheduleChapterCheck);
+    // After the first frame: the anchors have to be laid out before anything
+    // can be measured, and _AuthGate has already decided this screen is the one
+    _scheduleChapterCheck();
+  }
+
+  @override
+  void dispose() {
+    tourRouteObserver.removeListener(_scheduleChapterCheck);
+    _dismissTour?.call();
+    super.dispose();
+  }
+
+  // Each tab has a chapter that plays the first time the tab is shown. [force]
+  // replays one that has already run, for the guide in Settings
+  void _scheduleChapterCheck([String? force]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _dismissTour != null) return;
+      // Never over a sheet or a page: a chapter points at this screen
+      if (ModalRoute.of(context)?.isCurrent != true) return;
+      final chapter = kTourChapters[_index];
+      if (force != chapter && ref.read(onboardingProvider).contains(chapter)) return;
+      _dismissTour = CoachMarkOverlay.show(
+        context,
+        steps: tourChapter(chapter, ref, ref.read(stringsProvider)),
+        onFinished: () {
+          _dismissTour = null;
+          ref.read(onboardingProvider.notifier).markDone(chapter);
+          // Ending on "tap the next tab" lands on a tab whose chapter may be due
+          _scheduleChapterCheck();
+        },
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +97,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (tab == null) return;
       setState(() => _index = tab);
       ref.read(pendingTabProvider.notifier).state = null;
+      _scheduleChapterCheck();
+    });
+
+    // The guide in Settings asked to replay a chapter: whatever is running
+    // gives way, and the chapter's own tab comes up first
+    ref.listen<String?>(tourReplayProvider, (_, chapter) {
+      if (chapter == null) return;
+      ref.read(tourReplayProvider.notifier).state = null;
+      _dismissTour?.call();
+      _dismissTour = null;
+      setState(() => _index = kTourChapters.indexOf(chapter));
+      _scheduleChapterCheck(chapter);
     });
 
     // Surface writes that never reached Supabase. Without this the screen shows
@@ -136,7 +199,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (_index < 3)
           DraggableFab(
             storageKey: 'inspiration',
-            child: _VividFab(
+            child: TourAnchor(id: 'fab.inspiration', child: _VividFab(
               color: AppColors.categoryExchange,
               tooltip: s.addInspiration,
               onPressed: () => showAddInspirationSheet(context, ref),
@@ -150,9 +213,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ],
               ),
-            ),
+            )),
           ),
-        DraggableFab(storageKey: 'main', child: addButton),
+        DraggableFab(storageKey: 'main', child: TourAnchor(id: 'fab.add', child: addButton)),
       ],
     );
 
@@ -170,11 +233,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onDestinationSelected: _onDestinationSelected,
               extended: extended,
               destinations: [
-                for (final d in destinations)
+                for (var i = 0; i < destinations.length; i++)
                   NavigationRailDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon, color: AppColors.primary),
-                    label: Text(d.label),
+                    icon: TourAnchor(id: 'nav.$i', child: Icon(destinations[i].icon)),
+                    selectedIcon: TourAnchor(
+                      id: 'nav.$i',
+                      child: Icon(destinations[i].selectedIcon,
+                          color: AppColors.primary),
+                    ),
+                    label: Text(destinations[i].label),
                   ),
               ],
               // Same divider as the mobile drawer — marks room for future
@@ -256,11 +323,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: _onDestinationSelected,
         destinations: [
-          for (final d in destinations)
+          for (var i = 0; i < destinations.length; i++)
             NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.selectedIcon, color: AppColors.primary),
-              label: d.label,
+              icon: TourAnchor(id: 'nav.$i', child: Icon(destinations[i].icon)),
+              selectedIcon: TourAnchor(
+                id: 'nav.$i',
+                child: Icon(destinations[i].selectedIcon,
+                    color: AppColors.primary),
+              ),
+              label: destinations[i].label,
             ),
         ],
       ),

@@ -164,6 +164,11 @@
 | `test/widget/password_reset_test.dart` | 忘記密碼入口與預填、新密碼的不一致／長度驗證、`_AuthGate` 的 recovery 優先序、關閉後離開 recovery、失效連結的提示（含訪客在首頁時也看得到）、三語在地化 | `2026-09-05-phase0-reliability.md` 7、8、10、14、15、17 |
 | `test/widget/goal_link_visibility_test.dart` | 「只有頂層目標能連結願景」在新增／編輯表單、詳情頁、願景選單四處一致 | `2026-08-23-known-issues.md` 20–25、28 |
 | `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
+| `test/widget/inspirations_archive_test.dart` | 靈感封存的三段分區、預設收合、封存與完成互不影響 | `2026-09-25-phase3-onboarding-templates.md` 1–4 |
+| `test/goal_template_test.dart` | 範本批次建立的筆數、父子連結、分類繼承、**連續套用兩次不碰撞 id** | `2026-09-25-phase3-onboarding-templates.md` 5–9 |
+| `test/widget/goal_template_sheet_test.dart` | 目標頁 ✨ 入口、套用後的寫入與 SnackBar、套用的資料可正常刪除 | `2026-09-25-phase3-onboarding-templates.md` 10–12 |
+| `test/widget/coach_mark_test.dart` | 導覽引擎：`info` 步驟連光圈內也擋住、桌面 rail 的光圈位置、轉向後重新對位、`HomeScreen` 被換掉時遮罩跟著收掉且**不**算看過、✕ 算看過 | `2026-09-25-phase3-onboarding-chapters.md` 1–6 |
+| `test/widget/home_tour_test.dart` | 親手操作的章節：**光圈外點不到、光圈內點得到**、跟進真的 sheet 逐欄標示、**存了才前進、關掉沒存就倒回**、選擇器打開時導覽讓開、先跳過這步不留資料、上一步不跨越已完成的動作、每個分頁只播一次、沒建目標就跳過里程碑段、日記鈕先捲進畫面、有別的頁面在上面時等它關掉才開始、指南頁重播 | `2026-09-25-phase3-onboarding-chapters.md` 7–22 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
 | `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
 | `test/widget/completion_effect_test.dart` | 完成動畫：勾選後放大**再回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放；勾選會在 `Overlay` 上留下獨立的疊層，那一列離開清單也照播完 |
@@ -197,6 +202,12 @@
 3. **`pumpApp()` 之後才能種資料**。`App` 會 watch `syncProvider`，訪客模式下它呼叫
    `loadGuest()` 把每個 Provider 的 state 從 SharedPreferences 重新載入，
    pump 之前種的資料會被洗掉。
+4. **新手導覽預設當作「已經看過」**（2026-09-25 新增）。章節是一片蓋住 `HomeScreen`
+   的遮罩，光圈以外的點擊全部擋掉；`setUpTestSupabase()` 因此預設把 D22 `onboarding_done`
+   設成全部四章，否則所有 `pumpApp()` 的測試都會變成在點導覽而不是在點畫面
+   （當初一次弄紅 11 個）。要測導覽本身就傳 `setUpTestSupabase(seenTour: false)`。
+   `pumpScreen()` 的 `MaterialApp` 也掛了 `tourRouteObserver`，導覽才看得到 sheet 的開關。
+   這條與 `guest` 參數是同一個道理：**測試要先講清楚自己要的是哪一種起始狀態的使用者。**
 
 **平台相關的坑**：`flutter test` 的 `defaultTargetPlatform` **預設回報 android**，
 不是 host 平台。要測「不支援的平台」那條路徑必須用 `debugDefaultTargetPlatformOverride`，
@@ -214,6 +225,15 @@ launcher 的行程裡，`flutter test` 碰不到。因應方式與背景 isolate
 
 **不做的事**：不用 golden test 測視覺。沒有可信的基準圖時，測試紅了也分不出是真的
 跑版還是基準過期，維護成本高於價值。字距／權重／顏色留在手動清單。
+
+**但位置關係測得到**：不用 golden 不代表所有視覺問題都只能靠眼睛。新手導覽的高亮
+（`SpotlightPainter.hole`）就是用 `tester.getCenter()` 取得目標元件的位置，直接斷言
+「挖出來的洞包住那個元件」——文案全對但光圈打在別的地方，是這種功能最可能壞掉的方式，
+而它是幾何問題，不是像素問題。同理可用於任何「A 必須對準 B」的版面規則。
+
+**導覽的核心斷言都做過反向驗證**：把「光圈可穿透」關掉、把「關掉 sheet 視為已存」寫死、
+拿掉遮罩 painter 外的 `IgnorePointer`，三種改法各自讓 `home_tour_test.dart` 轉紅
+（8／1／8 個案例），證明這些測試真的會抓到這三種壞法。
 
 ---
 

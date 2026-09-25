@@ -15,6 +15,7 @@ import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/coach_mark.dart';
 import 'future_screen.dart';
 import 'semester_goal_detail_screen.dart';
 
@@ -157,7 +158,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           const Divider(),
 
           // Linked semester targets section
-          _SectionHeader(label: s.linkedTargets),
+          TourAnchor(id: 'visionDetail.linkedTargets', child: _SectionHeader(label: s.linkedTargets)),
           if (linkedTargets.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),

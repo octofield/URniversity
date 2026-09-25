@@ -3,6 +3,7 @@ class Inspiration {
   final String title;
   final String? content;
   final bool isCompleted;
+  final bool isArchived;
   final DateTime createdAt;
 
   const Inspiration({
@@ -10,6 +11,7 @@ class Inspiration {
     required this.title,
     this.content,
     this.isCompleted = false,
+    this.isArchived = false,
     required this.createdAt,
   });
 
@@ -18,6 +20,7 @@ class Inspiration {
     title: j['title'] as String,
     content: j['content'] as String?,
     isCompleted: (j['is_completed'] as bool?) ?? false,
+    isArchived: (j['is_archived'] as bool?) ?? false,
     createdAt: DateTime.parse(j['created_at'] as String),
   );
 
@@ -26,14 +29,16 @@ class Inspiration {
     'title': title,
     'content': content,
     'is_completed': isCompleted,
+    'is_archived': isArchived,
     'created_at': createdAt.toIso8601String(),
   };
 
-  Inspiration copyWith({String? title, String? content, bool? isCompleted}) => Inspiration(
+  Inspiration copyWith({String? title, String? content, bool? isCompleted, bool? isArchived}) => Inspiration(
     id: id,
     title: title ?? this.title,
     content: content ?? this.content,
     isCompleted: isCompleted ?? this.isCompleted,
+    isArchived: isArchived ?? this.isArchived,
     createdAt: createdAt,
   );
 }

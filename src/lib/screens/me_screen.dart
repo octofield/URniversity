@@ -34,6 +34,7 @@ import 'journals_screen.dart';
 import 'settings_screen.dart';
 import 'today_screen.dart' show showAddInspirationSheet;
 import '../widgets/sheet_fields.dart' show nearLimitCounter;
+import '../widgets/coach_mark.dart';
 
 class MeScreen extends ConsumerWidget {
   const MeScreen({super.key});
@@ -52,14 +53,14 @@ class MeScreen extends ConsumerWidget {
         PageHeader(
           title: s.me,
           actions: [
-            IconButton(
+            TourAnchor(id: 'me.settings', child: IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               ),
-            ),
+            )),
           ],
         ),
         Expanded(
@@ -105,7 +106,7 @@ class MeScreen extends ConsumerWidget {
                             const SizedBox(height: AppSpacing.sm),
                             const _ProfileCard(),
                             const SizedBox(height: AppSpacing.sm),
-                            const _SummaryTiles(),
+                            const TourAnchor(id: 'me.summary', child: _SummaryTiles()),
                           ],
                         ),
                       ),
@@ -116,7 +117,7 @@ class MeScreen extends ConsumerWidget {
                     children: [
                       const _ProfileCard(),
                       const SizedBox(height: AppSpacing.sm),
-                      const _SummaryTiles(),
+                      const TourAnchor(id: 'me.summary', child: _SummaryTiles()),
                       const SizedBox(height: AppSpacing.lg),
                       _InspirationSection(),
                       const SizedBox(height: AppSpacing.lg),
@@ -167,7 +168,7 @@ class _SummaryTiles extends ConsumerWidget {
         .watch(futureGoalsProvider)
         .where((g) => g.parentId == null && !g.isDone)
         .length;
-    final inspirations = ref.watch(inspirationsProvider).where((i) => !i.isCompleted).length;
+    final inspirations = ref.watch(inspirationsProvider).where((i) => !i.isCompleted && !i.isArchived).length;
 
     return Row(
       children: [
@@ -491,7 +492,7 @@ class _InspirationSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
     final all = ref.watch(inspirationsProvider);
-    final active = all.where((i) => !i.isCompleted).toList();
+    final active = all.where((i) => !i.isCompleted && !i.isArchived).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,12 +504,12 @@ class _InspirationSection extends ConsumerWidget {
               Text(s.inspirations, style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
               // Navigate to full inspirations page
-              IconButton(
+              TourAnchor(id: 'me.inspirations.open', child: IconButton(
                 icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationsScreen())),
-              ),
+              )),
               IconButton(
                 icon: const Icon(Icons.add, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
@@ -715,18 +716,18 @@ class _JournalSection extends ConsumerWidget {
               ],
               const Spacer(),
               // Navigate to full journals page
-              IconButton(
+              TourAnchor(id: 'me.journals.open', child: IconButton(
                 icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalsScreen())),
-              ),
-              IconButton(
+              )),
+              TourAnchor(id: 'me.journal.add', child: IconButton(
                 icon: const Icon(Icons.add, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
-              ),
+              )),
             ],
           ),
         ),

@@ -37,6 +37,7 @@ import '../widgets/page_header.dart';
 import '../widgets/swipe_switcher.dart';
 import '../widgets/sheet_fields.dart';
 import '../widgets/sort_sheet.dart';
+import '../widgets/coach_mark.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 
@@ -144,7 +145,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              SegmentedButton<int>(
+              TourAnchor(id: 'today.viewSwitch', child: SegmentedButton<int>(
                 segments: [
                   ButtonSegment(
                     value: 0,
@@ -166,7 +167,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                 ),
-              ),
+              )),
             ],
           ),
         ),
@@ -707,7 +708,7 @@ class _SummaryCard extends ConsumerWidget {
 
     // The whole card opens the history, not just the ring: the ring was a
     // 72px target nobody found
-    return HoverLift(
+    return TourAnchor(id: 'today.summary', child: HoverLift(
       child: Container(
         width: double.infinity,
         clipBehavior: Clip.antiAlias,
@@ -802,7 +803,7 @@ class _SummaryCard extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -812,7 +813,7 @@ class _InspirationsQuickList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
-    final active = ref.watch(inspirationsProvider).where((i) => !i.isCompleted).toList();
+    final active = ref.watch(inspirationsProvider).where((i) => !i.isCompleted && !i.isArchived).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

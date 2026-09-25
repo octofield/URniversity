@@ -8,7 +8,9 @@ import 'package:urniversity/core/config.dart';
 import 'package:urniversity/core/theme/app_theme.dart';
 import 'package:urniversity/main.dart';
 import 'package:urniversity/providers/guest_provider.dart';
+import 'package:urniversity/providers/onboarding_provider.dart';
 import 'package:urniversity/providers/settings_provider.dart';
+import 'package:urniversity/widgets/coach_mark.dart';
 
 // Guest mode never reaches Supabase — SyncedListNotifier.upsert() returns right
 // after persistLocally() — so a widget test can drive the real screens with no
@@ -19,12 +21,19 @@ import 'package:urniversity/providers/settings_provider.dart';
 // storage and detectSessionInUri: false keeps the deep link observer from
 // starting, so nothing here reaches the network. initialize() is idempotent,
 // so calling this from every setUp is safe
-Future<void> setUpTestSupabase({bool guest = true}) async {
+// seenTour defaults to true: a tour chapter puts a scrim over HomeScreen that
+// blocks every tap outside its highlight, so a test pumping the app would be
+// driving the tour instead of the screen it means to test. Only the tour's own
+// tests ask for the first-run state
+Future<void> setUpTestSupabase({bool guest = true, bool seenTour = true}) async {
   TestWidgetsFlutterBinding.ensureInitialized();
   // The midnight roll-over timer would still be pending when a test ends, which
   // fails the test. untilNextDay() is covered by its own unit test instead
   EffectiveNowNotifier.autoRollOver = false;
-  SharedPreferences.setMockInitialValues(guest ? {'is_guest_mode': true} : {});
+  SharedPreferences.setMockInitialValues({
+    if (guest) 'is_guest_mode': true,
+    if (seenTour) 'onboarding_done': kTourChapters,
+  });
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
@@ -36,6 +45,7 @@ Future<void> setUpTestSupabase({bool guest = true}) async {
   // Sets a library-private global that guestModeProvider seeds itself from;
   // setting the SharedPreferences key alone is not enough
   await preloadGuestMode();
+  await preloadOnboarding();
 }
 
 // Widget tests share one view, so a size set in one test leaks into the next
@@ -89,6 +99,7 @@ Future<ProviderContainer> pumpScreen(
           Locale('ja'),
         ],
         home: screen,
+        navigatorObservers: [tourRouteObserver],
       ),
     ),
   );

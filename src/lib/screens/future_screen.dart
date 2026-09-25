@@ -26,6 +26,7 @@ import '../widgets/page_header.dart';
 import '../widgets/sheet_fields.dart';
 import '../widgets/semester_list_dialog.dart';
 import '../widgets/sort_sheet.dart';
+import '../widgets/coach_mark.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
@@ -524,9 +525,10 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             itemCount: groups.length + 1,
             itemBuilder: (ctx, i) {
               if (i == groups.length) return _endGapZone(groups);
+              final card = _buildGroupCard(groups[i], allGoals, i, groups);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _buildGroupCard(groups[i], allGoals, i, groups),
+                child: i == 0 ? TourAnchor(id: 'future.firstCard', child: card) : card,
               );
             },
           );
@@ -584,7 +586,10 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         ),
         const SizedBox(height: AppSpacing.xs),
         // Mobile keeps the chip rows; desktop moves the filters into the sidebar
-        if (!isDesktop) ...[
+        if (!isDesktop) TourAnchor(id: 'future.filters', child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: 4),
             child: _AdaptiveChipRow(
@@ -634,7 +639,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ),
             ),
           ),
-        ],
+        ])),
         const SizedBox(height: AppSpacing.sm),
         Expanded(
           child: isDesktop
@@ -653,7 +658,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                           AppSpacing.pageHorizontal,
                           AppSpacing.xl,
                         ),
-                        child: _buildFilterSidebar(),
+                        child: TourAnchor(id: 'future.filters', child: _buildFilterSidebar()),
                       ),
                     ),
                   ],
@@ -1085,12 +1090,12 @@ void showFutureGoalSheet(
               style: Theme.of(sheetCtx).textTheme.titleLarge,
             ),
             const SizedBox(height: AppSpacing.md),
-            SheetTextField(
+            TourAnchor(id: 'vision.title', child: SheetTextField(
               label: s.titleField,
               controller: titleCtrl,
               maxLength: InputLimits.title,
               autofocus: true,
-            ),
+            )),
             const SizedBox(height: AppSpacing.sm),
             // One short line at rest, growing to three
             SheetTextField(
@@ -1107,7 +1112,7 @@ void showFutureGoalSheet(
               ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.xs),
-            SheetCategoryChips(
+            TourAnchor(id: 'vision.categories', child: SheetCategoryChips(
               categories: cats,
               selected: selectedCategories.toSet(),
               s: s,
@@ -1118,9 +1123,9 @@ void showFutureGoalSheet(
                   selectedCategories.add(cat);
                 }
               }),
-            ),
+            )),
             const SizedBox(height: AppSpacing.md),
-            Row(
+            TourAnchor(id: 'vision.semesters', child: Row(
               children: [
                 Expanded(
                   child: _semesterDropdown(
@@ -1153,9 +1158,9 @@ void showFutureGoalSheet(
                   ),
                 ),
               ],
-            ),
+            )),
             const SizedBox(height: AppSpacing.md),
-            SizedBox(
+            TourAnchor(id: 'vision.submit', child: SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: () {
@@ -1189,7 +1194,7 @@ void showFutureGoalSheet(
                 },
                 child: Text(isEdit ? s.save : s.add),
               ),
-            ),
+            )),
           ],
         ),
       ),
