@@ -26,7 +26,9 @@ class AppAvatars {
     AvatarPreset(color: AppColors.categoryExchange, icon: Icons.menu_book),
     AvatarPreset(color: AppColors.categoryCert, icon: Icons.school),
     AvatarPreset(color: AppColors.categoryIntern, icon: Icons.science),
-    AvatarPreset(color: AppColors.primary, icon: Icons.edit_note),
+    // The original caramel, fixed: an avatar is the user's pick and keeps its
+    // colour whatever style the app wears
+    AvatarPreset(color: Color(0xFFA07850), icon: Icons.edit_note),
     // Making things
     AvatarPreset(color: AppColors.categoryCompetition, icon: Icons.brush),
     AvatarPreset(color: AppColors.categoryPerformance, icon: Icons.camera_alt),

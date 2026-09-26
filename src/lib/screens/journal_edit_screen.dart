@@ -140,7 +140,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
-                                const Icon(Icons.chevron_right,
+                                Icon(Icons.chevron_right,
                                     size: 16, color: AppColors.textTertiary),
                                 const SizedBox(width: 2),
                                 InkWell(
@@ -152,7 +152,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                                         vertical: 2),
                                     child: Text(
                                       dateStr,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.primary,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -177,7 +177,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
                               decoration: InputDecoration(
                                 hintText: s.journalContent,
                                 hintStyle:
-                                    const TextStyle(color: AppColors.textTertiary),
+                                    TextStyle(color: AppColors.textTertiary),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 focusedBorder: InputBorder.none,

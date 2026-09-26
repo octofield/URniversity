@@ -4,7 +4,9 @@ part of 'today_screen.dart';
 
 class _DraggableTaskList extends ConsumerStatefulWidget {
   final List<Task> tasks;
-  const _DraggableTaskList({required this.tasks});
+  // Shown once the list is empty — after the last row has finished leaving
+  final Widget empty;
+  const _DraggableTaskList({required this.tasks, required this.empty});
 
   @override
   ConsumerState<_DraggableTaskList> createState() => _DraggableTaskListState();
@@ -16,6 +18,7 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
   final _rowCtxs = <String, BuildContext>{};
 
   void _onAccept(String draggedId, Task row, List<Task> siblings, int index) {
+    haptic(ref, HapticKind.select);
     final notifier = ref.read(tasksProvider.notifier);
     // The list is flat, so a drop only ever means "put it here"
     switch (_hoverZone) {
@@ -113,19 +116,19 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
               child: draggable,
             ),
             if (isHovered && _hoverZone == DropZone.before)
-              const Positioned(
+              Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
                   child: ColoredBox(
-                      color: AppColors.primary, child: SizedBox(height: 2))),
+                      color: AppColors.primary, child: const SizedBox(height: 2))),
             if (isHovered && _hoverZone == DropZone.after)
-              const Positioned(
+              Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
                   child: ColoredBox(
-                      color: AppColors.primary, child: SizedBox(height: 2))),
+                      color: AppColors.primary, child: const SizedBox(height: 2))),
           ],
         );
       },
@@ -149,16 +152,29 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
   @override
   Widget build(BuildContext context) {
     final tasks = widget.tasks;
-    final rows = <Widget>[];
+    final all = ref.watch(tasksProvider);
 
-    for (var i = 0; i < tasks.length; i++) {
-      if (rows.isNotEmpty) {
-        rows.add(const Divider(height: 1, indent: _taskTitleIndent));
-      }
-      rows.add(_buildRow(tasks[i], tasks, i));
+    // A row that leaves because it was ticked stays long enough for its
+    // strike-through to be seen; one deleted or filtered away just goes
+    Duration holdFor(Key key) {
+      final id = (key as ValueKey<String>).value;
+      final task = all.where((t) => t.id == id).firstOrNull;
+      if (task == null) return Duration.zero;
+      return task.isCompletedOn(ref.read(taskRowDateProvider(task))) ? AppMotion.hold : Duration.zero;
     }
 
-    return Column(children: rows);
+    const emptyKey = ValueKey('_empty');
+    return AnimatedRows(
+      separatorBuilder: (_, key) =>
+          key == emptyKey ? null : const Divider(height: 1, indent: _taskTitleIndent),
+      holdFor: holdFor,
+      enterDelayFor: (key) => key == emptyKey ? AppMotion.hold + AppMotion.exit : Duration.zero,
+      children: [
+        for (var i = 0; i < tasks.length; i++)
+          KeyedSubtree(key: ValueKey(tasks[i].id), child: _buildRow(tasks[i], tasks, i)),
+        if (tasks.isEmpty) KeyedSubtree(key: emptyKey, child: widget.empty),
+      ],
+    );
   }
 }
 
@@ -172,6 +188,12 @@ class _TaskTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
+    // The live row, not the one this tile was built with: a tile on its way out
+    // of the list keeps being rebuilt, and has to show the tick that sent it
+    final task = ref.watch(tasksProvider.select(
+          (all) => all.where((t) => t.id == this.task.id).firstOrNull,
+        )) ??
+        this.task;
     // Not the selected date: in the all-tasks view each row is about its own
     // occurrence, so a monthly task ticks off against the 20th, not today
     final rowDate = ref.watch(taskRowDateProvider(task));
@@ -211,12 +233,10 @@ class _TaskTile extends ConsumerWidget {
         onToggle: () => ref.read(tasksProvider.notifier).toggleOnDate(task.id, effectiveDate),
         isLastOutstanding: () => _isLastOutstanding(ref, effectiveDate),
       ),
-      title: Text(
-        task.title,
-        style: TextStyle(
-          decoration: isCompleted ? TextDecoration.lineThrough : null,
-          color: isCompleted ? AppColors.textTertiary : null,
-        ),
+      title: AnimatedStrikeText(
+        text: task.title,
+        struck: isCompleted,
+        struckColor: AppColors.textTertiary,
       ),
       subtitle: hasSubtitle
           ? Column(
@@ -244,7 +264,7 @@ class _TaskTile extends ConsumerWidget {
                       ),
                       if (task.recurrence != null && !task.recurrence!.isNone) ...[
                         const SizedBox(width: AppSpacing.xs),
-                        const Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
+                        Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
                         const SizedBox(width: 2),
                         Flexible(
                           child: Text(
@@ -262,7 +282,7 @@ class _TaskTile extends ConsumerWidget {
                 else if (task.recurrence != null && !task.recurrence!.isNone)
                   Row(
                     children: [
-                      const Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
+                      Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
                       const SizedBox(width: 2),
                       Flexible(
                         child: Text(

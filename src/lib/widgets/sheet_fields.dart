@@ -141,7 +141,7 @@ class SheetPickerBox extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),
+                Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),
               ],
             ),
           ],

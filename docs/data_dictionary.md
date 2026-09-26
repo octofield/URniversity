@@ -38,6 +38,7 @@
   | `journals.content` | 5000 | `journals_content_len` |
   | `user_settings.username` | 30 | `user_settings_username_len` |
   | `user_settings.school`、`user_settings.department` | 50 | `user_settings_{col}_len` |
+  | `user_settings.app_style` | 20 | `user_settings_app_style_len`（在 `supabase/app_style.sql`；值只由 App 從列舉寫入，沒有對應的 `InputLimits`） |
   | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
 ## D1. `tasks`（任務）
@@ -286,6 +287,7 @@
 | `semester_start_months` | int[] | ✗ | `[8, 2]` | 各學期起始月份，陣列長度需等於 `semester_count` |
 | `default_task_view` | int | ✗ | `0` | 任務頁預設檢視：0=全部、1=每日、2=每週 |
 | `show_day_counter` | bool | ✗ | `true` | 日記是否顯示「第 N 天」徽章 |
+| `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono`，或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
 
 **特別說明：**
 - 兩個處理程序各自只夾帶自己負責的欄位做 `upsert`，不會整列覆寫，因此可以放心獨立修改，但新增
@@ -435,6 +437,7 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 | Key | 型別 | 說明 |
 |---|---|---|
 | `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出（見下表）。**原生端勾選時會先改這份**，把該列的 `check` 標成 `checked` |
+| `app_style` | 字串 | 目前生效的風格名稱（隨機模式是當次抽到的那一個）。原生端 `WidgetStyle.of()` 換成該風格的顏色與形狀；暖棕或沒寫過時用原本的資源（並跟著系統深淺色） |
 | `widget_state` | JSON 字串 | **原生端寫入**（`WidgetData.writeState()`）：`mode`（`tasks` / `targets` / `goals` / `filterPicker`）/ `period`（`all` / `day` / `week` / `month`）/ `filter_id`（null＝不篩選）。使用者在小工具上的選擇，App 重開後沿用。Dart 不讀也不寫 |
 | `widget_language` | text | 語言代碼（`zhTw` / `en` / `jp`）。**背景 isolate 需要它才能用正確語言重建 snapshot**——App 設定在訪客模式完全不持久化，雲端那份背景也未必讀得到 |
 
@@ -678,3 +681,37 @@ key 名稱是 `cache_` 加上資料表名稱（`SyncedListNotifier.cacheKey`）�
 - **不是正本**：查詢成功就整份覆蓋；快取裡的東西永遠不會被上傳。
 - **查詢失敗時**：畫面保留快取內容並顯示同步錯誤。與原本相同，這次啟動在重新載入成功前的修改不會寫到雲端。
 - **不涵蓋**：trash_items、user_categories、個人資料與 App 設定（不是 `SyncedListNotifier`，也不在開 App 的第一眼）。
+
+---
+
+## D25. 裝置本機儲存 — `haptics_enabled`
+
+媒介：SharedPreferences，`bool`（預設 `true`）。
+
+寫入／讀取處理程序：`HapticsNotifier`（`src/lib/providers/settings_provider.dart`），設定頁「觸覺回饋」開關。
+
+打勾、當天全部完成、拖曳放下時要不要震動（`core/haptics.dart`）。與 D17 完成效果**分開**：
+有人想在安靜的教室看彩帶，也有人只要震動不要動畫。與 D13、D17 一樣是這台裝置的體感設定，不進 D8。
+
+`_restore()` 只套用**有存過的值**：它是非同步的，可能在使用者剛切換之後才讀完，
+若沒存過就寫回預設值會把剛切的狀態蓋掉（`test/widget/haptics_test.dart` 抓到過）。
+
+---
+
+## D26. 裝置本機儲存 — `app_style`、`app_style_last`、`app_style_next`
+
+媒介：SharedPreferences，三把 `String`。
+
+| Key | 內容 |
+|---|---|
+| `app_style` | 使用者的**選擇**：風格名稱，或 `random`（預設 `linen`） |
+| `app_style_last` | 隨機模式：上次（也就是這次）穿的風格，下次不會重複 |
+| `app_style_next` | 隨機模式：已經替**下次**開啟抽好的風格。Android 13+ 已經把它設成下次的系統啟動畫面，所以下次開啟時優先採用，兩邊才對得上 |
+
+寫入／讀取處理程序：`AppStyleNotifier`（`src/lib/providers/app_style_provider.dart`）；
+`main()` 在 `runApp` 之前先 `preloadAppStyle()`，所以連等待畫面都是當次的風格，不會先閃一下暖棕；
+隨機模式也只在這裡抽一次，從背景切回來不會換。
+
+- 訪客與登入帳號都用這把 key；登入帳號另外同步 D8-B `user_settings.app_style`：
+  登入時讀雲端值（有值才套用），之後每次切換都寫回。換裝置登入後會變成帳號的風格。
+- 不在 `guest_provider._dataKeys`：它是這台裝置顯示的樣子，退出訪客模式不該被清掉。

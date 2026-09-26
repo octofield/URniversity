@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input_limits.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/ui_symbols.dart';
+import '../core/haptics.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
@@ -27,6 +29,7 @@ import '../widgets/sheet_fields.dart';
 import '../widgets/semester_list_dialog.dart';
 import '../widgets/sort_sheet.dart';
 import '../widgets/coach_mark.dart';
+import '../widgets/expanding_card.dart';
 import '../widgets/goal_template_sheet.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
@@ -72,13 +75,14 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => _draggingId != null,
       onAcceptWithDetails: (details) {
+        haptic(ref, HapticKind.select);
         final lastOrder = groups.isNotEmpty ? groups.last.parent.sortOrder : 0;
         ref.read(futureGoalsProvider.notifier).reparent(details.data, null, lastOrder + 1000);
       },
       builder: (ctx, candidates, _) {
         final hovered = candidates.isNotEmpty;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: scaled(context, AppMotion.quick),
           height: hovered ? 36 : 8,
           decoration: hovered
               ? BoxDecoration(
@@ -152,6 +156,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
         if (_hoveredId == goalId) setState(() => _hoveredId = null);
       },
       onAcceptWithDetails: (details) {
+        haptic(ref, HapticKind.select);
         switch (_hoverZone) {
           case DropZone.before:
             final prev =
@@ -266,7 +271,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     if (children.isEmpty) return [];
     final result = <Widget>[];
     for (int i = 0; i < children.length; i++) {
-      result.add(const Divider(height: 1, thickness: 1, color: AppColors.border));
+      result.add(Divider(height: 1, thickness: 1, color: AppColors.border));
       result.add(
         _buildDraggableRow(
           children[i],
@@ -291,25 +296,29 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
     final rootItems = groups.map((g) => g.parent).toList();
 
     return HoverLift(
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDraggableRow(
-              parent,
-              depth: 0,
-              parentId: null,
-              siblings: rootItems,
-              siblingIndex: groupIdx,
-            ),
-            ..._buildDescendantRows(parent.id, allGoals, 1),
-          ],
+      child: ExpandingCard(
+        id: parent.id,
+        detail: FutureGoalDetailScreen(goalId: parent.id),
+        card: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDraggableRow(
+                parent,
+                depth: 0,
+                parentId: null,
+                siblings: rootItems,
+                siblingIndex: groupIdx,
+              ),
+              ..._buildDescendantRows(parent.id, allGoals, 1),
+            ],
+          ),
         ),
       ),
     );
@@ -802,11 +811,15 @@ class _FutureGoalCardRow extends ConsumerWidget {
     final catC = categoryColorOrNull(cats, primaryCat);
     final catIcon = categoryIconOrNull(cats, primaryCat);
 
-    void openDetail() => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => FutureGoalDetailScreen(goalId: goal.id)),
-        );
+    // The card's header grows into the page; anything else opens normally
+    final expand = ExpandingCard.openerOf(context, goal.id);
+    void openDetail() => expand != null
+        ? expand()
+        : Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => FutureGoalDetailScreen(goalId: goal.id)),
+          );
 
     Future<void> deleteGoal() async {
       // Confirm before deleting, matching the goal cards —
@@ -987,8 +1000,8 @@ class _FutureGoalCardRow extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(AppRadius.full),
                           child: TweenAnimationBuilder<double>(
                             tween: Tween(begin: 0, end: progress),
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves.easeOutCubic,
+                            duration: scaled(context, AppMotion.enter),
+                            curve: AppMotion.enterCurve,
                             builder: (_, v, _) => LinearProgressIndicator(
                               value: v,
                               minHeight: 4,
@@ -1017,7 +1030,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
                       padding: EdgeInsets.zero,
                       onPressed: deleteGoal,
                     ),
-                    const Icon(Icons.arrow_forward_ios,
+                    Icon(Icons.arrow_forward_ios,
                         size: 14, color: AppColors.textTertiary),
                   ],
                 ),

@@ -3,7 +3,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config.dart';
+import 'core/theme/app_motion.dart';
+import 'core/theme/app_colors.dart';
+import 'core/theme/app_styles.dart';
 import 'core/theme/app_theme.dart';
+import 'providers/app_style_provider.dart';
 import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/date_provider.dart';
@@ -29,11 +33,16 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'widgets/coach_mark.dart';
+import 'widgets/style_crossfade.dart';
 import 'screens/splash_screen.dart';
 import 'screens/setup_profile_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Before anything is drawn: even the wait screen wears the style, matching
+  // the system splash, and a random launch is drawn exactly once
+  await preloadAppStyle();
+  AppColors.use(kStylePalettes[launchStyle]!);
   // Paint first, connect second: the branded wait screen carries the app name,
   // which the Android 12 splash API cannot draw, and it picks up exactly where
   // the native splash leaves off
@@ -68,15 +77,17 @@ class _BootstrapState extends State<_Bootstrap> {
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
       future: _ready,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: SplashScreen(),
-          );
-        }
-        return const ProviderScope(child: App());
-      },
+      // The wait screen dissolves into the app instead of cutting to it
+      builder: (context, snapshot) => AnimatedSwitcher(
+        duration: AppMotion.page,
+        switchInCurve: AppMotion.enterCurve,
+        child: snapshot.connectionState != ConnectionState.done
+            ? const MaterialApp(
+                debugShowCheckedModeBanner: false,
+                home: SplashScreen(),
+              )
+            : const ProviderScope(child: App()),
+      ),
     );
   }
 }
@@ -89,6 +100,21 @@ final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 // The task edit sheet is a modal route, so opening it from a notification needs
 // a context below the Navigator rather than App's own
 final _navigatorKey = GlobalKey<NavigatorState>();
+
+final _crossfadeKey = GlobalKey<StyleCrossfadeState>();
+
+// Every widget reads AppColors directly rather than through Theme.of, so a new
+// style reaches only what happens to rebuild. Marking every element dirty
+// rebuilds the lot in one frame without recreating any State — the navigation
+// stack, scroll positions and open sheets all stay where they were
+void _rebuildEverything() {
+  void mark(Element element) {
+    element.markNeedsBuild();
+    element.visitChildren(mark);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(mark);
+}
 
 class App extends ConsumerStatefulWidget {
   const App({super.key});
@@ -122,6 +148,16 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     ref.watch(syncProvider);
+
+    // The style is applied here, above everything that reads it: App is the
+    // shallowest dirty element, so it rebuilds first in the frame
+    final palette = kStylePalettes[ref.watch(appStyleProvider)]!;
+    AppColors.use(palette);
+    ref.listen<AppStyle>(appStyleProvider, (_, _) {
+      // The screen still shows the old style at this point
+      _crossfadeKey.currentState?.snapshot();
+      _rebuildEverything();
+    });
 
     // When the day rolls over, the date being shown follows it — unless the
     // user has browsed to some other day, which rollOverTo() leaves alone
@@ -185,7 +221,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       scaffoldMessengerKey: _messengerKey,
       title: 'URniversity',
       debugShowCheckedModeBanner: false,
-      theme: appTheme,
+      theme: buildAppTheme(palette),
+      builder: (context, child) => StyleCrossfade(key: _crossfadeKey, child: child!),
       locale: _localeFor(lang),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

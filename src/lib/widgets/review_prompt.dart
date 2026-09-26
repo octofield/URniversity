@@ -35,7 +35,7 @@ class ReviewPromptCard extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.auto_graph_outlined, color: AppColors.primary),
+            Icon(Icons.auto_graph_outlined, color: AppColors.primary),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(

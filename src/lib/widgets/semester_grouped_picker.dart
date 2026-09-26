@@ -327,7 +327,7 @@ class _SemesterGroupedFilterDialogState extends State<SemesterGroupedFilterDialo
         child: groups.isEmpty
             ? Center(
                 child: Text(widget.emptyLabel,
-                    style: const TextStyle(color: AppColors.textTertiary)),
+                    style: TextStyle(color: AppColors.textTertiary)),
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

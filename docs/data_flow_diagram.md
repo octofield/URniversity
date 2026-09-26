@@ -212,13 +212,21 @@ flowchart TD
 
     PP["profile_provider\nProfileNotifier"]
     PSet["settings_provider\n(language / dateFormat /\nsemester / taskView / dayCounter)"]
-    P3b["sync_provider\n_loadSettings / _saveSettings"]
+    PStyle["app_style_provider\nAppStyleNotifier"]
+    P3b["sync_provider\n_loadSettings / _saveSettings\n_loadStyle / _saveStyle"]
+    DStyle[("D26 app_style\n(SharedPreferences)")]
 
     DUS[("D8 user_settings\n(單一資料表，\n同時存個人資料欄位與 App 設定欄位)")]
 
     User -- "編輯暱稱/學校/系所/年級/頭像" --> PP <--> DUS
     User -- "切換語言/日期格式/學期制度/\n預設檢視/是否顯示天數" --> PSet
     PSet -- "ref.listen(...) 觸發" --> P3b
+    User -- "設定 › 風格" --> PStyle
+    PStyle <-- "preloadAppStyle() 先讀；每次切換寫入" --> DStyle
+    PStyle -- "選擇改變（appStyleChoiceProvider）→ _saveStyle（只帶 app_style）" --> P3b
+    PStyle -- "StyleChannel：setIcon／setSplash" --> Android["MainActivity.kt\n(launcher alias、\n下次的啟動畫面)"]
+    PStyle -- "目前的風格 → HomeWidgetService.push" --> DW[("D15 HomeWidgetPreferences\napp_style")]
+    P3b -- "登入時 _loadStyle 讀回" --> PStyle
     P3b <--> DUS
 
     Note1["⚠ PSet 本身是純記憶體狀態，\n不直接讀寫資料庫；\n實際存取一律經由 sync_provider"]
@@ -460,5 +468,7 @@ flowchart TD
 | D20 | `target_sort` | 裝置本機 SharedPreferences（目標頁的排序方式；只影響顯示順序，不寫回 D2） |
 | D21 | `vision_sort` | 裝置本機 SharedPreferences（願景頁的排序方式；只影響顯示順序，不寫回 D3） |
 | D23 | `reviews` | Supabase 資料表（回顧：數字快照＋三段文字＋專注目標） |
+| D25 | `haptics_enabled` | 裝置本機 SharedPreferences（觸覺回饋開關，每台裝置各自設定） |
+| D26 | `app_style` | 裝置本機 SharedPreferences（使用者選的風格；登入帳號另同步到 D8 `user_settings.app_style`） |
 | D24 | `cache_*` 系列 key＋`cache_owner` | 裝置本機 SharedPreferences（登入帳號的清單快取，開 App 先畫、查詢回來覆蓋；登出即刪） |
 | D22 | `onboarding_done` | 裝置本機 SharedPreferences（新手導覽哪幾章跑過，StringList；不上雲、不進訪客資料清單） |

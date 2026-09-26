@@ -1,6 +1,7 @@
 package com.octofield.urniversity
 
 import android.content.Context
+import android.graphics.drawable.Icon
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -32,6 +33,7 @@ private class WidgetListFactory(private val context: Context) :
 
     private var rows: List<JSONObject> = emptyList()
     private var state = WidgetData.State()
+    private var style: WidgetStyle? = null
 
     override fun onCreate() = Unit
 
@@ -40,6 +42,7 @@ private class WidgetListFactory(private val context: Context) :
     override fun onDataSetChanged() {
         val prefs = HomeWidgetPlugin.getData(context)
         state = WidgetData.readState(prefs)
+        style = WidgetStyle.of(prefs)
         rows = WidgetData.visibleRows(WidgetData.snapshot(prefs), state)
     }
 
@@ -50,7 +53,7 @@ private class WidgetListFactory(private val context: Context) :
     override fun getViewAt(position: Int): RemoteViews {
         val row = rows.getOrNull(position)
             ?: return RemoteViews(context.packageName, R.layout.widget_row)
-        return WidgetRowViews.build(context, state, row)
+        return WidgetRowViews.build(context, state, style ?: WidgetStyle.of(HomeWidgetPlugin.getData(context)), row)
     }
 
     override fun getLoadingView(): RemoteViews? = null
@@ -71,12 +74,13 @@ object WidgetRowViews {
     // A regular row and a picker section header
     const val VIEW_TYPE_COUNT = 2
 
-    fun build(context: Context, state: WidgetData.State, row: JSONObject): RemoteViews {
+    fun build(context: Context, state: WidgetData.State, style: WidgetStyle, row: JSONObject): RemoteViews {
         val title = row.str("title").orEmpty()
 
         if (row.optBoolean("header", false)) {
             return RemoteViews(context.packageName, R.layout.widget_row_header).apply {
                 setTextViewText(R.id.row_title, title)
+                TaskWidgetProvider.setColorRes(context, this, R.id.row_title, "setTextColor", style.muted)
             }
         }
 
@@ -89,9 +93,9 @@ object WidgetRowViews {
 
         views.setTextViewText(R.id.row_title, if (struck) strikethrough(title) else title)
         val titleColor = when {
-            struck -> R.color.widget_muted
-            state.mode == WidgetData.MODE_PICKER && isCurrentFilter(tap, state) -> R.color.widget_accent
-            else -> R.color.widget_text
+            struck -> style.muted
+            state.mode == WidgetData.MODE_PICKER && isCurrentFilter(tap, state) -> style.accent
+            else -> style.text
         }
         TaskWidgetProvider.setColorRes(context, views, R.id.row_title, "setTextColor", titleColor)
 
@@ -104,7 +108,7 @@ object WidgetRowViews {
             if (subtitle == null) View.GONE else View.VISIBLE,
         )
         TaskWidgetProvider.setColorRes(context, views, R.id.row_subtitle, "setTextColor",
-            if (struck) R.color.widget_muted else R.color.widget_accent)
+            if (struck) style.muted else style.accent)
 
         // ARGB arrives as an unsigned 32-bit number; toInt() wraps it back into
         // the signed colour Android expects
@@ -112,7 +116,7 @@ object WidgetRowViews {
         views.setViewVisibility(R.id.row_color, if (color == 0) View.INVISIBLE else View.VISIBLE)
         if (color != 0) views.setInt(R.id.row_color, "setBackgroundColor", color)
 
-        bindCheck(views, state, row.str("check"), checkAction)
+        bindCheck(context, views, state, style, row.str("check"), checkAction)
 
         // A collection shares one PendingIntent template, so each row carries
         // only the part that differs — the action URI
@@ -124,8 +128,10 @@ object WidgetRowViews {
     }
 
     private fun bindCheck(
+        context: Context,
         views: RemoteViews,
         state: WidgetData.State,
+        style: WidgetStyle,
         check: String?,
         action: String?,
     ) {
@@ -143,6 +149,9 @@ object WidgetRowViews {
         val fillIn = action?.let { Intent().setData(Uri.parse(it)) }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // The style's tick box: CompoundButton.setButtonIcon is the one
+            // way RemoteViews can swap a CheckBox's drawable
+            views.setIcon(R.id.row_check, "setButtonIcon", Icon.createWithResource(context, style.checkSelector))
             views.setCompoundButtonChecked(R.id.row_check, checked)
             // A goal's tick is only a display; disabled so tapping cannot flip
             // a box that nothing would ever write
@@ -153,7 +162,7 @@ object WidgetRowViews {
             }
         } else {
             views.setImageViewResource(R.id.row_check,
-                if (checked) R.drawable.widget_check_on else R.drawable.widget_check_off)
+                if (checked) style.checkOn else style.checkOff)
             fillIn?.let { views.setOnClickFillInIntent(R.id.row_check, it) }
         }
     }

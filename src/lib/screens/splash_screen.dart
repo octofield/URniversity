@@ -22,7 +22,7 @@ class SplashScreen extends StatelessWidget {
             Image.asset('assets/icon/app_icon.png', width: 96, height: 96),
             const SizedBox(height: AppSpacing.md),
             // A brand name, the same in every language
-            const Text(
+            Text(
               'URniversity',
               style: TextStyle(
                 fontSize: 22,
@@ -32,7 +32,7 @@ class SplashScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            const SizedBox(
+            SizedBox(
               width: 22,
               height: 22,
               child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),

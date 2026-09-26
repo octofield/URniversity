@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_style_provider.dart';
 import 'auth_provider.dart';
 import 'synced_list_notifier.dart';
 import 'tasks_provider.dart';
@@ -48,6 +49,9 @@ final syncProvider = Provider<void>((ref) {
   ref.listen(semesterSettingsProvider, (prev, next) => _saveSettings(ref));
   ref.listen(defaultTaskViewProvider, (prev, next) => _saveSettings(ref));
   ref.listen(showDayCounterProvider, (prev, next) => _saveSettings(ref));
+  // The choice, not the style in use: a random launch drawing a new style is
+  // not a change of setting
+  ref.listen(appStyleChoiceProvider, (prev, next) => _saveStyle(ref));
 
   var handlingGuestLogin = false;
 
@@ -79,6 +83,7 @@ final syncProvider = Provider<void>((ref) {
         ref.read(reviewsProvider.notifier).load(uid);
         ref.read(profileProvider.notifier).load(uid);
         _loadSettings(ref, uid);
+        _loadStyle(ref, uid);
       } else {
         _clearAll(ref);
       }
@@ -120,6 +125,7 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   unawaited(ref.read(reviewsProvider.notifier).load(uid));
   unawaited(ref.read(profileProvider.notifier).load(uid));
   unawaited(_loadSettings(ref, uid));
+  unawaited(_loadStyle(ref, uid));
 }
 
 void _loadGuest(Ref ref) {
@@ -207,6 +213,47 @@ Future<void> _saveSettings(Ref ref) async {
       'semester_start_months': sem.startMonths,
       'default_task_view': ref.read(defaultTaskViewProvider),
       'show_day_counter': ref.read(showDayCounterProvider),
+    });
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
+}
+
+// ── Style sync ─────────────────────────────────────────────────────────────────
+//
+// Read and written on its own rather than as part of _loadSettings' select and
+// _saveSettings' upsert: user_settings.app_style is added by
+// supabase/app_style.sql, and until that has been run a query naming the
+// column fails. Kept apart, only the style stops syncing (and says so) while
+// language, date format and the rest carry on
+
+Future<void> _loadStyle(Ref ref, String uid) async {
+  try {
+    final row = await Supabase.instance.client
+        .from('user_settings')
+        .select('app_style')
+        .eq('user_id', uid)
+        .maybeSingle();
+    final name = row?['app_style'] as String?;
+    // Nothing stored yet: keep what this device already shows, and the first
+    // change writes it up
+    if (name == null) return;
+    await ref.read(appStyleProvider.notifier).applyChoice(name);
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
+}
+
+Future<void> _saveStyle(Ref ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return;
+  if (ref.read(guestModeProvider)) return;
+  try {
+    // Only these two columns: an upsert updates just the columns it names, so
+    // the rest of the row is left as it is
+    await Supabase.instance.client.from('user_settings').upsert({
+      'user_id': uid,
+      'app_style': ref.read(appStyleChoiceProvider),
     });
   } catch (e) {
     reportSyncError(ref, e);

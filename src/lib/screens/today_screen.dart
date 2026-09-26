@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show FilteringTextInputFormatter, LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/haptics.dart';
 import '../core/input_limits.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/recent_picks.dart';
@@ -25,9 +27,12 @@ import '../providers/recent_picks_provider.dart';
 import '../providers/profile_provider.dart';
 import '../utils/category_helpers.dart';
 import '../utils/semester_helpers.dart';
+import '../widgets/animated_rows.dart';
+import '../widgets/animated_strike.dart';
 import '../widgets/completion_effect.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/flip_text.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/semester_grouped_picker.dart';
 import '../widgets/sheet_body.dart';
@@ -192,7 +197,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.filter_list, size: 14, color: AppColors.primary),
+                      Icon(Icons.filter_list, size: 14, color: AppColors.primary),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
                         '${s.filters}$kDotSeparator${targetFilter.length}',
@@ -206,7 +211,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                         onTap: () {
                           ref.read(taskTargetFilterProvider.notifier).state = const {};
                         },
-                        child: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                        child: Icon(Icons.close, size: 14, color: AppColors.primary),
                       ),
                     ],
                   ),
@@ -437,7 +442,7 @@ class _WeeklyGridState extends ConsumerState<_WeeklyGrid> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           final ctx = _dayKeys[dayIndex].currentContext;
           if (ctx != null) {
-            Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300));
+            Scrollable.ensureVisible(ctx, duration: AppMotion.move, curve: AppMotion.moveCurve);
           }
         });
       }
@@ -516,7 +521,7 @@ class _DayRow extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        border: isFirst ? null : const Border(top: BorderSide(color: AppColors.border)),
+        border: isFirst ? null : Border(top: BorderSide(color: AppColors.border)),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -529,7 +534,7 @@ class _DayRow extends ConsumerWidget {
                 child: Container(
                   width: dateColumnWidth,
                   padding: const EdgeInsets.only(top: 10, bottom: 10),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(right: BorderSide(color: AppColors.border)),
                   ),
                   child: Column(
@@ -650,15 +655,15 @@ class _WeekTaskTile extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    task.title,
+                  AnimatedStrikeText(
+                    text: task.title,
+                    struck: isCompleted,
+                    struckColor: AppColors.textTertiary,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          decoration: isCompleted ? TextDecoration.lineThrough : null,
-                          color: isCompleted ? AppColors.textTertiary : AppColors.textPrimary,
+                          color: AppColors.textPrimary,
                         ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   if (meta != null)
                     Row(
@@ -733,7 +738,8 @@ class _SummaryCard extends ConsumerWidget {
               padding: const EdgeInsets.all(AppSpacing.cardPadding),
               child: Row(
                 children: [
-                  SizedBox(
+                  // Anchored so the day's confetti can burst from it
+                  TourAnchor(id: 'today.ring', child: SizedBox(
                     width: 72,
                     height: 72,
                     child: Tooltip(
@@ -741,8 +747,8 @@ class _SummaryCard extends ConsumerWidget {
                       waitDuration: const Duration(milliseconds: 400),
                       child: TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0, end: progress),
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeOutCubic,
+                        duration: scaled(context, AppMotion.enter),
+                        curve: AppMotion.enterCurve,
                         builder: (context, value, _) => Stack(
                           fit: StackFit.expand,
                           children: [
@@ -765,28 +771,36 @@ class _SummaryCard extends ConsumerWidget {
                         ),
                       ),
                     ),
-                  ),
+                  )),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        FlipText(
                           s.tasksCompleted(completed, total),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         if (allDone) ...[
                           const SizedBox(height: AppSpacing.xs),
+                          // Lands softly after the ring closes, instead of the
+                          // old elastic wobble
                           TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0.6, end: 1),
-                            duration: const Duration(milliseconds: 500),
-                            curve: Curves.elasticOut,
-                            builder: (_, v, child) =>
-                                Transform.scale(scale: v, alignment: Alignment.centerLeft, child: child),
+                            tween: Tween(begin: 0, end: 1),
+                            duration: scaled(context, AppMotion.enter),
+                            curve: AppMotion.enterCurve,
+                            builder: (_, v, child) => Opacity(
+                              opacity: v,
+                              child: Transform.scale(
+                                scale: 0.85 + 0.15 * v,
+                                alignment: Alignment.centerLeft,
+                                child: child,
+                              ),
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.celebration, size: 16, color: AppColors.warning),
+                                Icon(Icons.celebration, size: 16, color: AppColors.warning),
                                 const SizedBox(width: AppSpacing.xs),
                                 Text(
                                   s.allDoneToday,
@@ -859,8 +873,8 @@ class _InspirationsQuickList extends ConsumerWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 2),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
                               child: Icon(
                                 Icons.lightbulb_outline,
                                 size: 16,
@@ -926,7 +940,7 @@ class _TasksSection extends ConsumerWidget {
           height: 40,
           child: Row(
             children: [
-              Text(s.tasksWithCount(tasks.length), style: Theme.of(context).textTheme.titleLarge),
+              FlipText(s.tasksWithCount(tasks.length), style: Theme.of(context).textTheme.titleLarge),
               const Spacer(),
               SortButton(
                 s: s,
@@ -973,21 +987,24 @@ class _TasksSection extends ConsumerWidget {
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(color: AppColors.border, width: 1),
             ),
-            child: tasks.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.lg,
-                    ),
-                    child: EmptyState(
-                      icon: Icons.task_alt,
-                      message: s.noTasks,
-                      actionLabel: s.addTask,
-                      onAction: () => showTaskSheet(context, ref),
-                      compact: true,
-                    ),
-                  )
-                : _DraggableTaskList(tasks: tasks),
+            // One list either way, so the last ticked row can finish leaving
+            // before the empty state takes its place
+            child: _DraggableTaskList(
+              tasks: tasks,
+              empty: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.lg,
+                ),
+                child: EmptyState(
+                  icon: Icons.task_alt,
+                  message: s.noTasks,
+                  actionLabel: s.addTask,
+                  onAction: () => showTaskSheet(context, ref),
+                  compact: true,
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -1086,9 +1103,15 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
         )
         .toList();
 
-    if (completed.isEmpty) return const SizedBox.shrink();
-
-    return Column(
+    // The section itself unfolds when the first task is done, rather than
+    // popping in under the list
+    return AnimatedSize(
+      duration: scaled(context, AppMotion.enter),
+      curve: AppMotion.enterCurve,
+      alignment: Alignment.topCenter,
+      child: completed.isEmpty
+          ? const SizedBox(width: double.infinity)
+          : Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
@@ -1097,15 +1120,16 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Row(
               children: [
-                Text(
+                FlipText(
                   s.completedTasksWithCount(completed.length),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.expand_more, color: AppColors.textSecondary),
+                  duration: scaled(context, AppMotion.move),
+                  curve: AppMotion.moveCurve,
+                  child: Icon(Icons.expand_more, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -1113,8 +1137,8 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
         ),
         const SizedBox(height: AppSpacing.sm),
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
+          duration: scaled(context, _expanded ? AppMotion.enter : AppMotion.exit),
+          curve: _expanded ? AppMotion.enterCurve : AppMotion.exitCurve,
           alignment: Alignment.topCenter,
           child: !_expanded
               ? const SizedBox(width: double.infinity)
@@ -1127,18 +1151,21 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                       border: Border.all(color: AppColors.border, width: 1),
                     ),
-                    child: Column(
+                    // A task ticked above arrives here as its row up there
+                    // folds away, so it reads as one move
+                    child: AnimatedRows(
+                      separatorBuilder: (_, _) => const Divider(height: 1, indent: _taskTitleIndent),
+                      enterDelayFor: (_) => AppMotion.hold,
                       children: [
-                        for (var i = 0; i < completed.length; i++) ...[
-                          if (i > 0) const Divider(height: 1, indent: _taskTitleIndent),
-                          _TaskTile(task: completed[i]),
-                        ],
+                        for (final t in completed)
+                          KeyedSubtree(key: ValueKey(t.id), child: _TaskTile(task: t)),
                       ],
                     ),
                   ),
                 ),
         ),
       ],
+    ),
     );
   }
 }

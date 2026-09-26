@@ -21,6 +21,8 @@ class HomeWidgetService {
   // language. App settings never reach SharedPreferences otherwise, and a guest
   // has no cloud row to read the choice back from
   static const languageKey = 'widget_language';
+  // The app style in use; must match WidgetStyle.KEY in WidgetStyle.kt
+  static const styleKey = 'app_style';
 
   // Must match the provider's class name in AndroidManifest
   static const _providerName = 'TaskWidgetProvider';
@@ -32,12 +34,16 @@ class HomeWidgetService {
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-  Future<void> push(WidgetSnapshot snapshot, {String? languageCode}) async {
+  Future<void> push(WidgetSnapshot snapshot, {String? languageCode, String? styleName}) async {
     if (!isSupported) return;
     try {
       await HomeWidget.saveWidgetData<String>(snapshotKey, snapshot.encode());
       if (languageCode != null) {
         await HomeWidget.saveWidgetData<String>(languageKey, languageCode);
+      }
+      // The app style, which WidgetStyle.kt turns into the widget's colours
+      if (styleName != null) {
+        await HomeWidget.saveWidgetData<String>(styleKey, styleName);
       }
       await HomeWidget.updateWidget(
         androidName: _providerName,

@@ -148,9 +148,9 @@ class FutureGoalDetailScreen extends ConsumerWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading:
-                const Icon(Icons.add, color: AppColors.primary),
+                Icon(Icons.add, color: AppColors.primary),
             title: Text(s.addSubgoal,
-                style: const TextStyle(color: AppColors.primary)),
+                style: TextStyle(color: AppColors.primary)),
             onTap: () =>
                 showFutureGoalSheet(context, ref, parentId: goalId),
           ),
@@ -201,7 +201,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
                         .read(semesterGoalsProvider.notifier)
                         .linkFutureGoal(target.id, null),
                   ),
-                  const Icon(Icons.arrow_forward_ios,
+                  Icon(Icons.arrow_forward_ios,
                       size: 12, color: AppColors.textTertiary),
                 ],
               ),
@@ -215,9 +215,9 @@ class FutureGoalDetailScreen extends ConsumerWidget {
             ),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.add_link, color: AppColors.primary),
+            leading: Icon(Icons.add_link, color: AppColors.primary),
             title: Text(s.addLinkedTarget,
-                style: const TextStyle(color: AppColors.primary)),
+                style: TextStyle(color: AppColors.primary)),
             onTap: () => _showTargetSelectorForGoal(context, ref, goalId),
           ),
         ],
@@ -384,8 +384,8 @@ class _GoalTreeTile extends ConsumerWidget {
                 }
               },
             ),
-            const Padding(
-              padding: EdgeInsets.only(right: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
               child: Icon(Icons.arrow_forward_ios,
                   size: 12, color: AppColors.textTertiary),
             ),
@@ -462,7 +462,7 @@ void _showTargetSelectorForGoal(
                 .toList();
             if (targets.isEmpty) {
               return Text(s.noTargets,
-                  style: const TextStyle(color: AppColors.textTertiary));
+                  style: TextStyle(color: AppColors.textTertiary));
             }
             return ListView(
               shrinkWrap: true,

@@ -1,35 +1,49 @@
 import 'package:flutter/material.dart';
+import 'app_styles.dart';
 
+// The colours of the style in use (system_design.md §3-R). Getters rather than
+// constants so the whole app can change style at run time; App calls use() and
+// then rebuilds every widget. Anything built from these cannot be `const`.
 class AppColors {
-  // Background layers (warm linen tones)
-  static const background     = Color(0xFFF8F4EF); // Page background — warm off-white
-  static const surface        = Color(0xFFFFFFFF); // Cards, input fields
-  static const surfaceVariant = Color(0xFFEDE5D8); // Secondary cards, disabled state
+  AppColors._();
 
-  // Primary (warm caramel brown — linen family)
-  static const primary        = Color(0xFFA07850); // Main CTA color
-  static const primaryLight   = Color(0xFFF2EAE0); // Tag backgrounds, chip selected
-  static const primaryDark    = Color(0xFF7A5A38); // Pressed state
+  static StylePalette _p = kStylePalettes[AppStyle.linen]!;
+  static StylePalette get palette => _p;
 
-  // Text hierarchy (warm brown tones)
-  static const textPrimary    = Color(0xFF2A1E12); // Main text
-  static const textSecondary  = Color(0xFF6B5843); // Descriptions, secondary info
-  static const textTertiary   = Color(0xFFB09A84); // Placeholders, hints
-  static const textOnPrimary  = Color(0xFFFFFFFF); // Text on primary-colored background
+  // Only App (and tests) switch styles; everything else just reads
+  static void use(StylePalette palette) => _p = palette;
+
+  // Background layers
+  static Color get background => _p.background; // Page background
+  static Color get surface => _p.surface; // Cards, input fields
+  static Color get surfaceVariant => _p.surfaceVariant; // Secondary cards, disabled state
+
+  // Primary
+  static Color get primary => _p.primary; // Main CTA color
+  static Color get primaryLight => _p.primaryLight; // Tag backgrounds, chip selected
+  static Color get primaryDark => _p.primaryDark; // Pressed state
+
+  // Text hierarchy
+  static Color get textPrimary => _p.textPrimary; // Main text
+  static Color get textSecondary => _p.textSecondary; // Descriptions, secondary info
+  static Color get textTertiary => _p.textTertiary; // Placeholders, hints
+  // White in every style: it also sits on the category-coloured add buttons
+  static const textOnPrimary = Color(0xFFFFFFFF);
 
   // Semantic colors
-  static const success        = Color(0xFF10B981);
-  static const successLight   = Color(0xFFD1FAE5);
-  static const warning        = Color(0xFFF59E0B);
-  static const warningLight   = Color(0xFFFEF3C7);
-  static const error          = Color(0xFFEF4444);
-  static const errorLight     = Color(0xFFFEE2E2);
+  static Color get success => _p.success;
+  static Color get successLight => _p.successLight;
+  static Color get warning => _p.warning;
+  static Color get warningLight => _p.warningLight;
+  static Color get error => _p.error;
+  static Color get errorLight => _p.errorLight;
 
   // Borders
-  static const border         = Color(0xFFDDD0C0); // Default border
-  static const borderFocus    = Color(0xFFA07850); // Focused border (same as primary)
+  static Color get border => _p.border; // Default border
+  static Color get borderFocus => _p.primary; // Focused border (same as primary)
 
-  // Category colors (Future Goal categories)
+  // Category colors (Future Goal categories). The user's data, so the same in
+  // every style
   static const categoryExchange    = Color(0xFF4A90C4); // Exchange: soft blue
   static const categoryIntern      = Color(0xFF7B5CB8); // Intern: soft purple
   static const categoryCompetition = Color(0xFFE8980A); // Competition: warm amber

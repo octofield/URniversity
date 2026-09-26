@@ -122,6 +122,13 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
 | Current account's display name / avatar | `displayIdentityProvider` | `providers/profile_provider.dart` |
 | `—` `→` ` · ` placeholders | `kEmptyValue`, `kArrow`, `kDotSeparator` | `core/ui_symbols.dart` |
 | Pumping a screen in a widget test | `setUpTestSupabase()`, `pumpScreen()`, `pumpApp()` | `test/helpers/pump_app.dart` |
+| Animation duration / curve (never a bare ms number) | `AppMotion`, `scaled()`, `motionScale()` | `core/theme/app_motion.dart` |
+| Rows that arrive and leave in a list | `AnimatedRows` | `widgets/animated_rows.dart` |
+| A heading whose count changes | `FlipText` | `widgets/flip_text.dart` |
+| A card that opens its detail page | `ExpandingCard` | `widgets/expanding_card.dart` |
+| A vibration | `haptic(ref, HapticKind.…)` | `core/haptics.dart` |
+| Colours, corner radii of the current style | `AppColors`, `AppRadius` | `core/theme/app_colors.dart`, `app_radius.dart` |
+| Width breakpoints | `AppBreakpoints.desktop` / `.wide` | `core/theme/app_breakpoints.dart` |
 
 ### Hard rules
 
@@ -159,7 +166,76 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
    and one only in the database shows up as a sync failure (`23514`) after the
    user has typed. `SheetTextField`'s `maxLength` is required for this reason.
    See `docs/data_dictionary.md` D0.
-10. Always concern responsive designs.
+10. **Every screen is responsive and animated by the rules below** — §10 Responsive Design,
+    §11 Motion and §12 Styles are part of "done", not polish for later.
+
+## 10. Responsive Design
+
+**Always concern responsive designs.** The same build runs on a 360-px phone, a tablet and a
+1400-px desktop window; a screen is finished only when it works at all three.
+
+- **Layout follows the window width, never the platform.** A narrow web window gets the
+  phone layout. Breakpoints live in `AppBreakpoints`: below `desktop` (768) is the phone
+  layout with a bottom navigation bar; from 768 the navigation rail; from `wide` (1200) the
+  extended rail and larger content caps.
+- **Cap line length on wide screens.** Single-column screens go inside `ResponsiveBody`;
+  bottom sheets are capped at 640 by the theme; pages keep `AppSpacing.pageHorizontal`
+  (20) at the sides.
+- **No horizontal scroll, no overflow stripes.** A `Text` inside a `Row` gets `Flexible`
+  or `Expanded` plus `maxLines`/`overflow`; long user titles wrap rather than being cut
+  (see §2-K in `system_design.md`). Never size a list with `IntrinsicHeight` — lay the row
+  out and paint decorations over it with a `Stack`.
+- **Floating things are placed against the screen, not hard-coded.** Tour cards use
+  `placeCoachCard()` (beside the target on wide screens, above/below on phones, clear of
+  the keyboard); add buttons are draggable and remember their position as a fraction.
+- **Check three widths**: 360, 768 and 1280. Widget tests set the size with
+  `setViewWidth()`; a layout rule that matters gets a test at more than one width.
+
+## 11. Motion
+
+`system_design.md` §3-Q is the source of truth. Movement follows Material 3 motion: it
+explains where something came from and where it went, and never makes the user wait.
+
+- **Durations and curves come only from `AppMotion`** — never a bare millisecond number.
+  `enter` (emphasized decelerate) for things arriving, `exit` (emphasized accelerate,
+  shorter) for things leaving, `move` (standard) for things already on screen changing
+  place or value, `page` for page-level transitions, `hold` for the pause after a tick.
+- **Pick the transition by the relationship:** top-level tabs fade in (no slide — they are
+  not a sequence); ordinary pages use the platform transition from the theme (predictive
+  back on Android, Cupertino on Apple, fade-forwards elsewhere); a card opening its own
+  detail grows into it (`ExpandingCard`); steps of a flow use shared axis; sheets rise.
+- **Respect "reduce motion".** Custom controllers and holds are multiplied by
+  `motionScale(context)`; implicit animations take `scaled(context, …)`, which returns one
+  microsecond rather than zero (`AnimatedSize` asserts on a zero duration).
+- **Lists change through `AnimatedRows`**: a removed row can be held, then folds away; new
+  rows unfold. Counts in headings use `FlipText`.
+- **Animate with controllers, never `Timer` or `Future.delayed`.** `pumpAndSettle()` waits
+  for controllers and fails on stray timers; a ticked task stays on screen for about 0.55 s,
+  so tests settle before asserting it has gone (`testing.md` §2.6).
+- **Vibration only through `haptic()`**, which obeys the user's own switch (D25). Buzz for a
+  tick, the day's last task and a drop — nothing else.
+
+## 12. Styles
+
+The user picks one of several styles (colours, typeface and corner radius together —
+`system_design.md` §3-R). The app switches style at run time, so:
+
+- **Colours come only from `AppColors`, radii only from `AppRadius`.** No `Color(0x…)` in
+  screens. Category and avatar colours are the user's data and deliberately the same in
+  every style.
+- **An expression that reads `AppColors` or `AppRadius` cannot be `const`** — they are
+  getters over the current style.
+- **Look at a new screen in a light style and in Midnight (dark).** Anything drawn on a
+  hard-coded white or black is suspect.
+- **A new style must pass `test/app_styles_test.dart`** (WCAG contrast for body, secondary
+  and on-primary text) before it ships.
+- **The Android side is generated.** Launcher icons, splash themes and the widget's colours
+  come from `scripts/style_assets/generate.py` reading `palettes.json`. Change a palette in
+  `kStylePalettes` and you change `palettes.json` and re-run the script in the same change —
+  `test/style_assets_test.dart` fails otherwise. Never hard-code a colour in the widget's
+  Kotlin or layouts; go through `WidgetStyle`.
+- **A new style is also a launcher alias** (`AndroidManifest.xml`), a `LaunchTheme.<Style>`
+  and an entry in `MainActivity`'s and `WidgetStyle`'s lists — the assets test checks all four.
 
 ---
 

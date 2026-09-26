@@ -79,7 +79,8 @@ flowchart TD
     Future -.->|「更多分類」對話框| CatSettings
 ```
 
-- `Home` 為單一 `Scaffold`，用 `IndexedStack` 切換四個分頁，切換分頁不重建畫面（狀態保留）。
+- `Home` 為單一 `Scaffold`，用 `IndexedStack` 切換四個分頁，切換分頁不重建畫面（狀態保留）；
+  新分頁以 M3 的快速淡入出現（§3-Q）。
 - 響應式判斷（詳見 §3-F）：寬度 < 768 用底部 `NavigationBar`；≥ 768 用左側 `NavigationRail`；
   ≥ 1200 時 `NavigationRail` 展開顯示文字。
 
@@ -162,16 +163,20 @@ API，等於把那份名單公開出去。
 點日期欄設為選取日並捲動到該列；點任務開編輯 sheet；篩選與其他檢視共用。
 
 **已完成區塊**：標題可點，`AnimatedSize` 展開／收合，**預設收合**，狀態只存在記憶體。
+第一筆完成時整個區塊展開出現，標題的數字向上翻動（`FlipText`）。
 
-**完成動畫（`widgets/completion_effect.dart`，今日頁與週檢視共用）**：設定 D17 決定強度——
-`off` 沒有動畫；`basic` 勾選框放大**再回到原大小**（`TweenSequence`；單向的 tween 會讓框停在放大後的尺寸，
-那就是 2026-09-17 回報的「畫面上留下一個大框框」）；`celebrate` 再加上自繪彩帶，且**只在當天最後一筆
-未完成任務被勾掉時**放（每筆都放太吵）。動畫純粹是外觀，寫入照舊發生。
+**打勾的動態**（§3-Q 有完整流程圖）：勾選當下就寫入；列**不會立刻消失**——標題的刪除線由左畫到右
+（`AnimatedStrikeText`），停留 `AppMotion.hold`，再淡出並收合高度（`AnimatedRows`），
+同時出現在已完成區。最後一筆離開後「沒有任務」才展開，不會把還在離場的那一列切掉。
 
-⚠️ **動畫要畫在 `Overlay` 上**（`showCompletionPop()`）。勾選當下就寫入，那一列在下一個
-frame 就離開清單（進入已完成區或被篩掉），長在列身上的動畫等於沒播——這是 2026-09-19
-回報的「完成動畫消失了」。改成在原位置丟一個獨立的圓圈＋打勾疊層（約 420ms 後自行移除），
-列消失也照播完。
+**完成效果（`widgets/completion_effect.dart`，今日頁與週檢視共用）**：設定 D17 決定強度——
+`off` 沒有額外效果（刪除線與收合仍然有，那是清單本身的變化）；`basic` 勾選框**先下壓再微彈回原大小**
+（`TweenSequence` 一次走完；單向的 tween 會讓框停在放大後的尺寸，那就是 2026-09-17 回報的
+「畫面上留下一個大框框」）；`celebrate` 再加上自繪彩帶，且**只在當天最後一筆未完成任務被勾掉時**放
+（每筆都放太吵），從摘要卡的完成環噴出。觸覺回饋另有開關（D25）。
+
+2026-09-19 曾因「列在下一個 frame 就離開清單，長在列上的動畫等於沒播」改用 `Overlay` 疊一個打勾圓圈；
+現在列本身會停留，那個疊層已移除。
 
 **拖曳排序**：任務列表與兩個目標頁共用同一套命中判定（`widgets/drag_reorder.dart`
 的 `dropZoneFor()`）——詳見 §3-C，但任務是**單層清單**，呼叫時帶 `canNest: false`，只認
@@ -290,6 +295,7 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 | 欄位 | 輸入元件 | 格式 |
 |---|---|---|
 | 語言 | 單選清單 | 繁中／English／日本語 |
+| 風格 | 預覽卡片格（sheet，手機 2 欄、較寬 3 欄） | 「隨機」加七種風格，點了立即套用、sheet 不關，可直接比較；每張卡寫出英文與中文字體名稱（見 §3-R） |
 | 日期顯示格式 | 單選清單（附即時預覽） | 4 種格式，見 data_dictionary.md |
 | 預設任務檢視 | 單選清單 | 全部／每日／每週 |
 | 學期制度 | 數字選擇 + 每學期起始月 | 每年 2/3/4 學期，起始月 1–12 |
@@ -1061,6 +1067,151 @@ overlay entry（導覽）**留在最上層**（`navigator.dart` 的 `_flushHisto
 **提醒**（§3-K 的第四種）：每個週日在設定的時刻（預設 20:00）；那一週**已經回顧過**就不排；payload 是固定字串
 `open_review`（沒有 `|`，不會被當成任務的 payload），點開後由 `_handlePendingOpen` 打開當下該做的回顧，
 若已在別的裝置做完就什麼都不開。
+
+### 3-Q 動態設計（`core/theme/app_motion.dart`）
+
+依 Material 3 motion：時長與曲線**直接取 Flutter 內建的 M3 token**（`Durations`、`Easing`），
+`AppMotion` 只給它們語意名稱；程式裡不再寫死毫秒數。
+
+| 名稱 | 值 | 用在 |
+|---|---|---|
+| `quick` | `Durations.short4`（200ms） | hover、按下、拖放目標高亮 |
+| `enter`＋`enterCurve` | `Durations.medium4`（400ms）＋`Easing.emphasizedDecelerate` | 進場：sheet、展開、新列、進度 |
+| `exit`＋`exitCurve` | `Durations.short4`（200ms）＋`Easing.emphasizedAccelerate` | 離場：關閉、收合、列離開 |
+| `move`＋`moveCurve` | `Durations.medium2`（300ms）＋`Easing.standard` | 畫面上的位移與數值變化、刪除線 |
+| `page` | `Durations.medium3`（350ms） | 分頁淡入、卡片展開、回顧換步驟、splash 淡出 |
+| `hold` | 350ms | 打勾後停留，讓人看到刪除線 |
+
+**各種轉場用哪個模式**：
+
+| 情境 | 模式 | 實作 |
+|---|---|---|
+| 導覽列／rail 切換分頁 | 快速淡入（fade through 的進場半段，0.98→1） | `home_screen.dart` `_TabFade`，底下仍是 `IndexedStack` |
+| 一般頁面 | Android：預測返回；iOS、macOS：Cupertino；其他：fade-forwards | `app_theme.dart` `pageTransitionsTheme`；Android 需 manifest 的 `enableOnBackInvokedCallback` |
+| 目標卡、願景卡 → 詳情頁 | container transform（卡片長成整頁） | `widgets/expanding_card.dart`（`animations` 套件的 `OpenContainer`）；只有卡片標頭列，里程碑列照一般頁面 |
+| 回顧三步驟 | shared axis X | `review_screen.dart` `PageTransitionSwitcher`＋`SharedAxisTransition` |
+| sheet | 由下升起、較快收回 | `showAppSheet` 的 `sheetAnimationStyle` |
+| 清單列的增減 | 展開／停留後收合 | `widgets/animated_rows.dart` |
+| 標題裡的數字 | 向上翻動 | `widgets/flip_text.dart` |
+| 新增鈕 | 換分頁時顏色漸變、圖示轉入；按下縮到 0.92 | `_VividFab`（按下用 `Listener`，因為按鈕也能拖曳，`onTapDown` 要等 100ms 才觸發） |
+
+**打勾的完整流程**：
+
+```mermaid
+flowchart TD
+    Tap(["點勾選框"]) --> Write["toggleOnDate 寫入（立即）"]
+    Tap --> Haptic{"觸覺回饋開啟?（D25）"}
+    Haptic -->|是| Buzz["最後一筆：medium；其他：light；取消勾：selection"]
+    Tap --> Effect{"完成效果（D17）"}
+    Effect -->|basic／celebrate| Pop["勾選框 1 → 0.9 → 1.08 → 1"]
+    Effect -->|celebrate 且是當天最後一筆| Confetti["從完成環噴彩帶（空氣阻力＋翻面，1.1s）"]
+    Write --> Strike["標題刪除線由左畫到右（move）"]
+    Strike --> Hold["停留 hold"]
+    Hold --> Fold["淡出＋收合高度（exit），下方列往上補"]
+    Write --> Arrive["已完成區：等 hold 後展開出現"]
+    Fold --> Empty{"清單空了?"}
+    Empty -->|是| EmptyState["「沒有任務」展開（等 hold＋exit）"]
+```
+
+`AnimatedRows` 以 key 比對前後兩次的列：消失的列保留最後的 widget、`IgnorePointer`，
+一支 controller 跑完「停留＋收合」（收合是 `Interval` 後段）；新列展開；留著的列不動、state 保留。
+被移走的任務列之所以畫得出刪除線，是因為 `_TaskTile` 讀的是 provider 裡**當下**的那筆任務，
+不是建立時傳進來的舊物件。
+
+**減少動態**：系統開啟「移除動畫」（`MediaQuery.disableAnimations`）時，`motionScale()` 為 0：
+自訂 controller 與停留時間直接跳到結果，彩帶不放，關聯圖粒子停止。隱式動畫用 `scaled()`，
+回傳 1 微秒而不是 0——`AnimatedSize` 收到 0 會在自己的 layout 裡完成動畫、觸發框架斷言。
+
+**刻意不做**：清單第一次出現的錯開進場。資料已改成開 App 立刻出現（D24），再加進場延遲只會讓開啟變慢。
+
+### 3-R 風格系統（`core/theme/app_styles.dart`）
+
+使用者可選七種風格。一個風格是**顏色＋字體＋圓角**一起變：只換顏色的圓潤版面稱不上「現代」，只換字體也不會變「安靜」。
+配色依 Material 3 色彩系統（種子色產生配色，再固定成風格自己的中性色）與 2026 行動 App 趨勢
+（一兩個中性底色撐起畫面、強調色少而明確、深色用炭灰而非純黑）。
+
+| 風格 | 感覺 | 底色／卡片 | 主色 | 字體 | 卡片圓角 |
+|---|---|---|---|---|---|
+| 暖棕 `linen`（預設） | 溫暖、手帳感 | `F8F4EF`／`FFFFFF` | `A07850` | Nunito | 16 |
+| 現代 `modern` | 冷調中性＋靛藍 | `F8FAFC`／`FFFFFF` | `4F46E5` | Inter | 12 |
+| 午夜 `midnight`（深色） | 炭灰＋長春花藍 | `0F1115`／`181B21` | `7383F5` | Manrope | 14 |
+| 抹茶 `sage` | 自然、安靜 | `F4F6F1`／`FFFFFF` | `4F7A5A` | DM Sans | 18 |
+| 海洋 `ocean` | 清爽、專注 | `F2F7FA`／`FFFFFF` | `0E7490` | Plus Jakarta Sans | 16 |
+| 櫻花 `sakura` | 柔和、圓潤 | `FFF7F8`／`FFFFFF` | `D6617A` | Quicksand | 20 |
+| 極簡 `mono` | 黑白、銳利 | `FAFAFA`／`FFFFFF` | `18181B` | Space Grotesk | 8 |
+
+完整色值見 `kStylePalettes`。其他圓角依卡片圓角等比例換算（`AppRadius`：×0.375／0.5／0.75／1／1.5）。
+**分類色與頭像色是使用者的資料**，所有風格都一樣；`textOnPrimary` 一律白色（它也畫在分類色的新增鈕上）。
+
+**對比規則**（`test/app_styles_test.dart`，WCAG）：本文對底色與卡片 ≥ 7:1；次要文字 ≥ 4.5:1；
+提示文字對卡片 ≥ 2.5:1；白字對主色 ≥ 3:1；主色對底色 ≥ 3:1。
+實作時這條測試抓到四個差一點的色值：午夜主色、抹茶／海洋／櫻花的提示文字，都已微調。
+
+**切換流程**：
+
+```mermaid
+flowchart TD
+    Pick(["設定 › 風格 › 點一張卡片"]) --> Set["AppStyleNotifier.set：寫 D26"]
+    Set --> Sync["sync_provider：_saveStyle 寫 user_settings.app_style（登入時）"]
+    Set --> Listen["App 的 ref.listen"]
+    Listen --> Snap["StyleCrossfade 截下舊畫面（減少動態時略過）"]
+    Snap --> Mark["_rebuildEverything：每個 element markNeedsBuild"]
+    Mark --> Build["App 先重建：AppColors.use(新風格)、buildAppTheme(新風格)"]
+    Build --> Rest["其餘所有 widget 重建，讀到新的 AppColors／AppRadius"]
+    Rest --> Fade["舊畫面的截圖淡出（AppMotion.page）"]
+```
+
+- `AppColors`／`AppRadius` 是讀目前風格的 getter，所以用到它們的運算式不能是 `const`。
+- 大多數 widget 直接讀 `AppColors`、不依賴 `Theme`，換主題不會讓它們重建；所以要讓整棵樹重建一次。
+  重建不會重建 State：導覽堆疊、捲動位置、開著的 sheet 都留在原位。
+- Material 自己的元件（對話框、日期選擇器、選單、SnackBar）吃 `ColorScheme`：
+  以主色為種子產生，再把 surface、outline、onSurface 等固定成風格自己的值，深色風格因此會得到深色對話框。
+- 字體由 `google_fonts` 在第一次使用時下載並快取，離線時暫用系統字體。
+
+**中文字體**：每個風格配一套中文字體，作為英文字體的 `fontFamilyFallback`——英數用風格的英文字體，
+中文字元落到中文字體。只下載一般（400）與粗體（700）兩個檔；字重 600 以上的樣式用粗體檔，
+呼叫處另外加粗的由引擎用一般檔合成。風格選單只寫出字體名稱、不預覽中文字體（否則一開選單就要下載三套）。
+
+| 中文字體 | 風格 |
+|---|---|
+| 霞鶩文楷 LXGW WenKai TC | 暖棕、櫻花 |
+| 思源黑體 Noto Sans TC | 現代、午夜、海洋 |
+| 思源宋體 Noto Serif TC | 抹茶、極簡 |
+
+**隨機**：選擇（`appStyleChoiceProvider`：某個風格或 `random`）與當次生效的風格（`appStyleProvider`）分開存。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Preload: 冷啟動（runApp 之前）
+    Preload --> Fixed: app_style 是某個風格
+    Preload --> Draw: app_style = random
+    Draw --> UsePlanned: app_style_next 有效且不等於 app_style_last
+    Draw --> Redraw: 否則
+    UsePlanned --> Plan
+    Redraw --> Plan: 抽一個 ≠ last
+    Plan --> Running: 記 last＝這次；抽 next ≠ 這次；setSplash(next)
+    Fixed --> Running
+    Running --> Running: 回到前景（不重抽）
+```
+
+- 在設定裡點「隨機」：立刻換成和目前不同的一個，並預抽下一次；**不換圖示**（每次開啟都換圖示，桌面上的圖示就永遠對不上）。
+- 點某個風格：套用，並 `setIcon` 與 `setSplash`。
+- 同步到雲端的是**選擇**；隨機抽到的風格不寫回，以免每次開啟都算一次設定變更。
+
+**App 外的部分（Android）**：素材由 `scripts/style_assets/generate.py` 從 `palettes.json` 產生
+（`test/style_assets_test.dart` 確保它與 `kStylePalettes` 一致）。
+
+| 部分 | 做法 | 範圍 |
+|---|---|---|
+| 圖示 | 7 個 `activity-alias`（`.StyleLinen`…），各自的圖示；`MainActivity` 經 `urniversity/style` 通道切換啟用哪個（`DONT_KILL_APP`，先啟用新的再停用其他）。圖示是原圖依亮度做漸層映射重新上色 | 手動選風格時；已知限制：切換後數秒內點圖示可能「找不到應用程式」，Android 9 以下會移除桌面捷徑 |
+| 系統啟動畫面 | `SplashScreen.setSplashScreenTheme(LaunchTheme.<Style>)`，系統會記住給下次用 | Android 13+；更舊的版本維持暖棕（`activity-alias` 不能帶主題） |
+| Flutter 等待畫面 | `main()` 在 `runApp` 前就 `AppColors.use()` | 所有平台 |
+| 桌面小工具 | Dart 寫 `app_style`，`WidgetStyle.kt` 換背景、新增鈕、勾選框（Android 12+ 經 `setButtonIcon`）與文字色 | 暖棕沿用原資源並跟著系統深淺色；其他風格用自己的一組 |
+
+`MainActivity` 在原始碼 manifest 裡仍掛著 `MAIN`／`LAUNCHER`，但標了 `tools:node="remove"`：
+`flutter run` 只在 `<activity>` 裡找啟動點、不看 alias，而合併後的 manifest 會移除它，桌面上只出現 alias 的圖示。
+
+**不含 iOS**：iOS 換圖示要改 Xcode 專案設定，這台 Windows 無法建置驗證；iOS 的啟動畫面是固定的 storyboard。
 
 ---
 

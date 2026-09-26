@@ -60,7 +60,7 @@ Widget categoryManageTile({
           visualDensity: VisualDensity.compact,
           onPressed: () => _pickIcon(context, ref, entry),
         ),
-        const Icon(Icons.horizontal_rule, color: AppColors.textTertiary),
+        Icon(Icons.horizontal_rule, color: AppColors.textTertiary),
       ],
     ),
   );
@@ -247,7 +247,7 @@ class _HexColorFieldState extends State<_HexColorField> {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.check, color: AppColors.primary),
+          icon: Icon(Icons.check, color: AppColors.primary),
           onPressed: _submit,
         ),
       ],
@@ -304,7 +304,7 @@ class _CategoryAddRowState extends State<CategoryAddRow> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add, color: AppColors.primary),
+                  icon: Icon(Icons.add, color: AppColors.primary),
                   onPressed: submit,
                 ),
               ],

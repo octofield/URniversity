@@ -4,6 +4,7 @@
      inside the list comes from the snapshot Dart writes; only the tab names
      here are native resources. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"

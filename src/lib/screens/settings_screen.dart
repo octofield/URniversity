@@ -12,6 +12,7 @@ import '../core/ui_symbols.dart';
 import '../core/app_version.dart';
 import '../l10n/app_strings.dart';
 import '../models/review.dart';
+import '../providers/app_style_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/guest_provider.dart';
@@ -23,6 +24,7 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/style_picker_sheet.dart';
 import '../widgets/tour_guide_sheet.dart';
 import 'category_settings_screen.dart';
 import 'notification_settings_screen.dart';
@@ -95,6 +97,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => _showLanguageDialog(context, ref, s, currentLang),
           ),
           ListTile(
+            title: Text(s.appStyle),
+            subtitle: Text(appStyleChoiceName(ref.watch(appStyleChoiceProvider), s)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showStylePicker(context),
+          ),
+          ListTile(
             title: Text(s.dateFormat),
             subtitle: Text(formatDate(DateTime.now(), currentFmt, s)),
             trailing: const Icon(Icons.chevron_right),
@@ -129,6 +137,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => _showCompletionEffectDialog(context, ref, s, completionEffect),
           ),
           SwitchListTile(
+            title: Text(s.haptics),
+            subtitle: Text(s.hapticsSubtitle),
+            value: ref.watch(hapticsProvider),
+            activeThumbColor: AppColors.primary,
+            onChanged: (v) => ref.read(hapticsProvider.notifier).set(v),
+          ),
+          SwitchListTile(
             title: Text(s.showJournalDayCounter),
             value: showDayCounter,
             activeThumbColor: AppColors.primary,
@@ -160,7 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: Text(s.versionLabel),
               subtitle: const Text(kAppVersion),
               trailing: dev.enabled
-                  ? const Icon(Icons.code, color: AppColors.primary)
+                  ? Icon(Icons.code, color: AppColors.primary)
                   : null,
             ),
           ),
@@ -179,7 +194,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.schedule, color: AppColors.primary),
+              leading: Icon(Icons.schedule, color: AppColors.primary),
               title: Text(s.devTimeOverride),
               subtitle: Text(
                 dev.customTime != null
@@ -200,13 +215,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.refresh, color: AppColors.primary),
+              leading: Icon(Icons.refresh, color: AppColors.primary),
               title: Text(s.reset),
               onTap: () =>
                   ref.read(devModeProvider.notifier).setCustomTime(null),
             ),
             ListTile(
-              leading: const Icon(Icons.auto_graph_outlined, color: AppColors.primary),
+              leading: Icon(Icons.auto_graph_outlined, color: AppColors.primary),
               title: Text(s.devOpenReview),
               subtitle: Text(s.devOpenReviewHint),
               trailing: const Icon(Icons.chevron_right),
@@ -216,19 +231,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           if (isGuest)
             ListTile(
-              title: Text(s.exitGuestMode, style: const TextStyle(color: AppColors.error)),
-              leading: const Icon(Icons.logout, color: AppColors.error),
+              title: Text(s.exitGuestMode, style: TextStyle(color: AppColors.error)),
+              leading: Icon(Icons.logout, color: AppColors.error),
               onTap: () => _confirmExitGuest(context, ref),
             )
           else ...[
             ListTile(
-              title: Text(s.logout, style: const TextStyle(color: AppColors.error)),
-              leading: const Icon(Icons.logout, color: AppColors.error),
+              title: Text(s.logout, style: TextStyle(color: AppColors.error)),
+              leading: Icon(Icons.logout, color: AppColors.error),
               onTap: () => _confirmLogout(context, s),
             ),
             ListTile(
-              title: Text(s.deleteAccount, style: const TextStyle(color: AppColors.error)),
-              leading: const Icon(Icons.delete_forever_outlined, color: AppColors.error),
+              title: Text(s.deleteAccount, style: TextStyle(color: AppColors.error)),
+              leading: Icon(Icons.delete_forever_outlined, color: AppColors.error),
               onTap: () => _showDeleteAccountDialog(context, ref, s),
             ),
           ],
@@ -343,7 +358,7 @@ void _confirmLogout(BuildContext context, AppStrings s) {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           },
-          child: Text(s.logout, style: const TextStyle(color: AppColors.error)),
+          child: Text(s.logout, style: TextStyle(color: AppColors.error)),
         ),
       ],
     ),
@@ -668,7 +683,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: Text(
                   _errorMsg!,
-                  style: const TextStyle(color: AppColors.error),
+                  style: TextStyle(color: AppColors.error),
                 ),
               ),
           ] else
@@ -748,7 +763,7 @@ class AccountDataSummary extends ConsumerWidget {
             padding: const EdgeInsets.only(top: 2),
             child: Row(
               children: [
-                const Icon(Icons.remove, size: 12, color: AppColors.error),
+                Icon(Icons.remove, size: 12, color: AppColors.error),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
                 Text(
