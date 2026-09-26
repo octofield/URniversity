@@ -20,6 +20,7 @@ object WidgetData {
     const val MODE_TASKS = "tasks"
     const val MODE_TARGETS = "targets"
     const val MODE_GOALS = "goals"
+    const val MODE_CLASSES = "classes"
     const val MODE_PICKER = "filterPicker"
     const val PERIOD_ALL = "all"
     const val PERIOD_DAY = "day"
@@ -69,6 +70,7 @@ object WidgetData {
     private fun viewKey(state: State): String = when (state.mode) {
         MODE_TARGETS -> "targets"
         MODE_GOALS -> "goals"
+        MODE_CLASSES -> "classes"
         MODE_PICKER -> "filter_picker"
         else -> "tasks_${state.period}"
     }
@@ -123,6 +125,7 @@ object WidgetData {
         val key = when (state.mode) {
             MODE_TARGETS -> "targets"
             MODE_GOALS -> "goals"
+            MODE_CLASSES -> "classes"
             MODE_PICKER -> "filter_picker"
             else -> "tasks"
         }

@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/core/widget_snapshot.dart';
 import 'package:urniversity/l10n/strings_en.dart';
 import 'package:urniversity/models/category.dart';
+import 'package:urniversity/models/course.dart';
+import 'package:urniversity/providers/courses_provider.dart' show TermInfo;
 import 'package:urniversity/models/future_goal.dart';
 import 'package:urniversity/models/semester_goal.dart';
 import 'package:urniversity/models/task.dart';
@@ -110,6 +112,7 @@ void main() {
       'tasks_month',
       'targets',
       'goals',
+      'classes',
       'filter_picker',
     });
   });
@@ -375,5 +378,69 @@ void main() {
     final views = json['views'] as Map<String, dynamic>;
     expect((views['tasks_day'] as List).single, containsPair('title', 'Task'));
     expect(json['empty'], containsPair('tasks', s.noTasks));
+  });
+
+  // §3-S: what is left of today's classes, then tomorrow's
+  group('the classes tab', () {
+    // Monday 14 Sep 2026: 10:20–12:10 and 13:20–14:10; Tuesday 09:10–10:00
+    final courses = [
+      Course(
+        id: 'calc',
+        semester: '115-1',
+        title: 'Calculus',
+        color: 0xFF4A90C4,
+        createdAt: DateTime(2026, 9, 1),
+        sessions: const [
+          CourseSession(weekday: 1, startMinute: 620, endMinute: 730, location: 'R102'),
+          CourseSession(weekday: 1, startMinute: 800, endMinute: 850),
+          CourseSession(weekday: 2, startMinute: 550, endMinute: 600),
+        ],
+      ),
+    ];
+
+    List<WidgetRow> classes(DateTime at, {Map<String, TermInfo> terms = const {}}) => buildWidgetSnapshot(
+          tasks: const [],
+          semesterGoals: const [],
+          futureGoals: const [],
+          categories: const [],
+          semesterSettings: semSettings,
+          s: s,
+          now: at,
+          courses: courses,
+          terms: terms,
+        ).views[WidgetSnapshot.viewKey(WidgetMode.classes)]!;
+
+    test('lists what is left of today, with time, room and colour', () {
+      final rows = classes(DateTime(2026, 9, 14, 11));
+      expect(rows.map((r) => r.subtitle), ['10:20–12:10・R102', '13:20–14:10']);
+      expect(rows.first.title, 'Calculus');
+      expect(rows.first.colorArgb, 0xFF4A90C4);
+      expect(rows.first.tapAction, WidgetAction.openItem(kind: 'timetable', id: 'calc'));
+    });
+
+    test('once today is over, tomorrow under a header', () {
+      final rows = classes(DateTime(2026, 9, 14, 15));
+      expect(rows.first.isHeader, isTrue);
+      expect(rows.first.title, s.widgetTomorrow);
+      expect(rows.skip(1).map((r) => r.subtitle), ['09:10–10:00']);
+    });
+
+    test('nothing outside the teaching weeks', () {
+      final rows = classes(DateTime(2026, 9, 14, 11), terms: {'115-1': TermInfo(DateTime(2026, 10, 5))});
+      expect(rows, isEmpty);
+    });
+
+    test('says so when empty', () {
+      final snapshot = buildWidgetSnapshot(
+        tasks: const [],
+        semesterGoals: const [],
+        futureGoals: const [],
+        categories: const [],
+        semesterSettings: semSettings,
+        s: s,
+        now: DateTime(2026, 9, 14, 11),
+      );
+      expect(snapshot.emptyLabels['classes'], s.widgetNoClasses);
+    });
   });
 }

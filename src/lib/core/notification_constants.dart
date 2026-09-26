@@ -12,6 +12,7 @@ class NotificationConstants {
   static const summaryChannelId = 'daily_summary';
   static const goalChannelId = 'goal_deadlines';
   static const reviewChannelId = 'weekly_review';
+  static const classChannelId = 'class_reminders';
 
   // ── Id ranges ─────────────────────────────────────────────────────────────
   // One task can produce several pending notifications (a recurring task fires
@@ -20,6 +21,7 @@ class NotificationConstants {
   static const taskIdBase = 100000;
   static const goalIdBase = 500000;
   static const reviewIdBase = 700000;
+  static const classIdBase = 800000;
 
   // ── Defaults ──────────────────────────────────────────────────────────────
   static const defaultTaskLeadMinutes = 30;
@@ -31,10 +33,13 @@ class NotificationConstants {
   static const defaultGoalLeadDays = 7;
   // Sunday 20:00: the week is over, the evening is not
   static const defaultReviewMinuteOfDay = 20 * 60;
+  // Time to pack up and walk over
+  static const defaultClassLeadMinutes = 10;
 
   // ── Choices offered in the settings screen ────────────────────────────────
   static const taskLeadMinuteOptions = [0, 5, 15, 30, 60, 120, 1440];
   static const goalLeadDayOptions = [1, 3, 7, 14, 30];
+  static const classLeadMinuteOptions = [5, 10, 15, 30];
 
   // ── Scheduling limits ─────────────────────────────────────────────────────
   // A daily recurring task would otherwise generate an unbounded list, and
@@ -43,6 +48,10 @@ class NotificationConstants {
   // accurate; the cap is the backstop when a user has many recurring tasks
   static const scheduleHorizonDays = 14;
   static const maxScheduled = 48;
+  // Classes repeat every week and could crowd out the rest: only the next
+  // week of them, and at most this many
+  static const classHorizonDays = 7;
+  static const maxClassReminders = 20;
 
   // ── Action buttons ────────────────────────────────────────────────────────
   // Sent back as NotificationResponse.actionId. "done" is handled without

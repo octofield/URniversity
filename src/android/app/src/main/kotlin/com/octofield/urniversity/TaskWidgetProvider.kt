@@ -121,6 +121,8 @@ class TaskWidgetProvider : HomeWidgetProvider() {
                     action("mode", "value" to WidgetData.MODE_TARGETS))
                 bindChoice(context, views, style, R.id.tab_goals, state.mode == WidgetData.MODE_GOALS,
                     action("mode", "value" to WidgetData.MODE_GOALS))
+                bindChoice(context, views, style, R.id.tab_classes, state.mode == WidgetData.MODE_CLASSES,
+                    action("mode", "value" to WidgetData.MODE_CLASSES))
 
                 // + adds whatever the current tab lists. It opens the app
                 // directly: there is nothing to decide first, so no receiver hop
@@ -202,6 +204,7 @@ class TaskWidgetProvider : HomeWidgetProvider() {
         private fun newKind(mode: String): String = when (mode) {
             WidgetData.MODE_TARGETS -> "semesterGoal"
             WidgetData.MODE_GOALS -> "futureGoal"
+            WidgetData.MODE_CLASSES -> "course"
             else -> "task"
         }
 

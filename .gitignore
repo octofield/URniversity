@@ -20,6 +20,7 @@ obj/
 *.swp
 *.swo
 *~
+.VSCodeCounter/
 
 # OS
 .DS_Store
@@ -43,3 +44,6 @@ node_modules/
 
 # Android
 .kotlin/
+# Supabase service role key for scripts/catalog (never commit)
+scripts/catalog/.env
+__pycache__/

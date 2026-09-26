@@ -8,6 +8,7 @@ import '../services/home_widget_background.dart';
 import '../services/home_widget_service.dart';
 import 'app_style_provider.dart';
 import 'categories_provider.dart';
+import 'courses_provider.dart';
 import 'future_goals_provider.dart';
 import 'notification_action_provider.dart';
 import 'semester_goals_provider.dart';
@@ -30,6 +31,8 @@ final homeWidgetSyncProvider = Provider<void>((ref) {
     semesterSettings: ref.watch(semesterSettingsProvider),
     s: ref.watch(stringsProvider),
     now: DateTime.now(),
+    courses: ref.watch(coursesProvider),
+    terms: ref.watch(termsProvider),
   );
 
   unawaited(HomeWidgetService.instance.push(
@@ -45,6 +48,7 @@ const _newKinds = {
   'task': 'newTask',
   'semesterGoal': 'newSemesterGoal',
   'futureGoal': 'newFutureGoal',
+  'course': 'newCourse',
 };
 
 // Routes the widget taps that open the app: a row, or the + button. Everything

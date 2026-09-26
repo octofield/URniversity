@@ -136,6 +136,9 @@ class ReviewStats {
   final int? bestWeekday;
   final int journals;
   final List<TargetProgress> targets;
+  // A semester review only: that semester's GPA as it stood (Phase 6); null
+  // for weeks and months, or with no grades yet
+  final double? gpa;
 
   const ReviewStats({
     required this.done,
@@ -146,6 +149,7 @@ class ReviewStats {
     this.bestWeekday,
     required this.journals,
     this.targets = const [],
+    this.gpa,
   });
 
   // Every field falls back: a snapshot written by an older build may be missing
@@ -162,6 +166,7 @@ class ReviewStats {
           for (final t in (j['targets'] as List<dynamic>? ?? const []))
             TargetProgress.fromJson((t as Map).cast<String, dynamic>()),
         ],
+        gpa: (j['gpa'] as num?)?.toDouble(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -173,5 +178,6 @@ class ReviewStats {
         'best_weekday': bestWeekday,
         'journals': journals,
         'targets': [for (final t in targets) t.toJson()],
+        'gpa': gpa,
       };
 }

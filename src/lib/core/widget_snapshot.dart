@@ -2,7 +2,11 @@ import 'dart:convert';
 
 import '../l10n/app_strings.dart';
 import '../models/category.dart';
+import '../models/course.dart';
 import '../models/future_goal.dart';
+import '../providers/courses_provider.dart' show TermInfo;
+import 'review_stats.dart' show termAt;
+import 'timetable.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
@@ -13,7 +17,7 @@ import '../utils/semester_helpers.dart';
 // What the widget is showing. Owned by the native side now: switching is done
 // there without waking Dart, so these names are only the vocabulary the action
 // URIs and the snapshot keys share with Kotlin
-enum WidgetMode { tasks, targets, goals, filterPicker }
+enum WidgetMode { tasks, targets, goals, classes, filterPicker }
 
 // `all` is first because it sits leftmost in the widget's period row
 enum WidgetPeriod { all, day, week, month }
@@ -92,6 +96,7 @@ class WidgetSnapshot {
         WidgetMode.tasks => 'tasks_${period.name}',
         WidgetMode.targets => 'targets',
         WidgetMode.goals => 'goals',
+        WidgetMode.classes => 'classes',
         WidgetMode.filterPicker => 'filter_picker',
       };
 
@@ -121,6 +126,8 @@ WidgetSnapshot buildWidgetSnapshot({
   required SemesterSettings semesterSettings,
   required AppStrings s,
   required DateTime now,
+  List<Course> courses = const [],
+  Map<String, TermInfo> terms = const {},
 }) {
   final targetParents = {for (final g in semesterGoals) g.id: g.parentId};
 
@@ -131,6 +138,7 @@ WidgetSnapshot buildWidgetSnapshot({
             semesterGoals, futureGoals, categories, targetParents, period, now),
       WidgetSnapshot.viewKey(WidgetMode.targets): _targetRows(semesterGoals, categories, s),
       WidgetSnapshot.viewKey(WidgetMode.goals): _goalRows(futureGoals, categories, s),
+      WidgetSnapshot.viewKey(WidgetMode.classes): _classRows(courses, terms, semesterSettings, s, now),
       WidgetSnapshot.viewKey(WidgetMode.filterPicker): _filterPickerRows(
           semesterGoals, futureGoals, categories, semesterSettings, s, now),
     },
@@ -138,6 +146,7 @@ WidgetSnapshot buildWidgetSnapshot({
       'tasks': s.noTasks,
       'targets': s.noTargets,
       'goals': s.noGoals,
+      'classes': s.widgetNoClasses,
       'filter_picker': s.noTargets,
     },
     filterDefaultLabel: s.filters,
@@ -364,6 +373,48 @@ List<WidgetRow> _filterPickerRows(
   }
 
   return rows;
+}
+
+String _hm(int minute) =>
+    '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
+
+// The "Classes" tab (§3-S): what is left of today's classes, and once they are
+// all over, tomorrow's under a header. A day outside its semester's teaching
+// weeks (once a first day is known) has none
+List<WidgetRow> _classRows(
+  List<Course> courses,
+  Map<String, TermInfo> terms,
+  SemesterSettings semesterSettings,
+  AppStrings s,
+  DateTime now,
+) {
+  List<ClassMeeting> on(DateTime day) {
+    final semester = termAt(day, semesterSettings);
+    final term = terms[semester];
+    if (term != null && !inTerm(day, term.firstDay, term.weeks)) return const [];
+    return meetingsOn(day, semester, courses);
+  }
+
+  WidgetRow row(ClassMeeting m) => WidgetRow(
+        title: m.course.title,
+        subtitle: [
+          '${_hm(m.session.startMinute)}–${_hm(m.session.endMinute)}',
+          ?m.session.location,
+        ].join('・'),
+        colorArgb: m.course.color,
+        tapAction: WidgetAction.openItem(kind: 'timetable', id: m.course.id),
+      );
+
+  final today = _dateOnly(now);
+  final minute = now.hour * 60 + now.minute;
+  final left = on(today).where((m) => m.session.endMinute > minute).toList();
+  if (left.isNotEmpty) return [for (final m in left) row(m)];
+  final tomorrow = on(today.add(const Duration(days: 1)));
+  if (tomorrow.isEmpty) return const [];
+  return [
+    WidgetRow(title: s.widgetTomorrow, isHeader: true),
+    for (final m in tomorrow) row(m),
+  ];
 }
 
 // The action URIs the widget sends. Kept beside the rows that carry them so a

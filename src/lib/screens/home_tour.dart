@@ -40,8 +40,9 @@ List<CoachMarkStep> tourChapter(String id, WidgetRef ref, AppStrings s) {
         CoachMarkStep(close, anchor: 'task.submit', body: s.tourTaskSubmitBody),
         CoachMarkStep(open, anchor: 'today.summary', title: s.tourSummaryTitle, body: s.tourSummaryBody),
         CoachMarkStep(close, anchor: 'history.summary', body: s.tourHistoryBody),
-        // After the progress card, not before: the weekly view has no progress
-        // card, and trying out the switch may well leave the user there
+        CoachMarkStep(info, anchor: 'today.timetable', title: s.tourTimetableTitle, body: s.tourTimetableBody),
+        // After the progress and timetable cards, not before: the weekly view
+        // has neither, and trying out the switch may well leave the user there
         CoachMarkStep(tap, anchor: 'today.viewSwitch', title: s.tourViewTitle, body: s.tourViewBody),
         CoachMarkStep(open, anchor: 'fab.inspiration', title: s.tourInspAddTitle, body: s.tourInspAddBody, count: ideas),
         CoachMarkStep(field, anchor: 'insp.title', body: s.tourInspTitleBody),

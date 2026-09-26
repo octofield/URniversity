@@ -12,6 +12,7 @@ import '../l10n/app_strings.dart';
 import '../models/review.dart';
 import '../models/task.dart';
 import '../providers/journal_provider.dart';
+import '../providers/courses_provider.dart';
 import '../providers/reviews_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
@@ -76,6 +77,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       writtenByUser: JournalNotifier.isWrittenByUser,
       settings: settings,
       now: now,
+      courses: ref.read(coursesProvider),
     );
     // Twelve whole weeks ending with the one under review
     final heatEnd = weekOf(_window.end).end;
@@ -310,6 +312,7 @@ class _NumbersStep extends ConsumerWidget {
                         if (stats.bestWeekday != null)
                           _Pill('${s.historyBestWeekday}$kDotSeparator${s.weekdayShort(stats.bestWeekday!)}'),
                         if (stats.journals > 0) _Pill(s.reviewJournals(stats.journals)),
+                        if (stats.gpa != null) _Pill('${s.semesterGpa} ${stats.gpa!.toStringAsFixed(2)}'),
                       ],
                     ),
                   ],

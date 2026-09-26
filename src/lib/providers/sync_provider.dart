@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_style_provider.dart';
 import 'auth_provider.dart';
+import 'courses_provider.dart';
+import 'grade_settings_provider.dart';
+import '../core/grade_scale.dart';
 import 'synced_list_notifier.dart';
 import 'tasks_provider.dart';
 import 'future_goals_provider.dart';
@@ -52,6 +55,8 @@ final syncProvider = Provider<void>((ref) {
   // The choice, not the style in use: a random launch drawing a new style is
   // not a change of setting
   ref.listen(appStyleChoiceProvider, (prev, next) => _saveStyle(ref));
+  ref.listen(termsProvider, (prev, next) => _saveTerms(ref));
+  ref.listen(gradeSettingsProvider, (prev, next) => _saveGradeSettings(ref));
 
   var handlingGuestLogin = false;
 
@@ -81,9 +86,12 @@ final syncProvider = Provider<void>((ref) {
         ref.read(inspirationsProvider.notifier).load(uid);
         ref.read(journalProvider.notifier).load(uid);
         ref.read(reviewsProvider.notifier).load(uid);
+        ref.read(coursesProvider.notifier).load(uid);
         ref.read(profileProvider.notifier).load(uid);
         _loadSettings(ref, uid);
         _loadStyle(ref, uid);
+        _loadTerms(ref, uid);
+        _loadGradeSettings(ref, uid);
       } else {
         _clearAll(ref);
       }
@@ -107,6 +115,8 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
     // No foreign keys: a review's focus targets are plain ids, shown only if
     // they still exist
     await ref.read(reviewsProvider.notifier).mergeToUser(uid);
+    // A course carries its own meetings, so it has no rows to order around
+    await ref.read(coursesProvider.notifier).mergeToUser(uid);
     await ref.read(profileProvider.notifier).mergeToUser(uid);
   }
   // disable() clears SharedPreferences and sets isGuest = false,
@@ -123,9 +133,12 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   unawaited(ref.read(inspirationsProvider.notifier).load(uid));
   unawaited(ref.read(journalProvider.notifier).load(uid));
   unawaited(ref.read(reviewsProvider.notifier).load(uid));
+  unawaited(ref.read(coursesProvider.notifier).load(uid));
   unawaited(ref.read(profileProvider.notifier).load(uid));
   unawaited(_loadSettings(ref, uid));
   unawaited(_loadStyle(ref, uid));
+  unawaited(_loadTerms(ref, uid));
+  unawaited(_loadGradeSettings(ref, uid));
 }
 
 void _loadGuest(Ref ref) {
@@ -135,6 +148,7 @@ void _loadGuest(Ref ref) {
   ref.read(inspirationsProvider.notifier).loadGuest();
   ref.read(journalProvider.notifier).loadGuest();
   ref.read(reviewsProvider.notifier).loadGuest();
+  ref.read(coursesProvider.notifier).loadGuest();
   ref.read(profileProvider.notifier).loadGuest();
 }
 
@@ -147,6 +161,7 @@ void _clearAll(Ref ref) {
   ref.read(inspirationsProvider.notifier).clear();
   ref.read(journalProvider.notifier).clear();
   ref.read(reviewsProvider.notifier).clear();
+  ref.read(coursesProvider.notifier).clear();
   ref.read(profileProvider.notifier).clear();
   // Each list dropped its own cache_* rows above; signed out, none are left
   SharedPreferences.getInstance().then((p) => p.remove(kCacheOwnerKey));
@@ -254,6 +269,75 @@ Future<void> _saveStyle(Ref ref) async {
     await Supabase.instance.client.from('user_settings').upsert({
       'user_id': uid,
       'app_style': ref.read(appStyleChoiceProvider),
+    });
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
+}
+
+// ── First days of classes ──────────────────────────────────────────────────────
+//
+// On their own for the same reason as the style: user_settings.term_starts is
+// added by supabase/courses.sql, and a query naming it fails until that runs
+
+Future<void> _loadTerms(Ref ref, String uid) async {
+  try {
+    final cloud = await fetchCloudTerms(uid);
+    if (cloud.isNotEmpty) await ref.read(termsProvider.notifier).merge(cloud);
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
+}
+
+Future<void> _saveTerms(Ref ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return;
+  if (ref.read(guestModeProvider)) return;
+  final terms = ref.read(termsProvider);
+  if (terms.isEmpty) return;
+  try {
+    await Supabase.instance.client.from('user_settings').upsert({
+      'user_id': uid,
+      'term_starts': {for (final e in terms.entries) e.key: e.value.toJson()},
+    });
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
+}
+
+// ── Degree: credits to graduate, pass mark ─────────────────────────────────────
+//
+// Separate for the same reason: the columns come with supabase/courses.sql
+
+Future<void> _loadGradeSettings(Ref ref, String uid) async {
+  try {
+    final row = await Supabase.instance.client
+        .from('user_settings')
+        .select('graduation_credits, degree_level')
+        .eq('user_id', uid)
+        .maybeSingle();
+    final credits = row?['graduation_credits'] as int?;
+    if (credits == null) return;
+    await ref.read(gradeSettingsProvider.notifier).set(GradeSettings(
+          graduationCredits: credits,
+          level: degreeLevelFromName(row?['degree_level'] as String?),
+        ));
+  } catch (e) {
+    reportSyncError(ref, e);
+  }
+}
+
+Future<void> _saveGradeSettings(Ref ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return;
+  if (ref.read(guestModeProvider)) return;
+  if (!ref.read(gradeSettingsProvider.notifier).confirmed) return;
+  final settings = ref.read(gradeSettingsProvider);
+  try {
+    await Supabase.instance.client.from('user_settings').upsert({
+      'user_id': uid,
+      'graduation_credits': settings.graduationCredits,
+      'degree_level': settings.level.name,
     });
   } catch (e) {
     reportSyncError(ref, e);

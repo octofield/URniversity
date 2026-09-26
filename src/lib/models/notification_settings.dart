@@ -3,7 +3,7 @@ import '../core/notification_constants.dart';
 // The three kinds of reminder, each switchable on its own. Keeping them as one
 // enum lets the schedule builder and the settings screen iterate instead of
 // repeating the same three branches
-enum NotificationKind { taskDue, dailySummary, goalDeadline, weeklyReview }
+enum NotificationKind { taskDue, dailySummary, goalDeadline, weeklyReview, classStart }
 
 class NotificationSettings {
   // Master switch. Turning this off has to stop everything even if the
@@ -30,6 +30,10 @@ class NotificationSettings {
   // Minutes since midnight, on Sunday
   final int weeklyReviewMinuteOfDay;
 
+  // Before each class, only in the teaching weeks (§3-S)
+  final bool classStartEnabled;
+  final int classLeadMinutes;
+
   const NotificationSettings({
     this.enabled = false,
     this.taskDueEnabled = true,
@@ -41,6 +45,8 @@ class NotificationSettings {
     this.goalLeadDays = NotificationConstants.defaultGoalLeadDays,
     this.weeklyReviewEnabled = true,
     this.weeklyReviewMinuteOfDay = NotificationConstants.defaultReviewMinuteOfDay,
+    this.classStartEnabled = true,
+    this.classLeadMinutes = NotificationConstants.defaultClassLeadMinutes,
   });
 
   // Off by default: the app has to ask for the OS permission before anything
@@ -55,6 +61,7 @@ class NotificationSettings {
       NotificationKind.dailySummary => dailySummaryEnabled,
       NotificationKind.goalDeadline => goalDeadlineEnabled,
       NotificationKind.weeklyReview => weeklyReviewEnabled,
+      NotificationKind.classStart => classStartEnabled,
     };
   }
 
@@ -69,6 +76,8 @@ class NotificationSettings {
     int? goalLeadDays,
     bool? weeklyReviewEnabled,
     int? weeklyReviewMinuteOfDay,
+    bool? classStartEnabled,
+    int? classLeadMinutes,
   }) =>
       NotificationSettings(
         enabled: enabled ?? this.enabled,
@@ -81,6 +90,8 @@ class NotificationSettings {
         goalLeadDays: goalLeadDays ?? this.goalLeadDays,
         weeklyReviewEnabled: weeklyReviewEnabled ?? this.weeklyReviewEnabled,
         weeklyReviewMinuteOfDay: weeklyReviewMinuteOfDay ?? this.weeklyReviewMinuteOfDay,
+        classStartEnabled: classStartEnabled ?? this.classStartEnabled,
+        classLeadMinutes: classLeadMinutes ?? this.classLeadMinutes,
       );
 
   Map<String, dynamic> toJson() => {
@@ -94,6 +105,8 @@ class NotificationSettings {
         'goal_lead_days': goalLeadDays,
         'weekly_review_enabled': weeklyReviewEnabled,
         'weekly_review_minute_of_day': weeklyReviewMinuteOfDay,
+        'class_start_enabled': classStartEnabled,
+        'class_lead_minutes': classLeadMinutes,
       };
 
   // Every field falls back to its default: a payload written by an older build
@@ -116,5 +129,8 @@ class NotificationSettings {
         weeklyReviewEnabled: j['weekly_review_enabled'] as bool? ?? true,
         weeklyReviewMinuteOfDay: j['weekly_review_minute_of_day'] as int? ??
             NotificationConstants.defaultReviewMinuteOfDay,
+        classStartEnabled: j['class_start_enabled'] as bool? ?? true,
+        classLeadMinutes:
+            j['class_lead_minutes'] as int? ?? NotificationConstants.defaultClassLeadMinutes,
       );
 }

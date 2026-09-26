@@ -185,6 +185,8 @@ class NotificationService {
         (NotificationConstants.goalChannelId, 'Goal deadlines'),
       NotificationKind.weeklyReview =>
         (NotificationConstants.reviewChannelId, 'Weekly review'),
+      NotificationKind.classStart =>
+        (NotificationConstants.classChannelId, 'Class reminders'),
     };
     // Only a task reminder has a single row to act on, so only it gets buttons
     final isTask = kind == NotificationKind.taskDue;

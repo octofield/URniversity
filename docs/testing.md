@@ -172,7 +172,7 @@
 | `test/synced_list_cache_test.dart` | 登入帳號的清單快取（D24）：同一帳號沒網路也看得到上次的資料、別的帳號讀不到、變動寫回、`clear()` 刪除、訪客不寫 | `2026-09-26-startup-cache-and-vision-templates.md` 1–4 |
 | `test/widget/review_flow_test.dart` | 引導式回顧（UC17）：週日晚上出現回顧卡、週三不出現；三步走完存一筆且卡片消失；延後只動勾選的任務（+7 天保留時刻）；專注目標出現在任務頁並套用篩選；最多 3 個；同一週重做是更新；回顧紀錄的列表與刪除 | `2026-09-25-phase4-review.md` 1–12 |
 | `test/widget/coach_mark_test.dart` | 導覽引擎：`info` 步驟連光圈內也擋住、桌面 rail 的光圈位置、轉向後重新對位、`HomeScreen` 被換掉時遮罩跟著收掉且**不**算看過、✕ 算看過 | `2026-09-25-phase3-onboarding-chapters.md` 1–6 |
-| `test/widget/home_tour_test.dart` | 親手操作的章節：**光圈外點不到、光圈內點得到**、跟進真的 sheet 逐欄標示、**存了才前進、關掉沒存就倒回**、選擇器打開時導覽讓開、先跳過這步不留資料、上一步不跨越已完成的動作、每個分頁只播一次、沒建目標就跳過里程碑段、日記鈕先捲進畫面、有別的頁面在上面時等它關掉才開始、指南頁重播 | `2026-09-25-phase3-onboarding-chapters.md` 7–22 |
+| `test/widget/home_tour_test.dart` | 親手操作的章節：**光圈外點不到、光圈內點得到**、跟進真的 sheet 逐欄標示、**存了才前進、關掉沒存就倒回**、選擇器打開時導覽讓開、先跳過這步不留資料、上一步不跨越已完成的動作、每個分頁只播一次、任務章的課表卡一站在檢視切換之前、沒建目標就跳過里程碑段、日記鈕先捲進畫面、有別的頁面在上面時等它關掉才開始、指南頁重播 | `2026-09-25-phase3-onboarding-chapters.md` 7–22 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
 | `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
 | `test/widget/completion_effect_test.dart` | 完成效果：勾選框**先下壓、再微彈、最後回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放；只有當天最後一筆會在 `Overlay` 上放彩帶並自行清掉；系統要求減少動態時什麼都不動 | `2026-09-26-motion-redesign.md` 9–11 |
@@ -180,6 +180,11 @@
 | `test/widget/task_tick_motion_test.dart` | 打勾整段：刪除線正在畫、停留期間仍是全高、之後離開並出現在已完成區；「沒有任務」等最後一列離開才展開；從已完成區取消勾會回來；減少動態時立刻消失 | `2026-09-26-motion-redesign.md` 5–8 |
 | `test/widget/haptics_test.dart` | 觸覺回饋（D25）：打勾 light、最後一筆 medium、取消勾 selection；關閉時不震；完成效果關閉不影響震動；開關會記住 | `2026-09-26-motion-redesign.md` 12–14 |
 | `test/app_styles_test.dart` | 七種風格的 WCAG 對比（本文、次要、提示、白字對主色、主色對底色、淡主色上的文字）、邊框可見、亮暗與底色一致、圓角範圍；不認得的名稱退回暖棕 | `2026-09-26-app-styles.md` 1–3 |
+| `test/timetable_test.dart` | 課表規則（§3-S）：台大與清大節次逐節對照官方表、依學校找節次表、衝堂、第幾週與上課週、開學日建議、今天的課與狀態、格線範圍 | `2026-09-26-phase5-timetable.md` 1–6 |
+| `test/gpa_test.dart` | 成績（§3-T）：績分表、學士／研究所及格線、百分制對照印出的官方表 22 點（改成無條件捨去會轉紅）、加權、F/X 計入、通過制與停修排除、未知不是 0、學期與累積、已修學分、目標試算四種結果 | `2026-09-26-phase6-gpa.md` 1–6 |
+| `test/widget/timetable_screen_test.dart` | 課表與成績畫面：手動新增落在格線、沒課名不存、搜尋目錄加入含所有時段並標衝堂、每校一個搜尋入口且自己的學校排第一、這學期沒目錄的學校不出現、只查那所學校、讀不到目錄仍可手動新增、刪課進回收桶連時段還原、設定開學日、成績頁三格與百分制與試算、手機寬度不溢出、任務頁「今天的課」只有今天的、上課週外不出現、**入口**：手機 360 課表卡在完成度卡右邊同一列、桌面 1280 在它下方、抽屜／展開的 rail／收合的 rail（900）都能進課表 | `2026-09-26-phase5-timetable.md` 7–13、`2026-09-26-phase6-gpa.md` 7、`2026-09-26-timetable-entry.md` 1–3、`2026-09-26-multi-school-catalog.md` 5–6 |
+| `test/period_tables_test.dart` | `scripts/catalog/schools.json` 與 `kSchoolPeriods` 同名、逐節一致（改一邊沒改另一邊會轉紅） | `2026-09-26-multi-school-catalog.md` 4 |
+| `scripts/catalog/tests/`（Python，`python -m pytest scripts/catalog`） | 共同：節次轉時段（連續合併、斷開拆分、依表的順序、沒有的節次丟掉）、id 帶學校與學期、同 key 合併授課對象、截斷與最多 20 段、學期格式、每校都有模組與節次表；台大：存下的 NOL 頁 18 欄對應、多授課對象合一、沒流水號的 id、時間欄各種格式（含只有第 10 節）；清大：7 筆真實資料的單／多教室、多老師、HTML 實體、空時間、跨到晚上的連續節次、停開與暑修略過、沒有的學期不寫 | `2026-09-26-multi-school-catalog.md` 1–3 |
 | `test/style_assets_test.dart` | `palettes.json` 與 `kStylePalettes` 一致（改了 Dart 沒重跑腳本會轉紅）；小工具色值等於調色盤；每個風格的圖示、啟動 logo、小工具 drawable 都在；manifest 有每個 alias、只有暖棕預設啟用；Kotlin 的風格清單與 `AppStyle` 同序 | `2026-09-26-style-extensions.md` 1–4 |
 | `test/app_style_random_test.dart` | 隨機：排除上一個；連續 50 次冷啟動不重複且七種都出現；預抽的下次會被採用；預抽無效或重複時重抽；固定風格照穿；選隨機立刻換並記住；雲端的選擇會套用 | `2026-09-26-style-extensions.md` 5–9 |
 | `test/widget/app_style_test.dart` | 設定頁列出七種並套用、深色主題生效、仍停在設定頁；畫面上的東西跟著換，連不依賴任何東西的 const widget 也會重畫（拿掉整棵樹重建會轉紅）；切換時舊畫面淡出；下次開啟記得；七種風格各跑四個分頁＋新增任務 sheet 沒有例外；手動選風格會送出 `setIcon`／`setSplash` 並寫給小工具，隨機只送 `setSplash` 不換圖示 | `2026-09-26-app-styles.md` 4–9、`2026-09-26-style-extensions.md` 10–11 |

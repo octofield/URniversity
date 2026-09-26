@@ -168,6 +168,12 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
    See `docs/data_dictionary.md` D0.
 10. **Every screen is responsive and animated by the rules below** — §10 Responsive Design,
     §11 Motion and §12 Styles are part of "done", not polish for later.
+11. **Schools' course catalogs come from `scripts/catalog/`, and the app parses no school's
+    time strings.** Each school is a module in `scripts/catalog/schools/` that stores ready
+    `sessions`; the app lists searchable schools from `catalog_schools`. A period table lives
+    both in `scripts/catalog/schools.json` and in `period_tables.dart` (`kSchoolPeriods`) —
+    change one, change the other; `test/period_tables_test.dart` fails otherwise. Adding a
+    school: `scripts/catalog/README.md`.
 
 ## 10. Responsive Design
 

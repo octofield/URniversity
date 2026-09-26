@@ -1,6 +1,10 @@
 import '../l10n/app_strings.dart';
 import '../models/notification_settings.dart';
+import '../models/course.dart';
 import '../models/review.dart';
+import '../providers/courses_provider.dart' show TermInfo;
+import 'review_stats.dart' show termAt;
+import 'timetable.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
@@ -49,6 +53,9 @@ List<ScheduledNotification> buildNotificationSchedule({
   required DateTime now,
   // Weeks already reviewed are not nagged about
   List<Review> reviews = const [],
+  // Classes, and the teaching weeks that bound their reminders
+  List<Course> courses = const [],
+  Map<String, TermInfo> terms = const {},
 }) {
   // The master switch is not checked here: NotificationSettings.isOn() folds it
   // into every kind, so there is one place that decides rather than two that
@@ -68,6 +75,9 @@ List<ScheduledNotification> buildNotificationSchedule({
   }
   if (settings.isOn(NotificationKind.weeklyReview)) {
     out.addAll(_weeklyReviews(reviews, settings, s, now, horizon));
+  }
+  if (settings.isOn(NotificationKind.classStart)) {
+    out.addAll(_classReminders(courses, terms, settings, semesterSettings, s, now));
   }
 
   out.sort((a, b) => a.when.compareTo(b.when));
@@ -94,6 +104,7 @@ int _baseFor(NotificationKind kind) => switch (kind) {
       NotificationKind.dailySummary => NotificationConstants.summaryIdBase,
       NotificationKind.goalDeadline => NotificationConstants.goalIdBase,
       NotificationKind.weeklyReview => NotificationConstants.reviewIdBase,
+      NotificationKind.classStart => NotificationConstants.classIdBase,
     };
 
 // A one-off task with no due time has no moment to remind about — the daily
@@ -287,4 +298,42 @@ Iterable<ScheduledNotification> _weeklyReviews(
       payload: NotificationConstants.reviewPayload,
     );
   }
+}
+
+// A reminder before each class in the coming week — only on days inside the
+// teaching weeks of that day's semester, so the break stays quiet. A semester
+// with no first day set has no known teaching weeks, and gets none
+List<ScheduledNotification> _classReminders(
+  List<Course> courses,
+  Map<String, TermInfo> terms,
+  NotificationSettings settings,
+  SemesterSettings semesterSettings,
+  AppStrings s,
+  DateTime now,
+) {
+  final out = <ScheduledNotification>[];
+  final lead = Duration(minutes: settings.classLeadMinutes);
+  final today = _dateOnly(now);
+  for (var i = 0; i < NotificationConstants.classHorizonDays; i++) {
+    final day = today.add(Duration(days: i));
+    final semester = termAt(day, semesterSettings);
+    final term = terms[semester];
+    if (term == null || !inTerm(day, term.firstDay, term.weeks)) continue;
+    for (final m in meetingsOn(day, semester, courses)) {
+      final start = day.add(Duration(minutes: m.session.startMinute));
+      final fireAt = start.subtract(lead);
+      if (!fireAt.isAfter(now)) continue;
+      final time =
+          '${(m.session.startMinute ~/ 60).toString().padLeft(2, '0')}:${(m.session.startMinute % 60).toString().padLeft(2, '0')}';
+      out.add(ScheduledNotification(
+        id: 0,
+        kind: NotificationKind.classStart,
+        when: fireAt,
+        title: s.notifClassTitle(m.course.title),
+        body: m.session.location == null ? time : s.notifClassBody(time, m.session.location!),
+      ));
+      if (out.length >= NotificationConstants.maxClassReminders) return out;
+    }
+  }
+  return out;
 }

@@ -155,6 +155,30 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const Divider(height: 1),
+
+            _KindSection(
+              title: s.classReminder,
+              enabled: settings.classStartEnabled,
+              masterOn: settings.enabled,
+              onToggle: (v) =>
+                  notifier.update(settings.copyWith(classStartEnabled: v)),
+              details: [
+                (
+                  label: s.classReminderDesc,
+                  value: s.minutesBefore(settings.classLeadMinutes),
+                  onTap: () => _pickOption<int>(
+                    context: context,
+                    title: s.classReminder,
+                    options: NotificationConstants.classLeadMinuteOptions,
+                    current: settings.classLeadMinutes,
+                    label: s.minutesBefore,
+                    onPicked: (v) =>
+                        notifier.update(settings.copyWith(classLeadMinutes: v)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

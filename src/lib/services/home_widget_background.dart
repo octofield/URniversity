@@ -8,7 +8,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/notification_payload.dart';
 import '../core/widget_snapshot.dart';
 import '../models/category.dart';
+import '../models/course.dart';
 import '../models/future_goal.dart';
+import '../providers/courses_provider.dart' show TermsNotifier, decodeTerms;
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
@@ -87,6 +89,9 @@ Future<void> refreshWidgetFromStorage() async {
     semesterSettings: data.semesterSettings,
     s: stringsFor(data.language),
     now: DateTime.now(),
+    courses: data.courses,
+    // On the device for guests and accounts alike (D30)
+    terms: decodeTerms(prefs.getString(TermsNotifier.key)),
   );
   await HomeWidgetService.instance.push(snapshot);
 }
@@ -98,6 +103,7 @@ class _WidgetData {
   final List<CategoryEntry> categories;
   final SemesterSettings semesterSettings;
   final AppLanguage language;
+  final List<Course> courses;
 
   const _WidgetData({
     required this.tasks,
@@ -106,6 +112,7 @@ class _WidgetData {
     required this.categories,
     required this.semesterSettings,
     required this.language,
+    required this.courses,
   });
 }
 
@@ -134,6 +141,7 @@ _WidgetData _loadGuestData(SharedPreferences prefs, String? languageCode) =>
       categories: _builtInCategories(),
       semesterSettings: SemesterSettings.defaultSettings,
       language: _languageByCode(languageCode),
+      courses: _decodeList(prefs.getString('guest_courses'), Course.fromJson),
     );
 
 Future<_WidgetData?> _loadCloudData() async {
@@ -157,6 +165,14 @@ Future<_WidgetData?> _loadCloudData() async {
       .select('ordered_list, styles')
       .eq('user_id', uid)
       .maybeSingle();
+  // Fetched on its own: until supabase/courses.sql has run the table is
+  // missing, and that must cost only the classes tab, not the whole refresh
+  var courseRows = const <dynamic>[];
+  try {
+    courseRows = await db.from('courses').select().eq('user_id', uid);
+  } catch (e) {
+    debugPrint('[widget] courses unavailable: $e');
+  }
 
   return _WidgetData(
     tasks: [for (final r in tasks) Task.fromJson(r)],
@@ -165,6 +181,7 @@ Future<_WidgetData?> _loadCloudData() async {
     categories: _categoriesFromRow(catRow),
     semesterSettings: _settingsFromRow(settingsRow),
     language: _languageFromRow(settingsRow),
+    courses: [for (final r in courseRows) Course.fromJson(r as Map<String, dynamic>)],
   );
 }
 

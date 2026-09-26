@@ -13,6 +13,11 @@ class InputLimits {
   static const username = 30;
   // A school or department typed in because it is not in the list
   static const customPicker = 50;
+  // A course's teacher and a session's classroom
+  static const teacher = 50;
+  static const location = 50;
+  // "CSIE1212", a serial number, a course id
+  static const courseCode = 20;
 
   // ── Persisted inside JSON, so only the app enforces them ──────────────────
   static const categoryName = 20;

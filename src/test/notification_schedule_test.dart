@@ -4,7 +4,9 @@ import 'package:urniversity/core/notification_payload.dart';
 import 'package:urniversity/core/notification_schedule.dart';
 import 'package:urniversity/l10n/strings_en.dart';
 import 'package:urniversity/models/notification_settings.dart';
+import 'package:urniversity/models/course.dart';
 import 'package:urniversity/models/review.dart';
+import 'package:urniversity/providers/courses_provider.dart' show TermInfo;
 import 'package:urniversity/models/semester_goal.dart';
 import 'package:urniversity/models/task.dart';
 import 'package:urniversity/providers/settings_provider.dart';
@@ -434,6 +436,7 @@ void main() {
           NotificationKind.dailySummary => NotificationConstants.summaryIdBase,
           NotificationKind.goalDeadline => NotificationConstants.goalIdBase,
           NotificationKind.weeklyReview => NotificationConstants.reviewIdBase,
+          NotificationKind.classStart => NotificationConstants.classIdBase,
         };
         expect(n.id, greaterThanOrEqualTo(base));
         expect(n.id, lessThan(base + NotificationConstants.maxScheduled));
@@ -505,6 +508,84 @@ void main() {
       final back = NotificationSettings.fromJson({'enabled': true});
       expect(back.recurringMinuteOfDay,
           NotificationConstants.defaultRecurringMinuteOfDay);
+    });
+  });
+
+  // §3-S: before each class, only in the teaching weeks
+  group('class reminders', () {
+    Course course(String title, List<CourseSession> sessions, {String semester = '115-1'}) => Course(
+          id: title,
+          semester: semester,
+          title: title,
+          color: 0,
+          createdAt: DateTime(2026, 9, 1),
+          sessions: sessions,
+        );
+    // Monday and Wednesday, 10:20, in 新102
+    final calculus = course('Calculus', const [
+      CourseSession(weekday: 1, startMinute: 620, endMinute: 730, location: '新102'),
+      CourseSession(weekday: 3, startMinute: 620, endMinute: 730, location: '新102'),
+    ]);
+    // Term 115-1 from Monday 7 Sep, 16 weeks
+    final terms = {'115-1': TermInfo(DateTime(2026, 9, 7))};
+
+    List<ScheduledNotification> classes({
+      List<Course>? courses,
+      Map<String, TermInfo>? termMap,
+      DateTime? at,
+      NotificationSettings settings = allOn,
+    }) =>
+        buildNotificationSchedule(
+          tasks: const [],
+          goals: const [],
+          settings: settings,
+          semesterSettings: semSettings,
+          s: s,
+          now: at ?? now,
+          courses: courses ?? [calculus],
+          terms: termMap ?? terms,
+        ).where((n) => n.kind == NotificationKind.classStart).toList();
+
+    test('fires the lead time before each class in the coming week', () {
+      // Monday 14 Sep, 10:00: today's 10:20 fires at 10:10, still ahead; then
+      // Wednesday. Next Monday is the eighth day, past the horizon
+      final scheduled = classes();
+      expect(scheduled.map((n) => n.when), [
+        DateTime(2026, 9, 14, 10, 10),
+        DateTime(2026, 9, 16, 10, 10),
+      ]);
+      expect(scheduled.first.title, s.notifClassTitle('Calculus'));
+      expect(scheduled.first.body, s.notifClassBody('10:20', '新102'));
+    });
+
+    test('the lead time is the user\'s', () {
+      final scheduled = classes(settings: allOn.copyWith(classLeadMinutes: 30), at: DateTime(2026, 9, 14, 8));
+      expect(scheduled.first.when, DateTime(2026, 9, 14, 9, 50));
+    });
+
+    test('nothing without a first day of classes, or outside the teaching weeks', () {
+      expect(classes(termMap: const {}), isEmpty);
+      // 16 weeks from 7 Sep end on Sunday 27 Dec
+      expect(classes(at: DateTime(2026, 12, 28, 8)), isEmpty);
+      expect(classes(at: DateTime(2026, 9, 1, 8)).map((n) => n.when.day), [7]);
+    });
+
+    test('a course of another semester stays quiet', () {
+      expect(classes(courses: [course('Old', calculus.sessions, semester: '114-2')]), isEmpty);
+    });
+
+    test('switched off, none', () {
+      expect(classes(settings: allOn.copyWith(classStartEnabled: false)), isEmpty);
+    });
+
+    test('never more than twenty, however full the week', () {
+      final busy = [
+        for (var i = 0; i < 10; i++)
+          course('C$i', [
+            for (var d = 1; d <= 7; d++) CourseSession(weekday: d, startMinute: 600 + i * 60, endMinute: 650 + i * 60),
+          ]),
+      ];
+      expect(classes(courses: busy), hasLength(NotificationConstants.maxClassReminders));
     });
   });
 }

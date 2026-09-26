@@ -9,6 +9,7 @@ import '../core/notification_schedule.dart';
 import '../models/notification_settings.dart';
 import '../services/notification_service.dart';
 import 'semester_goals_provider.dart';
+import 'courses_provider.dart';
 import 'reviews_provider.dart';
 import 'settings_provider.dart';
 import 'tasks_provider.dart';
@@ -71,6 +72,8 @@ final notificationScheduleProvider = Provider<List<ScheduledNotification>>((ref)
     s: ref.watch(stringsProvider),
     now: DateTime.now(),
     reviews: ref.watch(reviewsProvider),
+    courses: ref.watch(coursesProvider),
+    terms: ref.watch(termsProvider),
   );
 });
 
