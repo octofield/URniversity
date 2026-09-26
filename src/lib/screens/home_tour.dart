@@ -85,6 +85,7 @@ List<CoachMarkStep> tourChapter(String id, WidgetRef ref, AppStrings s) {
         CoachMarkStep(close, anchor: 'journal.save', body: s.tourSubmitBody),
         CoachMarkStep(open, anchor: 'me.inspirations.open', title: s.tourInspOpenTitle, body: s.tourInspOpenBody),
         CoachMarkStep(close, anchor: 'inspirations.list', body: s.tourInspListBody),
+        CoachMarkStep(info, anchor: 'me.reviews', title: s.tourReviewsTitle, body: s.tourReviewsBody),
         CoachMarkStep(info, anchor: 'me.journals.open', title: s.tourJournalsTitle, body: s.tourJournalsBody),
         CoachMarkStep(info, anchor: 'me.settings', title: s.tourReplayTitle, body: s.tourReplayBody),
       ],

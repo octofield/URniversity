@@ -52,6 +52,10 @@ Future<void> drainNotificationActions(Ref ref) async {
 // on the notification body reach here; "done" is handled entirely in the
 // background isolate and never wakes the UI
 void handleForegroundResponse(Ref ref, NotificationResponse response) {
+  if (response.payload == NotificationConstants.reviewPayload) {
+    ref.read(pendingOpenProvider.notifier).state = (kind: 'review', id: '');
+    return;
+  }
   final payload = TaskNotificationPayload.decode(response.payload);
   if (payload == null) return;
   if (response.actionId != null &&

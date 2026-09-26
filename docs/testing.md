@@ -78,6 +78,7 @@
 | `test/trash_snapshot_test.dart` | `remove()` 回傳整棵子樹（目標／願景／任務），還原後父子關係完整 |
 | `test/auth_link_error_test.dart` | 失效的驗證連結分類：query string／fragment／Android custom scheme 三種形式，以及 PKCE 跨裝置與一般登入錯誤的區分 |
 | `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期 |
+| `test/notification_schedule_test.dart`（Phase 4 追加） | 每週回顧提醒：兩個週日、帶 `open_review`、已回顧的週不排、跟著時刻與開關、marker 不會被當成任務 payload、設定 JSON 來回。基準設定 `allOn` 關掉回顧提醒，因為其他案例是「關掉別種以隔離一種」寫成的 |
 | `test/notification_schedule_test.dart`（第十一批追加） | 沒設時間的重複任務（§3-K）：在設定的時刻排、不套提前量、當天時刻已過就從明天起、跳過已完成那天、跟著任務提醒開關；設定 JSON 來回與舊資料缺 key 時的預設 |
 | `test/notification_action_test.dart` | 通知動作依賴的純邏輯（§3-L）：`Task.toggledOn()` 與 `isCompletedOn()` 互為反函式、payload 編解碼、畸形輸入回 null 不拋例外、動作結果的成功／失敗記錄 |
 | `test/widget_snapshot_test.dart` | 桌面小工具要顯示什麼（§3-M）：六份預算好的頁面、三個期間互不影響、day/week/month 的範圍與去重、任務列 `filters` 含祖先 id（含循環 parent 不卡死）、篩選挑選器的分組與排序、序列化（無副標為 null） |
@@ -86,6 +87,7 @@
 | `test/date_rollover_test.dart` | 跨午夜（§3-A）：`untilNextDay()` 算到隔天零點；`rollOverTo()` 只在選取日還停在舊的今天時才跟著換日，使用者自己翻到的日期不動 |
 | `test/me_stats_test.dart` | 「我的」頁的連續寫日記天數：從今天往回數、自動補齊的那天中斷連續、今天還沒寫不算中斷、完全沒寫回 0 |
 | `test/notification_persistence_source_test.dart` | 防呆：通知要留到任務完成（§3-K）。`apply()` 只取消 pending、原始碼裡不得再出現 `cancelAll()`；`autoCancel: false`；`cancelForTask()` 走 `getActiveNotifications()`。`notification_service.dart` 碰 platform channel，測試環境沒有通道，只能讀原始碼把關 |
+| `test/review_stats_test.dart` | 回顧的規則（§3-P）：週一～週日、月底、學期判斷；回顧卡時段的四個邊界（週日 17:59／18:00、週二 23:59／週三）；學期＞月＞週一次一張；做過的不再出現；熱度圖沒排任務是 null；可延後任務排除循環與已完成；目標子樹的里程碑與任務；本週專注的起訖與新舊；快照 JSON 來回與缺鍵 |
 | `test/history_stats_test.dart` | 完成度頁的數字（§2-H）：連續達成的三種邊界（今天未完成、昨天未完成、空白日）、區間加總、最強星期幾取平均而非最忙、分類排序與排除無分類、逾期排序含循環任務 |
 | `test/sign_in_failure_test.dart` | 登入錯誤的分類（§2-A）：帳號不存在與密碼錯誤同屬一種說法、信箱未驗證、嘗試過多、連線失敗、其他；有碼與只有訊息兩種來源都涵蓋 |
 | `test/account_delete_auth_test.dart` | 刪除帳號要哪一種身分證明（UC12）：有密碼就輸入密碼（即使也連結了 Google）、只有 Google 才跳出去重新登入 |
@@ -165,8 +167,10 @@
 | `test/widget/goal_link_visibility_test.dart` | 「只有頂層目標能連結願景」在新增／編輯表單、詳情頁、願景選單四處一致 | `2026-08-23-known-issues.md` 20–25、28 |
 | `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
 | `test/widget/inspirations_archive_test.dart` | 靈感封存的三段分區、預設收合、封存與完成互不影響 | `2026-09-25-phase3-onboarding-templates.md` 1–4 |
-| `test/goal_template_test.dart` | 範本批次建立的筆數、父子連結、分類繼承、**連續套用兩次不碰撞 id** | `2026-09-25-phase3-onboarding-templates.md` 5–9 |
-| `test/widget/goal_template_sheet_test.dart` | 目標頁 ✨ 入口、套用後的寫入與 SnackBar、套用的資料可正常刪除 | `2026-09-25-phase3-onboarding-templates.md` 10–12 |
+| `test/goal_template_test.dart` | 範本批次建立的筆數、父子連結、分類繼承、**連續套用兩次不碰撞 id**；每個範本一個願景、只有頂層目標連到它、沒分類的目標沿用願景分類、三語標題都不超過字數上限 | `2026-09-25-phase3-onboarding-templates.md` 5–9、`2026-09-26-startup-cache-and-vision-templates.md` 5–8 |
+| `test/widget/goal_template_sheet_test.dart` | 目標頁與願景頁的 ✨ 入口、套用後的寫入與 SnackBar、套用的資料可正常刪除 | `2026-09-25-phase3-onboarding-templates.md` 10–12、`2026-09-26-startup-cache-and-vision-templates.md` 9 |
+| `test/synced_list_cache_test.dart` | 登入帳號的清單快取（D24）：同一帳號沒網路也看得到上次的資料、別的帳號讀不到、變動寫回、`clear()` 刪除、訪客不寫 | `2026-09-26-startup-cache-and-vision-templates.md` 1–4 |
+| `test/widget/review_flow_test.dart` | 引導式回顧（UC17）：週日晚上出現回顧卡、週三不出現；三步走完存一筆且卡片消失；延後只動勾選的任務（+7 天保留時刻）；專注目標出現在任務頁並套用篩選；最多 3 個；同一週重做是更新；回顧紀錄的列表與刪除 | `2026-09-25-phase4-review.md` 1–12 |
 | `test/widget/coach_mark_test.dart` | 導覽引擎：`info` 步驟連光圈內也擋住、桌面 rail 的光圈位置、轉向後重新對位、`HomeScreen` 被換掉時遮罩跟著收掉且**不**算看過、✕ 算看過 | `2026-09-25-phase3-onboarding-chapters.md` 1–6 |
 | `test/widget/home_tour_test.dart` | 親手操作的章節：**光圈外點不到、光圈內點得到**、跟進真的 sheet 逐欄標示、**存了才前進、關掉沒存就倒回**、選擇器打開時導覽讓開、先跳過這步不留資料、上一步不跨越已完成的動作、每個分頁只播一次、沒建目標就跳過里程碑段、日記鈕先捲進畫面、有別的頁面在上面時等它關掉才開始、指南頁重播 | `2026-09-25-phase3-onboarding-chapters.md` 7–22 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |

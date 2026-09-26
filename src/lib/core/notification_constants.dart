@@ -11,6 +11,7 @@ class NotificationConstants {
   static const taskChannelId = 'task_reminders';
   static const summaryChannelId = 'daily_summary';
   static const goalChannelId = 'goal_deadlines';
+  static const reviewChannelId = 'weekly_review';
 
   // ── Id ranges ─────────────────────────────────────────────────────────────
   // One task can produce several pending notifications (a recurring task fires
@@ -18,6 +19,7 @@ class NotificationConstants {
   static const summaryIdBase = 1000;
   static const taskIdBase = 100000;
   static const goalIdBase = 500000;
+  static const reviewIdBase = 700000;
 
   // ── Defaults ──────────────────────────────────────────────────────────────
   static const defaultTaskLeadMinutes = 30;
@@ -27,6 +29,8 @@ class NotificationConstants {
   // lands on. Minutes since midnight
   static const defaultRecurringMinuteOfDay = 8 * 60;
   static const defaultGoalLeadDays = 7;
+  // Sunday 20:00: the week is over, the evening is not
+  static const defaultReviewMinuteOfDay = 20 * 60;
 
   // ── Choices offered in the settings screen ────────────────────────────────
   static const taskLeadMinuteOptions = [0, 5, 15, 30, 60, 120, 1440];
@@ -47,6 +51,10 @@ class NotificationConstants {
   static const actionRescheduleId = 'task_reschedule';
   // iOS binds buttons to a category rather than to the notification itself
   static const taskCategoryId = 'task_due_category';
+
+  // What a weekly-review notification carries. No pipe, so it can never be
+  // mistaken for a task payload ("{taskId}|{date}")
+  static const reviewPayload = 'open_review';
 
   // ── Storage ───────────────────────────────────────────────────────────────
   // SharedPreferences, not user_settings: which device should buzz is a

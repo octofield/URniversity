@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_provider.dart';
 import 'synced_list_notifier.dart';
@@ -11,6 +12,7 @@ import 'categories_provider.dart';
 import 'inspirations_provider.dart';
 import 'journal_provider.dart';
 import 'profile_provider.dart';
+import 'reviews_provider.dart';
 import 'guest_provider.dart';
 import 'settings_provider.dart';
 import '../models/user_profile.dart';
@@ -74,6 +76,7 @@ final syncProvider = Provider<void>((ref) {
         ref.read(categoriesProvider.notifier).load(uid);
         ref.read(inspirationsProvider.notifier).load(uid);
         ref.read(journalProvider.notifier).load(uid);
+        ref.read(reviewsProvider.notifier).load(uid);
         ref.read(profileProvider.notifier).load(uid);
         _loadSettings(ref, uid);
       } else {
@@ -96,6 +99,9 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
     await ref.read(tasksProvider.notifier).mergeToUser(uid);
     await ref.read(inspirationsProvider.notifier).mergeToUser(uid);
     await ref.read(journalProvider.notifier).mergeToUser(uid);
+    // No foreign keys: a review's focus targets are plain ids, shown only if
+    // they still exist
+    await ref.read(reviewsProvider.notifier).mergeToUser(uid);
     await ref.read(profileProvider.notifier).mergeToUser(uid);
   }
   // disable() clears SharedPreferences and sets isGuest = false,
@@ -111,6 +117,7 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   unawaited(ref.read(categoriesProvider.notifier).load(uid));
   unawaited(ref.read(inspirationsProvider.notifier).load(uid));
   unawaited(ref.read(journalProvider.notifier).load(uid));
+  unawaited(ref.read(reviewsProvider.notifier).load(uid));
   unawaited(ref.read(profileProvider.notifier).load(uid));
   unawaited(_loadSettings(ref, uid));
 }
@@ -121,6 +128,7 @@ void _loadGuest(Ref ref) {
   ref.read(semesterGoalsProvider.notifier).loadGuest();
   ref.read(inspirationsProvider.notifier).loadGuest();
   ref.read(journalProvider.notifier).loadGuest();
+  ref.read(reviewsProvider.notifier).loadGuest();
   ref.read(profileProvider.notifier).loadGuest();
 }
 
@@ -132,7 +140,10 @@ void _clearAll(Ref ref) {
   ref.read(categoriesProvider.notifier).reset();
   ref.read(inspirationsProvider.notifier).clear();
   ref.read(journalProvider.notifier).clear();
+  ref.read(reviewsProvider.notifier).clear();
   ref.read(profileProvider.notifier).clear();
+  // Each list dropped its own cache_* rows above; signed out, none are left
+  SharedPreferences.getInstance().then((p) => p.remove(kCacheOwnerKey));
 }
 
 // ── Settings sync ──────────────────────────────────────────────────────────────

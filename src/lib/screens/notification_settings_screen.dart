@@ -134,6 +134,27 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const Divider(height: 1),
+
+            _KindSection(
+              title: s.notifReview,
+              enabled: settings.weeklyReviewEnabled,
+              masterOn: settings.enabled,
+              onToggle: (v) =>
+                  notifier.update(settings.copyWith(weeklyReviewEnabled: v)),
+              details: [
+                (
+                  label: s.notifReviewTime,
+                  value: _hhmm(settings.weeklyReviewMinuteOfDay),
+                  onTap: () => _pickTime(
+                    context,
+                    settings.weeklyReviewMinuteOfDay,
+                    (minute) => notifier.update(
+                        settings.copyWith(weeklyReviewMinuteOfDay: minute)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

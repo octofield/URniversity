@@ -332,11 +332,13 @@
 | `guest_future_goals` | `List<FutureGoal>` 的 JSON | `FutureGoal` | D3 `future_goals` |
 | `guest_inspirations` | `List<Inspiration>` 的 JSON | `Inspiration` | D4 `inspirations` |
 | `guest_journals` | `List<Journal>` 的 JSON | `Journal` | D5 `journals` |
+| `guest_reviews` | `List<Review>` 的 JSON | `Review` | D23 `reviews` |
 | `guest_profile` | 單一 `UserProfile.toRow('guest')` 的 JSON | `UserProfile` | D8-A（僅個人資料部分） |
 
 **特別說明：**
-- 這六把 key 的清單同時定義在 `guest_provider.dart` 的 `_dataKeys`（登出訪客模式時會逐一清除）
+- 這七把 key 的清單同時定義在 `guest_provider.dart` 的 `_dataKeys`（登出訪客模式時會逐一清除）
   與各自 Provider 檔案中的 `_localKey` 常數，**新增/刪除訪客可用的資料類型時，兩處都要修改**。
+- 登入帳號另有一組 `cache_*`（D24）：內容格式相同，但只是**快取**，雲端才是正本；兩組 key 互不覆蓋。
 - **沒有** `guest_trash`、`guest_categories`、`guest_settings` 這幾把 key——回收桶、自訂分類、
   App 設定在訪客模式下都只存在記憶體，不會寫入本機儲存（呼應 D6／D7／D8-B 的特別說明）。
 
@@ -366,6 +368,8 @@
 | `summary_minute_of_day` | int | ✗ | `480` | 摘要時間，以「當日第幾分鐘」儲存（480 = 08:00） |
 | `goal_deadline_enabled` | bool | ✗ | `true` | 學期目標截止提醒 |
 | `goal_lead_days` | int | ✗ | `7` | 學期結束前幾天提醒。可選值見 `NotificationConstants.goalLeadDayOptions` |
+| `weekly_review_enabled` | bool | ✗ | `true` | 每週回顧提醒（Phase 4）。舊版寫入的 JSON 缺這個 key 時視為開啟 |
+| `weekly_review_minute_of_day` | int | ✗ | `1200` | 週日的提醒時刻（1200 = 20:00）。星期固定為週日，因為回顧卡從週日 18:00 開始顯示 |
 
 **特別說明：**
 
@@ -600,3 +604,77 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 - 不在 `guest_provider.dart` 的 `_dataKeys`（那份清單是「離開訪客模式要清掉的使用者資料」）：
   訪客轉正式帳號的當下，這個人**剛剛才用完 App**，再放一次導覽是倒退。
   所以合併帳號不會重播導覽——這是刻意的。
+
+---
+
+## D23. `reviews`（回顧，Phase 4）
+
+對應 Dart 型別：`Review`、`ReviewStats`、`TargetProgress`（`src/lib/models/review.dart`）
+讀寫處理程序：`ReviewsNotifier`（`src/lib/providers/reviews_provider.dart`）
+建表：`supabase/reviews_table.sql`（手動在 SQL 編輯器執行）
+
+| 欄位 | 型別 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `id` | text (PK) | ✓ | — | `newRowId()` |
+| `user_id` | text | ✓ | — | 由 Provider 附加 |
+| `period` | text | ✓ | — | `week`／`month`／`semester`（CHECK） |
+| `period_start` | date | ✓ | — | 週一；月初；學期起始日 |
+| `period_end` | date | ✓ | — | 週日；月底；學期結束日（CHECK ≥ `period_start`） |
+| `went_well` | text | ✗ | `null` | 「做得好的」；≤ 500 字 |
+| `stuck` | text | ✗ | `null` | 「卡住的」；≤ 500 字 |
+| `next_focus` | text | ✗ | `null` | 「下一步最重要的一件事」；≤ 500 字 |
+| `focus_target_ids` | text[] | ✓ | `{}` | 接下來專注的頂層學期目標，最多 3 個（CHECK）。**不是外鍵** |
+| `stats` | jsonb | ✓ | `{}` | 回顧當下的數字快照，見下表 |
+| `created_at` | timestamptz | ✓ | `now()` | |
+
+唯一鍵：`(user_id, period, period_start)`——同一週重做回顧是**更新同一筆**（`ReviewsNotifier.save()`
+沿用舊列的 `id` 與 `created_at`），不會多出一筆。
+
+`stats` 的鍵（`ReviewStats.toJson()`）：
+
+| 鍵 | 型別 | 說明 |
+|---|---|---|
+| `done`、`total` | int | 期間內完成／應完成的任務次數（與完成度頁同一套計算，`totalsBetween`） |
+| `rate`、`prev_rate` | double? | 完成率與上一個同長度期間的完成率；沒有排任務時為 `null`（不是 0） |
+| `streak` | int | 期間結束時連續全部完成的天數 |
+| `best_weekday` | int? | 1 = 週一 |
+| `journals` | int | 期間內**使用者自己寫的**日記篇數（不算自動補齊的） |
+| `targets` | list | 每個頂層學期目標：`id`、`title`、`ms_done`、`ms_total`（里程碑）、`done`、`total`（掛在它底下的任務） |
+
+**特別說明：**
+
+- **快照而非即時計算**：之後修改或刪除任務，過去的回顧不會跟著改——回顧記下的是「那時候怎麼看這段時間」。
+  `fromJson` 對每個鍵都有預設值，舊版寫的快照缺了新鍵仍能顯示。
+- **`focus_target_ids` 不設外鍵**：目標被刪除時，回顧不該擋住刪除、也不該跟著被改；顯示時找不到的目標
+  寫成「這個目標已刪除」，任務頁的「本週專注」則直接略過。
+- 訪客模式寫 `guest_reviews`（D11）；合併帳號時與其他資料一起 `mergeToUser`，沒有外鍵順序限制。
+- 回顧的提醒設定在 D13（`weekly_review_*`），不在這張表。
+
+---
+
+## D24. 裝置本機儲存 — `cache_*` 系列 key 與 `cache_owner`（登入帳號的清單快取）
+
+媒介：SharedPreferences。由 `SyncedListNotifier`（`providers/synced_list_notifier.dart`）統一讀寫，
+讓登入帳號開 App 時先畫出上次的資料，不必等查詢回來（本機優先，類似 Google Tasks 的開啟方式）。
+
+| Key | 內容 | 對應 Dart 型別 |
+|---|---|---|
+| `cache_owner` | 快取屬於哪個帳號的 `user_id`（字串） | — |
+| `cache_tasks` | `List<Task>` 的 JSON | `Task`（D1） |
+| `cache_semester_goals` | `List<SemesterGoal>` 的 JSON | `SemesterGoal`（D2） |
+| `cache_future_goals` | `List<FutureGoal>` 的 JSON | `FutureGoal`（D3） |
+| `cache_inspirations` | `List<Inspiration>` 的 JSON | `Inspiration`（D4） |
+| `cache_journals` | `List<Journal>` 的 JSON | `Journal`（D5） |
+| `cache_reviews` | `List<Review>` 的 JSON | `Review`（D23） |
+
+key 名稱是 `cache_` 加上資料表名稱（`SyncedListNotifier.cacheKey`）。
+
+**規則：**
+- **讀**：`load(uid)` 在查詢之前讀；只有 `cache_owner == uid` 而且清單還是空的才套用，換帳號不會看到別人的資料。
+  讀不懂的舊格式直接略過（查詢仍會補上）。
+- **寫**：建構子掛 `addListener`，登入狀態（`_userId` 有值、不是訪客）下清單每次變動就整份寫回，並更新 `cache_owner`。
+  訪客模式不寫（訪客資料在 D11）。
+- **刪**：`clear()` 刪自己那把 `cache_*`；`sync_provider._clearAll` 再刪 `cache_owner`。登出、刪帳號後本機不留帳號資料。
+- **不是正本**：查詢成功就整份覆蓋；快取裡的東西永遠不會被上傳。
+- **查詢失敗時**：畫面保留快取內容並顯示同步錯誤。與原本相同，這次啟動在重新載入成功前的修改不會寫到雲端。
+- **不涵蓋**：trash_items、user_categories、個人資料與 App 設定（不是 `SyncedListNotifier`，也不在開 App 的第一眼）。

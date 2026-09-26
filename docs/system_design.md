@@ -295,6 +295,7 @@ frame 就離開清單（進入已完成區或被篩掉），長在列身上的�
 | 學期制度 | 數字選擇 + 每學期起始月 | 每年 2/3/4 學期，起始月 1–12 |
 | 日記天數徽章開關 | `Switch` | 開／關 |
 | 開發者模式時間覆寫 | 日期選擇器 | 覆寫「現在時間」，僅供測試用（見 §4-J） |
+| 開發者模式開啟回顧 | 單選對話框（本週／上個月／本學期，附日期範圍） | 不論是否到期，直接開 `ReviewScreen`；完成會存成真的回顧（見 §3-P） |
 
 輸出：即時套用到對應畫面；非訪客模式會非同步寫回 `user_settings`（見 data_flow_diagram.md Diagram 1-D）。
 
@@ -435,6 +436,29 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 
 **連帶影響**：Today 頁靈感區塊、「我的」頁靈感區塊與 §2-J 的靈感計數都排除已封存的筆數；
 否則封存等於什麼都沒發生。
+
+---
+
+### 2-M 引導式回顧（Phase 4）
+
+**入口**：任務頁完成度卡上方的回顧卡（只在回顧時段內出現，§3-P）、週日晚上的通知、「我的」頁的「回顧」區塊、
+完成度頁右上角的圖示。
+
+`ReviewScreen` 三步，上方三段進度條，底部「上一步／繼續／完成回顧」；步驟**只能用按鈕切換**，
+避免在第二步打字時誤滑回第一步。
+
+| 步驟 | 內容 |
+|---|---|
+| ① 這段時間 | 完成率（大字）、完成 N／M、較上一期 ↑／↓，連續全部完成天數、最強的一天、日記篇數；近 12 週熱度圖（每天一格，顏色越深完成越多，灰色＝沒排任務）；每個頂層目標的里程碑進度條與任務數 |
+| ② 想一想 | 三格各 ≤ 500 字、都可留空，每格下方有一句引導：做得好的／卡住的／下一步最重要的一件事 |
+| ③ 安排下一步 | 期間內到期、還沒完成的**一次性**任務（預設全勾），按「把勾選的 N 個延後 7 天」；本學期頂層目標的 chip，**最多選 3 個**作為接下來的專注 |
+
+**輸出**：一筆 D23 `reviews`；被勾選的任務截止時間 +7 天（保留時刻）。完成後回到任務頁，SnackBar「回顧已存下」。
+
+**本週專注**：任務頁完成度卡下方一列 chip（「本週專注：多益 800」），點一下把任務清單篩成那個目標
+（沿用 `taskTargetFilterProvider`），再點一下取消。
+
+**回顧紀錄**（`ReviewsScreen`）：新到舊，展開看快照數字、三段文字與專注目標；可刪除（`confirmDelete`）。
 
 ## 3. 處理過程（核心演算法）
 
@@ -868,29 +892,35 @@ flowchart TD
 
 ### 3-N 目標範本的批次建立（`widgets/goal_template_sheet.dart`）
 
-範本本身是**純資料**（`core/goal_templates.dart`）：`GoalTemplate` → `TemplateGoal` →
-`TemplateMilestone` → 任務字串。每個文字欄位都是 `String Function(AppStrings)`，
+範本本身是**純資料**（`core/goal_templates.dart`）：`GoalTemplate`（帶一個 `TemplateVision`）→
+`TemplateGoal` → `TemplateMilestone` → 任務字串。目前七個：新生、交換、實習、研究所、證照／競賽、
+雙主修／輔系、健康與理財。每個文字欄位都是 `String Function(AppStrings)`，
 所以範本內容跟著 App 語言走，而不是寫死的中文。
 
 `applyGoalTemplate(ref, template, s, semester)` 的寫入順序：
 
 ```
+visionId ← futureGoals.addGoal(vision.title, vision.categories,
+                               startSemester: semester)    // 願景先建
 for 每個 TemplateGoal:
-    goalId ← addGoal(title, semester, categories)          // 頂層目標
+    cats ← goal.categories 空的話用 vision.categories
+    goalId ← addGoal(title, semester, cats,
+                     futureGoalId: visionId)               // 頂層目標連到願景
     for 每個 TemplateMilestone:
-        msId ← addGoal(title, semester, parentId: goalId,  // 里程碑
-                       categories: 該目標的 categories)     // 分類跟著父目標
+        msId ← addGoal(title, semester, parentId: goalId,  // 里程碑（不帶 futureGoalId）
+                       categories: cats)                   // 分類跟著父目標
         for 每個任務字串:
             add(title, linkedTargetId: msId)               // 任務掛在里程碑上
 ```
 
 三件事是刻意的：
 
-1. **父節點先於子節點**。`parent_id` 是真的外鍵，先送子節點會被拒絕——與
-   `mergeOrder()`（§3-I）擋的是同一個坑。
+1. **父節點先於子節點**。`parent_id` 與 `future_goal_id` 都是真的外鍵，先送子節點會被拒絕——與
+   `mergeOrder()`（§3-I）擋的是同一個坑；所以願景第一個建。
 2. **里程碑帶走父目標的分類**，與手動新增里程碑的行為一致（`semester_goal_detail_screen.dart`
    也是這樣傳 `categories`）。
-3. **沒有任何一列帶 `future_goal_id`**。只有手動連結的頂層目標才有（§9 rule 7 / UC4）。
+3. **只有頂層目標帶 `future_goal_id`**，里程碑不帶（§9 rule 7 / UC4）。沒有自己分類的目標沿用願景的分類，
+   與手動 `linkFutureGoal()` 的行為一致。
 
 `goalCount`（頂層＋里程碑）與 `taskCount` 由範本自己算出來，sheet 的預覽數字與 SnackBar
 的回報數字都讀同一個來源，不會與實際建立的筆數不一致。
@@ -977,13 +1007,60 @@ overlay entry（導覽）**留在最上層**（`navigator.dart` 的 `_flushHisto
   每步三次後停下，不會一直閃。只是看的步驟（`info`、`field`、逛頁面）沒有脈動。
 - 光圈邊緣一圈白色細框；遮罩透明度 0.6。
 
-**卡片**：放在光圈上方或下方空間較大的一側，以「畫面高 − 鍵盤高」計算，最高佔 40%、
-內容可捲動；朝光圈那一邊有一個**小三角指向目標中心**。上方一列是「第幾站 / 共幾站」
+**卡片位置（響應式，`placeCoachCard()`，純函式）**——依照 popover 函式庫（Floating UI 等）的慣例：
+放在空間最多的一側、放不下就翻面、再滑動留在畫面內。以「畫面高 − 鍵盤高」計算可用空間。
+
+| 情況 | 卡片 |
+|---|---|
+| 手機（< 768） | 全寬（扣掉兩側 20 的頁邊），放在光圈上方或下方空間較大的一側 |
+| 寬螢幕（≥ 768），目標在左側 1/4（導覽 rail） | 固定 360 寬，**放在目標右邊**，垂直置中於目標 |
+| 寬螢幕，目標在右側 1/4（角落的新增鈕） | 放在**目標左邊** |
+| 寬螢幕，目標在中間 | 360 寬、**水平置中於目標**，放上方或下方 |
+| 上下都不夠 180（橫放手機、很高的目標） | 改放左右，有空間的那一側 |
+| 四面都放不下（目標幾乎占滿手機畫面） | 疊在畫面下方，蓋住目標的下半部 |
+
+朝光圈那一邊有一個**小三角**，尖端落在目標邊緣中心（在卡片範圍內滑動，不會落在圓角上）。上方一列是「第幾站 / 共幾站」
 （一整個 open…close 段落算一站），段落內再加「· 2 / 5」；右上 ✕「略過這章」（視同看過）。
 
 **導覽必須跟著 `HomeScreen` 一起下台**：`OverlayEntry` 的壽命比插入它的 widget 長，所以
 `CoachMarkOverlay.show()` 回傳 dismiss 函式，由 `HomeScreen.dispose()` 呼叫；這條路徑
 **不**標記完成——使用者根本沒看完，下次還是要放。
+
+---
+
+### 3-P 回顧的時段與數字（`core/review_stats.dart`）
+
+**哪一個回顧該出現**（`dueReviewWindow`）——同時最多一張卡，順序：學期 → 月 → 週；已經做過的那一期不再出現。
+
+| 回顧 | 出現的時段 | 回顧的範圍 |
+|---|---|---|
+| 週 | 週日 18:00 起到**週二**結束 | 週日當天：這一週；週一、二：上一週（週一～週日） |
+| 月 | 每月 1～3 日 | 上個月 |
+| 學期 | 學期結束日前 20 天到結束後 7 天 | 那個學期（`semesterStart`～`semesterEnd`） |
+
+學期的結束日來自 `semesterEnd()`＝下一學期開始的前一天，**包含寒暑假**；在課表階段有真正的最後上課日之前，
+這是 App 能知道的最接近值（Phase 5 的 `catalog_terms` 會改善）。
+
+「現在」由 `reviewNowProvider` 提供：App 的日期（開發者模式可覆寫）加上實際的時分，因為「週日 18:00」需要時間。
+學期以 `termAt(date)` 判斷——與 `currentSemester()` 同規則，但吃參數而不讀系統時鐘，測試與日期覆寫都能控制。
+
+開發者模式的「開啟回顧」不看上表的時段，改用 `latestReviewWindow(period, now)`：本週（週一～週日）、
+上個月、`termAt(now)` 那個學期——三者正好對得上「本週回顧／上個月的回顧／學期回顧」的標題。
+同一段已經做過時，完成會覆寫那一筆（與正常流程相同，一段一筆）。
+
+**數字**（`buildReviewStats`，打開回顧時算一次並凍結）：
+
+- 完成數與完成率沿用完成度頁的 `totalsBetween`／`rateBetween`；「上一期」是緊接在前、同樣長度的期間（月則是整個上個月）。
+- 熱度圖 `dailyRates`：每天一個完成率，**沒排任務的日子是 `null`**，畫成灰色而不是 0%——「沒事做」和「沒做完」要看得出差別。
+- 目標推進 `targetProgressBetween`：學期內每個頂層目標，統計它**整棵子樹**的里程碑完成數，以及掛在子樹任一節點上、落在期間內的任務。
+- 可延後的任務 `carryOverCandidates`：非循環、未完成、截止時間在期間內——循環任務下週自己會再出現，不需要搬。
+
+**本週專注**（`activeFocus`）：取「期間結束日 ≤ 今天 ≤ 結束日 + 7 天」的週回顧中最新的一筆，所以週日晚上做完回顧，
+當下就開始顯示，一直到下個週日。
+
+**提醒**（§3-K 的第四種）：每個週日在設定的時刻（預設 20:00）；那一週**已經回顧過**就不排；payload 是固定字串
+`open_review`（沒有 `|`，不會被當成任務的 payload），點開後由 `_handlePendingOpen` 打開當下該做的回顧，
+若已在別的裝置做完就什麼都不開。
 
 ---
 
@@ -1269,15 +1346,26 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 
 ---
 
+### UC17　每週回顧（Phase 4）
+
+1. 週日晚上 20:00 收到「本週回顧・3 分鐘」通知（可在通知設定改時間或關閉）；或週日 18:00 之後打開 App，
+   任務頁最上方出現「本週回顧」卡。
+2. 按「開始回顧」→ ① 看這週的完成率、比上週多或少、熱度圖、每個目標推進了多少 → 「繼續」。
+3. ② 三格想一想，都可以留空 → 「繼續」。
+4. ③ 勾選要延後的未完成任務，按「延後 7 天」；選最多 3 個接下來要專注的目標 → 「完成回顧」。
+5. 回到任務頁，回顧卡消失，完成度卡下方出現「本週專注」chip；點 chip 只看那個目標的任務。
+6. 週一、週二仍可補做上週的回顧；月初三天出現「上個月的回顧」，學期末出現「學期回顧」，流程相同、範圍不同。
+7. 「我的」頁「回顧」區塊顯示最近一次，點進去看所有紀錄。
+
 ### UC15　套用目標範本（Phase 3）
 
-1. 目標頁頁首點 ✨（`Icons.auto_awesome_outlined`，常駐，不只在清單空的時候出現）→
-   開啟「目標範本」sheet。
-2. sheet 列出 `kGoalTemplates` 的每個範本：名稱、一句說明、以及**會建立幾個目標與幾個任務**
+1. 目標頁或願景頁頁首點 ✨（`Icons.auto_awesome_outlined`，常駐，不只在清單空的時候出現）→
+   開啟同一個「目標範本」sheet。
+2. sheet 列出 `kGoalTemplates` 的每個範本：名稱、一句說明、以及**會建立 1 個願景、幾個目標與幾個任務**
    （`templateContents()`，數字由 `GoalTemplate.goalCount` / `taskCount` 當場算出，不是手寫的）。
 3. 點「套用範本」→ `applyGoalTemplate()` 依序寫入（見 §3-N）→ sheet 關閉 →
    SnackBar 回報「已建立 N 個目標、M 個任務」。
-4. 建立出來的目標／里程碑／任務是**完全普通的資料**：沒有任何「來自範本」的旗標，
+4. 建立出來的願景／目標／里程碑／任務是**完全普通的資料**：沒有任何「來自範本」的旗標，
    編輯、拖曳排序、連結願景、刪除進回收桶的行為與手動建立的完全一樣。
 5. 範本寫進的是**目標頁目前選取的那個學期**（`selectedSemesterProvider`），不是當前學期——
    使用者先切到下學期再套用，資料就落在下學期。
@@ -1335,6 +1423,22 @@ flowchart TD
     ProfileCheck -->|已載入| ProviderCheck{"provider = google\n或已有暱稱?"}
     ProviderCheck -->|否| Setup["顯示 SetupProfileScreen"]
     ProviderCheck -->|是| Home4["顯示 HomeScreen"]
+```
+
+登入帳號的清單先畫快取、再等查詢（`SyncedListNotifier.load`，資料見 data_dictionary.md D24）。
+HomeScreen 一出現就有上次的資料，不必像以前一樣空白幾秒等網路：
+
+```mermaid
+flowchart TD
+    L(["load(uid)"]) --> Same{"已經是這個帳號?"}
+    Same -->|是| Skip(["不動作"])
+    Same -->|否| Owner{"cache_owner == uid 且清單是空的?"}
+    Owner -->|是| Draw["state = cache_*（先畫出來）"]
+    Owner -->|否| Query
+    Draw --> Query["查詢 Supabase（runWithRetry）"]
+    Query -->|成功| Replace["state = 查詢結果 → afterLoad()"]
+    Replace --> Write["listener 把整份寫回 cache_*"]
+    Query -->|失敗| Keep["保留畫面上的資料，回報同步錯誤"]
 ```
 
 ### 5-B 循環任務適用判斷（`_taskAppliesTo`）
@@ -1476,5 +1580,6 @@ flowchart TD
 | `OverviewGraphScreen` | `futureGoalsProvider` + `semesterGoalsProvider` + `tasksProvider`（唯讀彙整） | D1／D2／D3 |
 | `LoginScreen` / `RegisterScreen` | `authStateProvider` / `guestModeProvider` | D10 `auth.users` / D12 `is_guest_mode` |
 | 個人資料學校／系所選擇器 | `universitiesProvider` | 靜態常數，非持久化資料儲存 |
-| 目標頁「目標範本」sheet | `semesterGoalsProvider` + `tasksProvider`（只寫，見 §3-N） | D1 `tasks`／D2 `semester_goals`；範本本身是靜態常數 |
+| 目標頁／願景頁「目標範本」sheet | `futureGoalsProvider` + `semesterGoalsProvider` + `tasksProvider`（只寫，見 §3-N） | D3 `future_goals`／D2 `semester_goals`／D1 `tasks`；範本本身是靜態常數 |
+| `ReviewScreen`／`ReviewsScreen`／任務頁回顧卡與本週專注 | `reviewsProvider`、`dueReviewProvider`、`activeFocusProvider`（讀 `tasksProvider`／`semesterGoalsProvider`／`journalProvider`） | D23 `reviews`；延後任務寫 D1 |
 | 新手導覽章節（`HomeScreen` 上的 overlay，見 §3-O）／設定頁「新手指南」 | `onboardingProvider`、`tourReplayProvider` | D22 `onboarding_done` |

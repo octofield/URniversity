@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/core/goal_templates.dart';
+import 'package:urniversity/core/input_limits.dart';
+import 'package:urniversity/l10n/app_strings.dart';
+import 'package:urniversity/l10n/strings_en.dart';
+import 'package:urniversity/l10n/strings_jp.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
+import 'package:urniversity/providers/future_goals_provider.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart';
 import 'package:urniversity/providers/tasks_provider.dart';
 import 'package:urniversity/widgets/goal_template_sheet.dart';
@@ -68,8 +73,38 @@ void main() {
     for (final milestone in milestones) {
       expect(rootIds, contains(milestone.parentId));
     }
-    // Rule 7: only a goal linked by hand carries a vision
-    expect(goals.every((g) => g.futureGoalId == null), isTrue);
+  });
+
+  testWidgets('each template makes one vision and links only its top-level goals',
+      (tester) async {
+    for (final template in kGoalTemplates) {
+      final scope = await apply(tester, [template]);
+      final visions = scope.read(futureGoalsProvider);
+      final goals = scope.read(semesterGoalsProvider);
+
+      expect(visions.single.title, template.vision.title(zh), reason: template.id);
+      expect(visions.single.startSemester, semester);
+      // Rule 7: a milestone takes its vision from its parent, never directly
+      for (final g in goals) {
+        expect(g.futureGoalId, g.parentId == null ? visions.single.id : isNull,
+            reason: '${template.id}: ${g.title}');
+      }
+    }
+  });
+
+  testWidgets('a goal with no category of its own takes the vision\'s',
+      (tester) async {
+    final grad = kGoalTemplates.firstWhere((t) => t.id == 'grad');
+    final cert = kGoalTemplates.firstWhere((t) => t.id == 'cert');
+    final scope = await apply(tester, [grad, cert]);
+    final goals = scope.read(semesterGoalsProvider);
+
+    List<String> categoriesOf(String title) =>
+        goals.firstWhere((g) => g.title == title).categories;
+    expect(categoriesOf(zh.tplGradG1), ['other']);
+    expect(categoriesOf(zh.tplGradG1M1), ['other']);
+    // One that names its own keeps it
+    expect(categoriesOf(zh.tplCertG2), ['competition']);
   });
 
   testWidgets('tasks link to a milestone, and every row lands in the semester',
@@ -120,6 +155,24 @@ void main() {
       // Every text slot resolves; a missing override would throw here
       expect(template.name(zh), isNotEmpty);
       expect(template.description(zh), isNotEmpty);
+    }
+  });
+
+  test('every title fits the title cap in every language', () {
+    for (final s in const <AppStrings>[StringsZhTw(), StringsEn(), StringsJp()]) {
+      for (final template in kGoalTemplates) {
+        final titles = [
+          template.vision.title(s),
+          for (final g in template.goals) ...[
+            g.title(s),
+            for (final m in g.milestones) ...[m.title(s), for (final t in m.tasks) t(s)],
+          ],
+        ];
+        for (final title in titles) {
+          expect(title, isNotEmpty, reason: template.id);
+          expect(title.length, lessThanOrEqualTo(InputLimits.title), reason: title);
+        }
+      }
     }
   });
 }

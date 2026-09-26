@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -191,6 +192,139 @@ class CoachMarkOverlay {
     Overlay.of(context).insert(entry);
     return dismiss;
   }
+}
+
+// Which side of the highlight the card goes on
+enum CoachCardSide { above, below, left, right, overlay, center }
+
+class CoachCardPlacement {
+  final CoachCardSide side;
+  final double left;
+  final double width;
+  // Exactly one of top / bottom is set for above, below, overlay and center;
+  // left and right sides are centred on [centerY] instead
+  final double? top;
+  final double? bottom;
+  final double? centerY;
+  final double maxHeight;
+  // Tip of the arrow, on the card's edge facing the highlight; null for none
+  final Offset? arrowTip;
+
+  const CoachCardPlacement({
+    required this.side,
+    required this.left,
+    required this.width,
+    this.top,
+    this.bottom,
+    this.centerY,
+    required this.maxHeight,
+    this.arrowTip,
+  });
+}
+
+const double _gutter = AppSpacing.pageHorizontal;
+const double _gap = AppSpacing.xs;
+const double kCoachArrow = 9;
+// Below this the card cannot show a title, a line of text and its buttons
+const double _minCardHeight = 180;
+
+// Where the tour card goes, the way popover libraries decide it: the side with
+// the most room, flipped when it does not fit, then slid to stay on screen.
+//
+// Phones get a full-width card above or below the target. From the desktop
+// breakpoint the card is a fixed 360 and, for a target hugging the left or
+// right edge — the navigation rail, the add button in the corner — it sits
+// beside the target, where a wide screen has the room, instead of far away.
+// A target too tall to leave room anywhere (a whole list) gets the card laid
+// over its lower part, which is still better than off screen
+CoachCardPlacement placeCoachCard({
+  required Size screen,
+  required double keyboard,
+  Rect? hole,
+}) {
+  final visibleHeight = screen.height - keyboard;
+  final wide = screen.width >= AppBreakpoints.desktop;
+  final width = wide
+      ? 360.0.clamp(0.0, screen.width - _gutter * 2)
+      : (screen.width - _gutter * 2).clamp(0.0, 480.0);
+
+  if (hole == null) {
+    return CoachCardPlacement(
+      side: CoachCardSide.center,
+      left: (screen.width - width) / 2,
+      width: width,
+      top: visibleHeight / 3,
+      maxHeight: visibleHeight * 0.6,
+    );
+  }
+
+  double slideX(double left) => left.clamp(_gutter, screen.width - _gutter - width);
+
+  CoachCardPlacement? beside(CoachCardSide side) {
+    final room = side == CoachCardSide.right
+        ? screen.width - hole.right - _gutter
+        : hole.left - _gutter;
+    if (room < width + _gap + kCoachArrow) return null;
+    final left = side == CoachCardSide.right
+        ? hole.right + _gap + kCoachArrow
+        : hole.left - _gap - kCoachArrow - width;
+    final y = hole.center.dy.clamp(_gutter + 12, visibleHeight - _gutter - 12);
+    return CoachCardPlacement(
+      side: side,
+      left: left,
+      width: width,
+      centerY: y,
+      maxHeight: (visibleHeight - _gutter * 2) * 0.8,
+      arrowTip: Offset(
+        side == CoachCardSide.right ? hole.right + _gap : hole.left - _gap,
+        y,
+      ),
+    );
+  }
+
+  // Wide screens: a target at the edge gets the card beside it
+  if (wide) {
+    if (hole.center.dx < screen.width * 0.25) {
+      final right = beside(CoachCardSide.right);
+      if (right != null) return right;
+    } else if (hole.center.dx > screen.width * 0.75) {
+      final left = beside(CoachCardSide.left);
+      if (left != null) return left;
+    }
+  }
+
+  final roomAbove = hole.top - _gutter;
+  final roomBelow = visibleHeight - hole.bottom - _gutter;
+  final useBelow = roomBelow >= roomAbove;
+  final room = useBelow ? roomBelow : roomAbove;
+  if (room >= _minCardHeight) {
+    final left = slideX(hole.center.dx - width / 2);
+    final tipX = hole.center.dx.clamp(left + 20, left + width - 20);
+    return CoachCardPlacement(
+      side: useBelow ? CoachCardSide.below : CoachCardSide.above,
+      left: left,
+      width: width,
+      top: useBelow ? hole.bottom + _gap + kCoachArrow : null,
+      bottom: useBelow ? null : screen.height - hole.top + _gap + kCoachArrow,
+      maxHeight: (room - _gap - kCoachArrow).clamp(0.0, visibleHeight * 0.5),
+      arrowTip: Offset(tipX, useBelow ? hole.bottom + _gap : hole.top - _gap),
+    );
+  }
+
+  // Not enough room above or below: try either side before giving up
+  final side = beside(
+        hole.center.dx < screen.width / 2 ? CoachCardSide.right : CoachCardSide.left,
+      ) ??
+      beside(hole.center.dx < screen.width / 2 ? CoachCardSide.left : CoachCardSide.right);
+  if (side != null) return side;
+
+  return CoachCardPlacement(
+    side: CoachCardSide.overlay,
+    left: slideX(hole.center.dx - width / 2),
+    width: width,
+    bottom: keyboard + _gutter,
+    maxHeight: visibleHeight * 0.45,
+  );
 }
 
 class _TrackedRoute {
@@ -557,8 +691,6 @@ class _CoachMarkViewState extends ConsumerState<_CoachMarkView>
 
     final media = MediaQuery.of(context);
     final screen = media.size;
-    // The keyboard takes the bottom of the screen; the card has to fit above it
-    final visibleHeight = screen.height - media.viewInsets.bottom;
     final hole = _hole?.inflate(AppSpacing.xs);
 
     final blockers = <Widget>[];
@@ -573,17 +705,16 @@ class _CoachMarkViewState extends ConsumerState<_CoachMarkView>
       ]);
     }
 
-    final spaceBelow = hole == null ? 0.0 : visibleHeight - hole.bottom;
-    final spaceAbove = hole == null ? 0.0 : hole.top;
-    final cardBelow = hole != null && spaceBelow >= spaceAbove;
-    final maxCardHeight = visibleHeight * 0.4;
-    final cardWidth = (screen.width - AppSpacing.pageHorizontal * 2).clamp(0.0, 480.0);
-    // Where along the card's edge the arrow sits: under the target's centre,
-    // kept off the rounded corners
-    final arrowX = hole == null
-        ? 0.0
-        : (hole.center.dx - AppSpacing.pageHorizontal).clamp(24.0, cardWidth - 24.0);
+    final placement = placeCoachCard(
+      screen: screen,
+      keyboard: media.viewInsets.bottom,
+      hole: hole,
+    );
     final pulsing = _invitesTap;
+    final card = ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: placement.maxHeight),
+      child: _card(context),
+    );
 
     return Listener(
       behavior: HitTestBehavior.translucent,
@@ -614,28 +745,29 @@ class _CoachMarkViewState extends ConsumerState<_CoachMarkView>
             ),
           ),
           ...blockers,
-          Positioned(
-            left: AppSpacing.pageHorizontal,
-            right: AppSpacing.pageHorizontal,
-            top: hole == null
-                ? visibleHeight / 3
-                : (cardBelow ? hole.bottom + AppSpacing.xs : null),
-            bottom: hole == null || cardBelow
-                ? null
-                : screen.height - hole.top + AppSpacing.xs,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: maxCardHeight, maxWidth: 480),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (hole != null && cardBelow) _Arrow(x: arrowX, up: true),
-                  Flexible(child: _card(context)),
-                  if (hole != null && !cardBelow) _Arrow(x: arrowX, up: false),
-                ],
+          if (placement.centerY == null)
+            Positioned(
+              left: placement.left,
+              width: placement.width,
+              top: placement.top,
+              bottom: placement.bottom,
+              child: card,
+            )
+          else
+            // Beside the target: centred on it, then slid to stay on screen.
+            // Needs the card's height, so it is placed after layout
+            Positioned(
+              left: placement.left,
+              width: placement.width,
+              top: 0,
+              bottom: media.viewInsets.bottom,
+              child: CustomSingleChildLayout(
+                delegate: _CentreOnY(placement.centerY!),
+                child: card,
               ),
             ),
-          ),
+          if (placement.arrowTip != null)
+            _Arrow(tip: placement.arrowTip!, side: placement.side),
         ],
       ),
     );
@@ -837,39 +969,87 @@ class SpotlightPainter extends CustomPainter {
   bool shouldRepaint(SpotlightPainter old) => old.hole != hole || old.pulse != pulse;
 }
 
-// The notch on the card's edge that points at the highlight
+// The notch on the card's edge that points at the highlight, placed by its tip
 class _Arrow extends StatelessWidget {
-  final double x;
-  final bool up;
+  final Offset tip;
+  final CoachCardSide side;
 
-  const _Arrow({required this.x, required this.up});
+  const _Arrow({required this.tip, required this.side});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.only(left: x - 9),
-        child: CustomPaint(size: const Size(18, 9), painter: _ArrowPainter(up)),
-      );
+  Widget build(BuildContext context) {
+    const long = kCoachArrow * 2;
+    const short = kCoachArrow;
+    final vertical = side == CoachCardSide.above || side == CoachCardSide.below;
+    final size = vertical ? const Size(long, short) : const Size(short, long);
+    final origin = switch (side) {
+      CoachCardSide.below => Offset(tip.dx - long / 2, tip.dy),
+      CoachCardSide.above => Offset(tip.dx - long / 2, tip.dy - short),
+      CoachCardSide.right => Offset(tip.dx, tip.dy - long / 2),
+      _ => Offset(tip.dx - short, tip.dy - long / 2),
+    };
+    return Positioned(
+      left: origin.dx,
+      top: origin.dy,
+      child: IgnorePointer(
+        child: CustomPaint(size: size, painter: _ArrowPainter(side)),
+      ),
+    );
+  }
+}
+
+// Lays the card out so its middle sits at [y], without leaving the screen
+class _CentreOnY extends SingleChildLayoutDelegate {
+  final double y;
+
+  const _CentreOnY(this.y);
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      constraints.loosen();
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final top = (y - childSize.height / 2)
+        .clamp(_gutter, (size.height - _gutter - childSize.height).clamp(_gutter, double.infinity));
+    return Offset(0, top);
+  }
+
+  @override
+  bool shouldRelayout(_CentreOnY old) => old.y != y;
 }
 
 class _ArrowPainter extends CustomPainter {
-  final bool up;
+  final CoachCardSide side;
 
-  const _ArrowPainter(this.up);
+  const _ArrowPainter(this.side);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = up
-        ? (Path()
-          ..moveTo(0, size.height)
-          ..lineTo(size.width / 2, 0)
-          ..lineTo(size.width, size.height))
-        : (Path()
-          ..moveTo(0, 0)
-          ..lineTo(size.width / 2, size.height)
-          ..lineTo(size.width, 0));
+    final w = size.width;
+    final h = size.height;
+    // Each triangle points from the card towards the highlight
+    final path = switch (side) {
+      CoachCardSide.below => Path()
+        ..moveTo(0, h)
+        ..lineTo(w / 2, 0)
+        ..lineTo(w, h),
+      CoachCardSide.above => Path()
+        ..moveTo(0, 0)
+        ..lineTo(w / 2, h)
+        ..lineTo(w, 0),
+      CoachCardSide.right => Path()
+        ..moveTo(w, 0)
+        ..lineTo(0, h / 2)
+        ..lineTo(w, h),
+      _ => Path()
+        ..moveTo(0, 0)
+        ..lineTo(w, h / 2)
+        ..lineTo(0, h),
+    };
     canvas.drawPath(path..close(), Paint()..color = AppColors.surface);
   }
 
   @override
-  bool shouldRepaint(_ArrowPainter old) => old.up != up;
+  bool shouldRepaint(_ArrowPainter old) => old.side != side;
 }

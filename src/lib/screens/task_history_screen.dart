@@ -18,6 +18,7 @@ import '../providers/tasks_provider.dart';
 import '../utils/category_helpers.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/coach_mark.dart';
+import 'reviews_screen.dart';
 
 // One point on the history chart. rate is null when no task applied that
 // day/week/month — distinct from 0%, where tasks existed but none were done.
@@ -160,6 +161,18 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          // The numbers here are the running picture; the reviews are what
+          // was made of them, week by week
+          IconButton(
+            icon: const Icon(Icons.auto_graph_outlined),
+            tooltip: s.reviews,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReviewsScreen()),
+            ),
+          ),
+        ],
       ),
       body: ResponsiveBody(
         child: SingleChildScrollView(

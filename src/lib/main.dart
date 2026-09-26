@@ -21,6 +21,8 @@ import 'screens/semester_goal_detail_screen.dart';
 import 'screens/today_screen.dart';
 import 'providers/password_recovery_provider.dart';
 import 'providers/profile_provider.dart';
+import 'providers/reviews_provider.dart';
+import 'screens/review_screen.dart';
 import 'providers/settings_provider.dart';
 import 'providers/sync_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -299,6 +301,19 @@ void _handlePendingOpen(WidgetRef ref) {
 
     case 'newFutureGoal':
       open((ctx) => showFutureGoalSheet(ctx, ref));
+
+    // The Sunday reminder. Opens whichever review is due; if it was already
+    // done from another device, there is nothing to open and the request ends
+    case 'review':
+      final window = ref.read(dueReviewProvider);
+      if (window == null) {
+        ref.read(pendingOpenProvider.notifier).state = null;
+      } else {
+        open((ctx) => Navigator.push(
+              ctx,
+              MaterialPageRoute(builder: (_) => ReviewScreen(window: window)),
+            ));
+      }
 
     default:
       // An unknown kind would otherwise stay pending forever, rebuilding

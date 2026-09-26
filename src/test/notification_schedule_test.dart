@@ -4,6 +4,7 @@ import 'package:urniversity/core/notification_payload.dart';
 import 'package:urniversity/core/notification_schedule.dart';
 import 'package:urniversity/l10n/strings_en.dart';
 import 'package:urniversity/models/notification_settings.dart';
+import 'package:urniversity/models/review.dart';
 import 'package:urniversity/models/semester_goal.dart';
 import 'package:urniversity/models/task.dart';
 import 'package:urniversity/providers/settings_provider.dart';
@@ -16,7 +17,11 @@ void main() {
   // A Monday, mid-morning
   final now = DateTime(2026, 9, 14, 10, 0);
 
-  const allOn = NotificationSettings(enabled: true);
+  // The weekly review is left out: the cases below narrow to one kind by
+  // switching the others off, and were written before it existed. It only
+  // fires on Sunday evenings and has its own group, which turns it back on
+  const allOn = NotificationSettings(enabled: true, weeklyReviewEnabled: false);
+  final withReview = allOn.copyWith(weeklyReviewEnabled: true);
 
   Task task({
     String id = 't1',
@@ -59,6 +64,7 @@ void main() {
     List<SemesterGoal> goals = const [],
     NotificationSettings settings = allOn,
     DateTime? at,
+    List<Review> reviews = const [],
   }) =>
       buildNotificationSchedule(
         tasks: tasks,
@@ -67,6 +73,7 @@ void main() {
         semesterSettings: semSettings,
         s: s,
         now: at ?? now,
+        reviews: reviews,
       );
 
   group('the master switch', () {
@@ -426,12 +433,67 @@ void main() {
           NotificationKind.taskDue => NotificationConstants.taskIdBase,
           NotificationKind.dailySummary => NotificationConstants.summaryIdBase,
           NotificationKind.goalDeadline => NotificationConstants.goalIdBase,
+          NotificationKind.weeklyReview => NotificationConstants.reviewIdBase,
         };
         expect(n.id, greaterThanOrEqualTo(base));
         expect(n.id, lessThan(base + NotificationConstants.maxScheduled));
       }
     });
   });
+  // §3-P: Sunday evening, the moment the review window opens
+  group('the weekly review', () {
+    List<ScheduledNotification> reviewsOnly(List<ScheduledNotification> all) =>
+        all.where((n) => n.kind == NotificationKind.weeklyReview).toList();
+
+    test('fires every Sunday evening in the horizon, carrying the review marker', () {
+      // Monday 14 Sep 2026: the next two Sundays are 20 and 27 Sep
+      final scheduled = reviewsOnly(build(settings: withReview));
+      expect(scheduled.map((n) => n.when), [
+        DateTime(2026, 9, 20, 20),
+        DateTime(2026, 9, 27, 20),
+      ]);
+      expect(scheduled.every((n) => n.payload == NotificationConstants.reviewPayload), isTrue);
+    });
+
+    test('a week already reviewed is not reminded about', () {
+      final done = Review(
+        id: 'r',
+        period: ReviewPeriod.week,
+        periodStart: DateTime(2026, 9, 14),
+        periodEnd: DateTime(2026, 9, 20),
+        stats: const ReviewStats(done: 0, total: 0, streak: 0, journals: 0),
+        createdAt: DateTime(2026, 9, 19, 22),
+      );
+      final scheduled = reviewsOnly(build(settings: withReview, reviews: [done]));
+      expect(scheduled.map((n) => n.when), [DateTime(2026, 9, 27, 20)]);
+    });
+
+    test('follows the chosen time, and stops when switched off', () {
+      final later = reviewsOnly(build(
+        settings: const NotificationSettings(enabled: true, weeklyReviewMinuteOfDay: 21 * 60 + 30),
+      ));
+      expect(later.first.when, DateTime(2026, 9, 20, 21, 30));
+
+      expect(
+        reviewsOnly(build(settings: const NotificationSettings(enabled: true, weeklyReviewEnabled: false))),
+        isEmpty,
+      );
+    });
+
+    test('the review marker is never read as a task', () {
+      expect(TaskNotificationPayload.decode(NotificationConstants.reviewPayload), isNull);
+    });
+
+    test('the settings keep the review choices across a round trip', () {
+      const settings = NotificationSettings(weeklyReviewEnabled: false, weeklyReviewMinuteOfDay: 19 * 60);
+      final back = NotificationSettings.fromJson(settings.toJson());
+      expect(back.weeklyReviewEnabled, isFalse);
+      expect(back.weeklyReviewMinuteOfDay, 19 * 60);
+      // Settings stored by a build before reviews existed turn the reminder on
+      expect(NotificationSettings.fromJson(const {}).weeklyReviewEnabled, isTrue);
+    });
+  });
+
   group('the stored settings', () {
     test('keep the untimed repeating time across a round trip', () {
       const settings = NotificationSettings(recurringMinuteOfDay: 7 * 60 + 30);

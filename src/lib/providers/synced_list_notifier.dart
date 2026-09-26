@@ -94,6 +94,9 @@ const _idSuffixRange = 0x100000000;
 String newRowId() =>
     '${DateTime.now().millisecondsSinceEpoch}_${_idRandom.nextInt(_idSuffixRange)}';
 
+// Which account the cache_* rows belong to (D24)
+const kCacheOwnerKey = 'cache_owner';
+
 // Shared guest/Supabase plumbing for the list-shaped providers.
 //
 // Every list provider needs the same five things: load from Supabase, load from
@@ -107,7 +110,9 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     required this.localKey,
     required this.orderColumn,
     this.orderAscending = true,
-  }) : super([]);
+  }) : super([]) {
+    addListener(_writeCache, fireImmediately: false);
+  }
 
   final Ref ref;
   final String table;
@@ -132,6 +137,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
   Future<void> load(String userId) async {
     if (_userId == userId) return;
     _userId = userId;
+    await _readCache(userId);
     try {
       // Retried harder than a single write: a failed load nulls _userId below,
       // which silently disables every write for the rest of the session
@@ -191,9 +197,42 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     });
   }
 
+  // A signed-in account's last-seen rows, so the next launch draws them at once
+  // and the query only refreshes them — the way an offline-first app opens
+  // (data_dictionary.md D24). Kept apart from guest_* so neither overwrites the
+  // other, and tagged with its owner so another account never sees them
+  String get cacheKey => 'cache_$table';
+
+  Future<void> _readCache(String userId) async {
+    final p = await SharedPreferences.getInstance();
+    if (p.getString(kCacheOwnerKey) != userId) return;
+    final json = p.getString(cacheKey);
+    // Something written meanwhile is newer than the cache
+    if (json == null || state.isNotEmpty || _userId != userId) return;
+    try {
+      state = (jsonDecode(json) as List)
+          .map((j) => fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      // Parse fallback: a cache from an older build is simply skipped, the
+      // query below fills the list anyway
+      debugPrint('[sync] $cacheKey unreadable - $e');
+    }
+  }
+
+  void _writeCache(List<T> rows) {
+    final owner = _userId;
+    if (owner == null || isGuest) return;
+    SharedPreferences.getInstance().then((p) {
+      p.setString(kCacheOwnerKey, owner);
+      p.setString(cacheKey, jsonEncode(rows.map(toJson).toList()));
+    });
+  }
+
   void clear() {
     _userId = null;
     state = [];
+    SharedPreferences.getInstance().then((p) => p.remove(cacheKey));
   }
 
   // Self-referencing parent id, for the tree-shaped tables. Used to order the

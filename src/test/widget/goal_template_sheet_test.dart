@@ -4,6 +4,8 @@ import 'package:urniversity/core/goal_templates.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart';
 import 'package:urniversity/providers/tasks_provider.dart';
+import 'package:urniversity/providers/future_goals_provider.dart';
+import 'package:urniversity/screens/future_screen.dart';
 import 'package:urniversity/screens/semester_screen.dart';
 
 import '../helpers/pump_app.dart';
@@ -69,5 +71,20 @@ void main() {
       isFalse,
     );
     expect(find.text(template.goals.first.title(zh)), findsNothing);
+  });
+
+  testWidgets('the vision page opens the same sheet and the vision shows there',
+      (tester) async {
+    final scope = await pumpScreen(
+        tester, const Scaffold(body: FutureScreen()), width: 420);
+    final template = kGoalTemplates.first;
+
+    await tester.tap(find.byTooltip(zh.goalTemplates));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(zh.applyTemplate).first);
+    await tester.pumpAndSettle();
+
+    expect(scope.read(futureGoalsProvider).single.title, template.vision.title(zh));
+    expect(find.text(template.vision.title(zh)), findsOneWidget);
   });
 }
