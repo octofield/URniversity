@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/core/review_stats.dart';
+import 'package:urniversity/models/course.dart';
 import 'package:urniversity/models/review.dart';
 import 'package:urniversity/models/semester_goal.dart';
 import 'package:urniversity/models/task.dart';
@@ -248,6 +249,41 @@ void main() {
       expect(back.stats.total, 0);
       expect(back.stats.targets, isEmpty);
       expect(back.focusTargetIds, isEmpty);
+    });
+  });
+
+  // Phase 6: a semester review carries that semester's GPA
+  group('the semester GPA', () {
+    final graded = [
+      Course(id: 'a', semester: '115-1', title: 'a', credits: 3, grade: 'A', color: 0, createdAt: DateTime(2026, 9)),
+      Course(id: 'b', semester: '115-1', title: 'b', credits: 2, grade: 'B', color: 0, createdAt: DateTime(2026, 9)),
+      Course(id: 'c', semester: '114-2', title: 'c', credits: 3, grade: 'F', color: 0, createdAt: DateTime(2026, 2)),
+    ];
+    ReviewStats statsFor(ReviewWindow w) => buildReviewStats(
+          window: w,
+          tasks: const [],
+          goals: const [],
+          journals: const [],
+          writtenByUser: (_) => true,
+          settings: settings,
+          now: DateTime(2027, 2, 1),
+          courses: graded,
+        );
+
+    test('is that semester\'s, not the cumulative one', () {
+      final term = ReviewWindow(ReviewPeriod.semester, DateTime(2026, 8, 1), DateTime(2027, 1, 31));
+      expect(statsFor(term).gpa, 3.6);
+    });
+
+    test('weeks and months carry none', () {
+      final week = ReviewWindow(ReviewPeriod.week, DateTime(2027, 1, 25), DateTime(2027, 1, 31));
+      expect(statsFor(week).gpa, isNull);
+    });
+
+    test('survives the round trip through the stored snapshot', () {
+      const stats = ReviewStats(done: 0, total: 0, streak: 0, journals: 0, gpa: 3.6);
+      expect(ReviewStats.fromJson(stats.toJson()).gpa, 3.6);
+      expect(ReviewStats.fromJson(const {}).gpa, isNull);
     });
   });
 }

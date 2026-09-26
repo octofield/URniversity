@@ -395,6 +395,7 @@ flowchart TD
 ```
 
 - 回顧**讀**任務、目標、日記，但只**寫**兩個地方：`reviews` 一筆，以及使用者勾選「挪到下週」的任務的截止時間。
+- 學期回顧另外讀 D27 `courses`，把該學期 GPA 存進 `stats.gpa`（Phase 6）。
 - 數字在打開回顧時算一次並凍結成快照（`stats`），之後任務變動不影響已存的回顧。
 
 ---
@@ -469,6 +470,63 @@ flowchart TD
 | D21 | `vision_sort` | 裝置本機 SharedPreferences（願景頁的排序方式；只影響顯示順序，不寫回 D3） |
 | D23 | `reviews` | Supabase 資料表（回顧：數字快照＋三段文字＋專注目標） |
 | D25 | `haptics_enabled` | 裝置本機 SharedPreferences（觸覺回饋開關，每台裝置各自設定） |
+| D27 | `courses` | Supabase 資料表（課程，時段在同一列的 jsonb；Phase 6 的成績也在這裡） |
+| D29 | `course_catalog` | Supabase 資料表（各校課程目錄，時段已讀好；公開唯讀，由離線腳本寫入） |
+| D32 | `catalog_schools` | Supabase 資料表（可搜尋的學校與學期；公開唯讀，由離線腳本寫入） |
+| D30 | `term_starts` | 裝置本機 SharedPreferences（各學期開學日；登入帳號另同步到 D8 `user_settings.term_starts`） |
+| D31 | `graduation_credits`、`degree_level` | 裝置本機 SharedPreferences（畢業學分與及格線；登入帳號另同步到 D8） |
 | D26 | `app_style` | 裝置本機 SharedPreferences（使用者選的風格；登入帳號另同步到 D8 `user_settings.app_style`） |
 | D24 | `cache_*` 系列 key＋`cache_owner` | 裝置本機 SharedPreferences（登入帳號的清單快取，開 App 先畫、查詢回來覆蓋；登出即刪） |
 | D22 | `onboarding_done` | 裝置本機 SharedPreferences（新手導覽哪幾章跑過，StringList；不上雲、不進訪客資料清單） |
+
+---
+
+## Diagram 1-I：課表與成績（Phase 5／6）
+
+```mermaid
+flowchart TD
+    User(["使用者：課表頁 / 任務頁「今天的課」/ 成績頁"])
+    Script["scripts/catalog/fetch_catalog.py\n--school=… --semesters=…\n（每學期手動跑一次）"]
+    Mods["schools/ntu.py、schools/nthu.py…\n各校抓取＋以 schools.json 節次表讀時間"]
+    Src[("各校公開來源\nNOL 查詢頁、清大開放資料…")]
+
+    PC["courses_provider\nCoursesNotifier"]
+    PT["courses_provider\nTermsNotifier"]
+    PCat["course_catalog_provider\n（學校清單、搜尋）"]
+    PG["grade_settings_provider"]
+    TT["core/timetable.dart\ncore/gpa_stats.dart（純函式）"]
+    PN["notification_provider"]
+    PW["home_widget_provider"]
+
+    DC[("D27 courses")]
+    DCat[("D29 course_catalog")]
+    DSch[("D32 catalog_schools")]
+    DT[("D30 term_starts\n＋D8 user_settings.term_starts")]
+    DG[("D31 ＋ D8 graduation_credits／degree_level")]
+    DTrash[("D6 trash_items")]
+    DW[("D15 widget_snapshot")]
+
+    Src --> Mods --> Script
+    Script -- "service role upsert（含 sessions）\n完整時刪掉已停開的課" --> DCat
+    Script -- "寫入成功的學期" --> DSch
+    DSch -- "每次開啟讀一次" --> PCat
+    User -- "選學校、搜尋課名／老師／課號" --> PCat
+    DCat -- "同校同學期 ilike，最多 40 筆" --> PCat
+    PCat -- "加入：複製 sessions" --> PC
+    User -- "手動新增／編輯／填成績" --> PC
+    PC <--> DC
+    PC -- "刪除：整門課連時段" --> DTrash
+    User -- "設定開學日" --> PT <--> DT
+    User -- "畢業學分、學士／研究所" --> PG <--> DG
+    PC --> TT
+    PT --> TT
+    TT -- "今天的課、衝堂、第幾週、GPA、試算" --> User
+    PC -- "上課前提醒（上課週內，7 天內最多 20 則）" --> PN
+    PT --> PN
+    PC -- "小工具「課表」分頁" --> PW --> DW
+```
+
+- 課程目錄只有腳本寫、App 只讀；加入的課是**複製**進 D27，之後與目錄無關（`catalog_id` 只記來源）。
+- 各校的時間字串只在腳本裡讀（`common.periods_to_sessions` 加各校節次表），App 拿到的就是時段；新增一所學校＝一個 Python 模組＋`schools.json` 一筆，App 從 D32 自動多出那所學校的搜尋入口。
+- 一門課的時段在同一列，所以新增、修改、刪除、還原、訪客合併都是一次寫入。
+- GPA、及格學分、目標試算都是由 D27 即時算出，不另外存；只有學期回顧把當時的 GPA 存進 D23 的 `stats`。

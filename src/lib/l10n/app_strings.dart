@@ -479,6 +479,80 @@ abstract class AppStrings {
   String get cjkSans;
   String get cjkSerif;
 
+  // Timetable (Phase 5)
+  String get timetable;
+  String timetableWeek(int week);
+  String get timetableBeforeTerm;
+  String get timetableAfterTerm;
+  String get setFirstDay;
+  String get firstDayTitle;
+  String get firstDayHint;
+  String get teachingWeeks;
+  String get addCourse;
+  String searchSchoolCourses(String school);
+  String get searchCourseHint;
+  String get addManually;
+  String get editCourse;
+  String get courseTitle;
+  String get courseTeacher;
+  String get courseCredits;
+  String get courseMeetings;
+  String get addMeeting;
+  String get meetingRoom;
+  String get meetingStart;
+  String get meetingEnd;
+  String get meetingInvalid;
+  String get courseColor;
+  String courseAdded(String title);
+  String clashesWith(String titles);
+  String get catalogEmpty;
+  String get catalogUnavailable;
+  String get catalogTypeMore;
+  String get catalogAdded;
+  String get noCoursesYet;
+  String get todayClasses;
+  String get classNext;
+  String get classNow;
+  String notifClassTitle(String title);
+  String notifClassBody(String time, String room);
+  String get classReminder;
+  String get classReminderDesc;
+  String minutesBefore(int minutes);
+  String get tourTimetableTitle;
+  String get tourTimetableBody;
+
+  // Grades and GPA (Phase 6)
+  String get courseTitleRequired;
+  String get courseGradeLabel;
+  String get gradeNone;
+  String get gradePass;
+  String get gradeFail;
+  String get gradeWithdrawn;
+  String get countsInGpaLabel;
+  String get grades;
+  String get semesterGpa;
+  String get cumulativeGpa;
+  String get creditsEarned;
+  String creditsOf(String earned, int total);
+  String percentEquivalent(String percent);
+  String get gpaTrend;
+  String get targetGpa;
+  String targetNeeds(String credits, String average);
+  String targetOutOfReach(String best);
+  String get targetMet;
+  String get targetNoCourses;
+  String get graduationCredits;
+  String get degreeLevel;
+  String get degreeBachelor;
+  String get degreeGraduate;
+  String get gradesOtherSchool;
+  String get noGradesYet;
+  String creditsCount(String credits);
+
+  // Widget: classes tab
+  String get widgetNoClasses;
+  String get widgetTomorrow;
+
   // Haptics
   String get haptics;
   String get hapticsSubtitle;

@@ -38,6 +38,9 @@
   | `journals.content` | 5000 | `journals_content_len` |
   | `user_settings.username` | 30 | `user_settings_username_len` |
   | `user_settings.school`、`user_settings.department` | 50 | `user_settings_{col}_len` |
+  | `courses.title` | 100 | `CHECK` 寫在 `supabase/courses.sql` 的 CREATE TABLE |
+  | `courses.teacher`；課程時段的教室（`sessions` 內的 `location`） | 50 | `teacher` 有 CHECK；`location` 在 jsonb 裡，**只有 App 端擋**（`InputLimits.location`） |
+  | `courses.course_code`、`courses.serial_no` | 20 | `CHECK`（`courses.sql`） |
   | `user_settings.app_style` | 20 | `user_settings_app_style_len`（在 `supabase/app_style.sql`；值只由 App 從列舉寫入，沒有對應的 `InputLimits`） |
   | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
@@ -202,7 +205,7 @@
 | `id` | text (PK) | ✓ | — | 格式 `"trash_{原始id}_{刪除時的毫秒時間戳}"` |
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 附加 |
 | `deleted_at` | timestamptz | ✓ | — | 刪除時間 |
-| `item_type` | text | ✓ | — | 列舉：`task` / `semester_goal` / `future_goal` |
+| `item_type` | text | ✓ | — | 列舉：`task` / `semester_goal` / `future_goal` / `course`（Phase 5；`supabase/courses.sql` 把 CHECK 重建成包含 `course`）。`course` 的 `item_data` 是整門課，連同 `sessions`，還原時一起回來 |
 | `item_data` | jsonb | ✓ | — | 被刪除項目當下的完整快照，內容為對應 Model 的 `toJson()` 結果 |
 
 **特別說明：**
@@ -287,6 +290,9 @@
 | `semester_start_months` | int[] | ✗ | `[8, 2]` | 各學期起始月份，陣列長度需等於 `semester_count` |
 | `default_task_view` | int | ✗ | `0` | 任務頁預設檢視：0=全部、1=每日、2=每週 |
 | `show_day_counter` | bool | ✗ | `true` | 日記是否顯示「第 N 天」徽章 |
+| `term_starts` | jsonb | ✗ | `null` | 各學期的開學日與上課週數：`{"115-1": {"first_day": "2026-09-07", "weeks": 16}}`（D30 的雲端副本）。由 `supabase/courses.sql` 新增，**單獨讀寫**（`_loadTerms` / `_saveTerms`） |
+| `graduation_credits` | int | ✗ | `null`（＝128） | 畢業學分（Phase 6），1–400。與 `degree_level` 一起**單獨讀寫**（`_loadGradeSettings` / `_saveGradeSettings`） |
+| `degree_level` | text | ✗ | `null`（＝`bachelor`） | `bachelor`（C- 及格）/ `graduate`（B- 及格） |
 | `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono`，或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
 
 **特別說明：**
@@ -335,6 +341,7 @@
 | `guest_inspirations` | `List<Inspiration>` 的 JSON | `Inspiration` | D4 `inspirations` |
 | `guest_journals` | `List<Journal>` 的 JSON | `Journal` | D5 `journals` |
 | `guest_reviews` | `List<Review>` 的 JSON | `Review` | D23 `reviews` |
+| `guest_courses` | `List<Course>` 的 JSON（含每門課的 `sessions`） | `Course` | D27 `courses` |
 | `guest_profile` | 單一 `UserProfile.toRow('guest')` 的 JSON | `UserProfile` | D8-A（僅個人資料部分） |
 
 **特別說明：**
@@ -372,6 +379,8 @@
 | `goal_lead_days` | int | ✗ | `7` | 學期結束前幾天提醒。可選值見 `NotificationConstants.goalLeadDayOptions` |
 | `weekly_review_enabled` | bool | ✗ | `true` | 每週回顧提醒（Phase 4）。舊版寫入的 JSON 缺這個 key 時視為開啟 |
 | `weekly_review_minute_of_day` | int | ✗ | `1200` | 週日的提醒時刻（1200 = 20:00）。星期固定為週日，因為回顧卡從週日 18:00 開始顯示 |
+| `class_start_enabled` | bool | ✗ | `true` | 上課前提醒（Phase 5）。只在該學期的上課週內；沒設定開學日的學期不提醒 |
+| `class_lead_minutes` | int | ✗ | `10` | 提前幾分鐘：5 / 10 / 15 / 30 |
 
 **特別說明：**
 
@@ -437,6 +446,7 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 | Key | 型別 | 說明 |
 |---|---|---|
 | `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出（見下表）。**原生端勾選時會先改這份**，把該列的 `check` 標成 `checked` |
+| `widget_snapshot` 的 `classes` view | （snapshot 內） | 小工具「課表」分頁：今天還沒上完的課；都上完了就顯示明天的課（前面一列「明天」標頭）。點一門課開 App 的課表頁 |
 | `app_style` | 字串 | 目前生效的風格名稱（隨機模式是當次抽到的那一個）。原生端 `WidgetStyle.of()` 換成該風格的顏色與形狀；暖棕或沒寫過時用原本的資源（並跟著系統深淺色） |
 | `widget_state` | JSON 字串 | **原生端寫入**（`WidgetData.writeState()`）：`mode`（`tasks` / `targets` / `goals` / `filterPicker`）/ `period`（`all` / `day` / `week` / `month`）/ `filter_id`（null＝不篩選）。使用者在小工具上的選擇，App 重開後沿用。Dart 不讀也不寫 |
 | `widget_language` | text | 語言代碼（`zhTw` / `en` / `jp`）。**背景 isolate 需要它才能用正確語言重建 snapshot**——App 設定在訪客模式完全不持久化，雲端那份背景也未必讀得到 |
@@ -715,3 +725,95 @@ key 名稱是 `cache_` 加上資料表名稱（`SyncedListNotifier.cacheKey`）�
 - 訪客與登入帳號都用這把 key；登入帳號另外同步 D8-B `user_settings.app_style`：
   登入時讀雲端值（有值才套用），之後每次切換都寫回。換裝置登入後會變成帳號的風格。
 - 不在 `guest_provider._dataKeys`：它是這台裝置顯示的樣子，退出訪客模式不該被清掉。
+
+---
+
+## D27. `courses`（課程，Phase 5／6）
+
+對應 Dart 型別：`Course`、`CourseSession`（`src/lib/models/course.dart`）；讀寫處理程序：`CoursesNotifier`（`src/lib/providers/courses_provider.dart`，`SyncedListNotifier`）。
+建表：`supabase/courses.sql`（你手動執行）。
+
+| 欄位 | 型別 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `id` | text (PK) | ✓ | — | `newRowId()` |
+| `user_id` | text | ✓ | — | owner 政策 `auth.uid()::text = user_id` |
+| `semester` | text | ✓ | — | `115-1`，與學期目標同一套 token |
+| `title` | text | ✓ | — | ≤ 100 |
+| `teacher` | text | ✗ | `null` | ≤ 50 |
+| `course_code`、`serial_no` | text | ✗ | `null` | 課號、流水號（從課程目錄加入時帶入），≤ 20 |
+| `credits` | numeric(3,1) | ✓ | `0` | 0–30 |
+| `grade` | text | ✗ | `null` | Phase 6：`A+`…`C-`、`F`、`X`，或 `pass` / `fail` / `withdrawn`；`null` 是還沒給分 |
+| `counts_in_gpa` | bool | ✓ | `true` | 關掉就不計入 GPA（例如服務學習） |
+| `color` | bigint | ✓ | — | ARGB；新增時自動挑這學期還沒用過的顏色 |
+| `catalog_id` | text | ✗ | `null` | 從哪一筆 D29 課程目錄加入；**不是外鍵**（目錄每學期重抓） |
+| `sessions` | jsonb | ✓ | `[]` | 每週的上課時段陣列，每個 `{weekday 1–7, start_minute, end_minute, location}`，最多 20 個 |
+| `created_at` | timestamptz | ✓ | `now()` | |
+
+**為什麼時段放在同一列**：原計劃是另一張 `course_sessions` 表，但 App 的寫入在背景送出、不等回應，
+兩列可能以任何順序抵達，時段先到就會被外鍵拒絕而靜靜遺失。放在同一列，一門課永遠是一次寫入；
+回收桶與訪客合併也因此不用處理父子順序。
+
+---
+
+## D29. `course_catalog`（各校課程目錄，Phase 5，公開唯讀）
+
+讀取處理程序：`SupabaseCatalogSource.search(school, semester, query)`（`src/lib/providers/course_catalog_provider.dart`），搜尋時才查（`ilike`，一次最多 40 筆）。
+寫入：只有 `scripts/catalog/fetch_catalog.py --school=…` 用 service role key 寫（見該資料夾的 README）。建表：`supabase/course_catalog.sql`（可重複執行）。
+RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | text (PK) | `<學校>_<學期>_<key>`，≤ 80。key 由各校決定：台大是流水號（沒有流水號的課用 `<課號>_<班次>_<老師>`），清大是科號去掉學期前綴 |
+| `school` | text | 學校代碼，見 `scripts/catalog/schools.json`：`ntu`、`nthu`；**沒有預設值** |
+| `semester` | text | `115-1`，App 的學期格式；各校模組自己換算成來源的格式 |
+| `serial_no`、`course_code`、`class_no` | text | 流水號、課號、班次（清大沒有流水號與班次） |
+| `title`、`teacher` | text | 各有 `pg_trgm` GIN 索引；多位老師以「、」連接，≤ 50 |
+| `credits` | numeric(3,1) | |
+| `required` | text | 學校寫的「必／選修」原文，取第一個授課對象的 |
+| `audience` | text | 所有列出這門課的授課對象，用「、」連接 |
+| `time_text` | text | 學校原文，只用來顯示，例如台大 `三6,7 (基醫508)`、清大 `BMES醫環618 W2W3W4` |
+| `sessions` | jsonb | **腳本已讀好的時段**，格式與 D27 `courses.sessions` 相同，CHECK 陣列且最多 20 段。加入課程時直接複製過去，App 不再解析任何學校的時間字串 |
+| `updated_at` | timestamptz | 這次寫入的時間；完整抓取後，同校同學期中早於這次的列會被刪掉（學校已停開的課） |
+
+來源：
+- 台大是 NOL（`nol.ntu.edu.tw`）的公開查詢頁；`course.ntu.edu.tw` 會封鎖程式化存取，**不要用它**。
+- 清大是官方開放資料 `open_course_data.json`，只有當學期。
+
+115-1 實測：台大 NOL 回報 16,032 列、全數解析、合併成 12,044 門；清大 3,043 門。
+
+**舊版資料**：第一版的 `id` 沒有學校前綴；SQL 會刪掉這些列，重跑腳本即以新 id 寫回。
+
+---
+
+## D30. 裝置本機儲存 — `term_starts`（開學日）
+
+媒介：SharedPreferences，`String`（JSON，格式同 D8-B `term_starts`）。讀寫處理程序：`TermsNotifier`（`courses_provider.dart`）。
+
+- 決定課表的「第幾週」、上課提醒與小工具「課表」只在上課週內出現。
+- 每學期在課表頁問一次（「設定開學日」），預設建議是學期起始月的第一個週一，上課週數預設 16。
+- 訪客與登入帳號都存這把 key；登入帳號另同步 D8-B `user_settings.term_starts`，登入時合併雲端的值。
+- 背景 isolate（小工具重繪）也讀這把 key。
+
+---
+
+## D31. 裝置本機儲存 — `graduation_credits`、`degree_level`
+
+媒介：SharedPreferences（`int`、`String`）。讀寫處理程序：`GradeSettingsNotifier`（`src/lib/providers/grade_settings_provider.dart`）。
+成績頁第一次開啟時在頁內問一次；登入帳號另同步 D8-B 的同名欄位。沒存過時用 128 學分、學士班。
+
+---
+
+## D32. `catalog_schools`（可搜尋的學校，Phase 5，公開唯讀）
+
+讀取處理程序：`SupabaseCatalogSource.schools()` → `catalogSchoolsProvider`（每次開啟 App 讀一次）。寫入：`scripts/catalog/fetch_catalog.py`，某校某學期完整寫入後更新該校這一列。
+建表：`supabase/course_catalog.sql`。RLS 只開 `SELECT TO anon, authenticated`。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `code` | text (PK) | 學校代碼，同 D29 `school` |
+| `name` | text | 學校全名，與 App 學校清單（`taiwan_universities.dart`）及 D8-B `user_settings.school` 同一寫法，用來把使用者自己的學校排第一 |
+| `short_name` | text | 「台大」「清大」，組成「搜尋{簡稱}課程」 |
+| `semesters` | text[] | 有目錄的學期；舊的保留，新寫的加進去 |
+| `updated_at` | timestamptz | |
+
+**為什麼要這張表**：「新增課程」依它列出每個學校的搜尋入口，所以新增一所學校只要跑腳本，不用發新版 App。

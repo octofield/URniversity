@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_motion.dart';
+import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../widgets/coach_mark.dart';
 import '../widgets/draggable_fab.dart';
@@ -20,6 +21,7 @@ import 'future_screen.dart';
 import 'me_screen.dart';
 import 'journal_edit_screen.dart';
 import 'home_tour.dart';
+import 'timetable_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -139,6 +141,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (icon: Icons.person_outlined, selectedIcon: Icons.person, label: s.me),
     ];
 
+    void openTimetable() => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TimetableScreen()),
+        );
+
     final addButton = switch (_index) {
       1 => _VividFab(
           color: AppColors.categoryIntern,
@@ -252,18 +259,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     label: Text(destinations[i].label),
                   ),
               ],
-              // Same divider as the mobile drawer — marks room for future
-              // secondary features below the four main destinations.
+              // Same divider as the mobile drawer — secondary features sit
+              // below the four main destinations and open as pages.
               // NavigationRail centers trailing in an unbounded-width Column,
               // so the Divider needs an explicit finite width (matching the
               // rail's own current width) rather than double.infinity, which
               // crashes hit-testing when the incoming constraint is unbounded.
-              trailing: Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: SizedBox(
-                  width: railWidth - AppSpacing.sm * 2,
-                  child: Divider(color: AppColors.border),
-                ),
+              trailing: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: SizedBox(
+                      width: railWidth - AppSpacing.sm * 2,
+                      child: Divider(color: AppColors.border),
+                    ),
+                  ),
+                  if (extended)
+                    SizedBox(
+                      width: railWidth - AppSpacing.sm * 2,
+                      child: ListTile(
+                        leading: const Icon(Icons.calendar_view_week_outlined),
+                        title: Text(s.timetable),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                        ),
+                        onTap: openTimetable,
+                      ),
+                    )
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.calendar_view_week_outlined),
+                      tooltip: s.timetable,
+                      onPressed: openTimetable,
+                    ),
+                ],
               ),
             ),
             VerticalDivider(width: 1, color: AppColors.border),
@@ -322,6 +351,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const Divider(
                 indent: AppSpacing.pageHorizontal,
                 endIndent: AppSpacing.pageHorizontal,
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_view_week_outlined),
+                title: Text(s.timetable),
+                onTap: () {
+                  Navigator.pop(context);
+                  openTimetable();
+                },
               ),
             ],
           ),

@@ -22,6 +22,7 @@ import 'providers/tasks_provider.dart';
 import 'screens/future_goal_detail_screen.dart';
 import 'screens/future_screen.dart';
 import 'screens/semester_goal_detail_screen.dart';
+import 'screens/timetable_screen.dart';
 import 'screens/today_screen.dart';
 import 'providers/password_recovery_provider.dart';
 import 'providers/profile_provider.dart';
@@ -338,6 +339,14 @@ void _handlePendingOpen(WidgetRef ref) {
 
     case 'newFutureGoal':
       open((ctx) => showFutureGoalSheet(ctx, ref));
+
+    // A class on the widget, or its + on the classes tab
+    case 'timetable':
+    case 'newCourse':
+      open((ctx) => Navigator.push(
+            ctx,
+            MaterialPageRoute(builder: (_) => const TimetableScreen()),
+          ));
 
     // The Sunday reminder. Opens whichever review is due; if it was already
     // done from another device, there is nothing to open and the request ends

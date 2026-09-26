@@ -36,6 +36,11 @@
             style="@style/WidgetTabCompact"
             android:text="@string/widget_tab_goals" />
 
+        <TextView
+            android:id="@+id/tab_classes"
+            style="@style/WidgetTabCompact"
+            android:text="@string/widget_tab_classes" />
+
         <!-- RemoteViews only inflates an allowlist of view classes, and Space
              is not on it: using one makes the launcher refuse to add the whole
              widget. FrameLayout is on the list and spaces just as well -->

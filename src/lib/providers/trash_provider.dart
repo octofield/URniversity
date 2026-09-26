@@ -4,6 +4,7 @@ import '../models/trash_item.dart';
 import 'synced_list_notifier.dart';
 import '../models/task.dart';
 import '../models/semester_goal.dart';
+import '../models/course.dart';
 import '../models/future_goal.dart';
 
 class TrashNotifier extends StateNotifier<List<TrashItem>> {
@@ -74,6 +75,12 @@ class TrashNotifier extends StateNotifier<List<TrashItem>> {
 
   void addFutureGoal(FutureGoal goal) {
     final item = TrashItem.fromFutureGoal(goal);
+    state = [item, ...state];
+    _insertRow(item);
+  }
+
+  void addCourse(Course course) {
+    final item = TrashItem.fromCourse(course);
     state = [item, ...state];
     _insertRow(item);
   }

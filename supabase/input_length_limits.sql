@@ -49,3 +49,5 @@ ALTER TABLE user_settings
 --    TABLE, so there is nothing to retrofit. Listed here so this stays the one
 --    place that names every cap:
 --    reviews.went_well / stuck / next_focus  <= 500   (reviews_table.sql)
+--    courses.title <= 100, teacher <= 50, course_code / serial_no <= 20
+--                                                     (courses.sql)

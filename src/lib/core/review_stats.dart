@@ -1,3 +1,4 @@
+import '../models/course.dart';
 import '../models/journal.dart';
 import '../models/review.dart';
 import '../models/semester_goal.dart';
@@ -5,6 +6,7 @@ import '../models/task.dart';
 import '../providers/settings_provider.dart' show SemesterSettings;
 import '../providers/tasks_provider.dart' show taskCompletionStatsOn;
 import '../utils/semester_helpers.dart';
+import 'gpa_stats.dart' show semesterGpa;
 import 'history_stats.dart';
 
 // The rules behind the guided review (system_design.md §3-P): which review is
@@ -240,6 +242,7 @@ ReviewStats buildReviewStats({
   required bool Function(Journal) writtenByUser,
   required SemesterSettings settings,
   required DateTime now,
+  List<Course> courses = const [],
 }) {
   final totals = totalsBetween(tasks, window.start, window.end);
   final previous = previousWindow(window);
@@ -266,6 +269,7 @@ ReviewStats buildReviewStats({
       from: window.start,
       to: window.end,
     ),
+    gpa: window.period == ReviewPeriod.semester ? semesterGpa(courses, semester) : null,
   );
 }
 

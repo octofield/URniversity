@@ -7,6 +7,7 @@ import '../models/trash_item.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/semester_goals_provider.dart';
+import '../providers/courses_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/trash_provider.dart';
 import '../widgets/responsive_body.dart';
@@ -87,6 +88,7 @@ class _TrashTile extends ConsumerWidget {
       TrashItemType.task => Icons.check_box_outline_blank,
       TrashItemType.semesterGoal => Icons.school_outlined,
       TrashItemType.futureGoal => Icons.flag_outlined,
+      TrashItemType.course => Icons.calendar_view_week_outlined,
     };
 
     final mm = item.deletedAt.month.toString().padLeft(2, '0');
@@ -117,6 +119,8 @@ class _TrashTile extends ConsumerWidget {
                     ref.read(semesterGoalsProvider.notifier).restore(popped.semesterGoal!);
                   case TrashItemType.futureGoal:
                     ref.read(futureGoalsProvider.notifier).restore(popped.futureGoal!);
+                  case TrashItemType.course:
+                    ref.read(coursesProvider.notifier).restore(popped.course!);
                 }
               },
             ),

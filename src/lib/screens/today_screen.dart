@@ -44,8 +44,10 @@ import '../widgets/sheet_fields.dart';
 import '../widgets/sort_sheet.dart';
 import '../widgets/coach_mark.dart';
 import '../widgets/review_prompt.dart';
+import '../widgets/today_classes_strip.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
+import 'timetable_screen.dart';
 
 // Split with `part` rather than separate libraries: every helper here is
 // library-private and used across all three files, so real imports would mean
@@ -375,7 +377,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                     ),
                                     const SizedBox(height: AppSpacing.sm),
                                     const ReviewPromptCard(),
+                                    const TodayClassesStrip(),
                                     const _SummaryCard(),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    const _TimetableCard(),
                                     const FocusChips(),
                                     const SizedBox(height: AppSpacing.lg),
                                     const _InspirationsQuickList(),
@@ -388,7 +393,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ReviewPromptCard(),
-                              _SummaryCard(),
+                              TodayClassesStrip(),
+                              Row(
+                                children: [
+                                  Expanded(child: _SummaryCard()),
+                                  SizedBox(width: AppSpacing.sm),
+                                  _TimetableCard(compact: true),
+                                ],
+                              ),
                               FocusChips(),
                               SizedBox(height: AppSpacing.lg),
                               _TasksSection(),
@@ -702,6 +714,66 @@ bool _isLastOutstanding(WidgetRef ref, DateTime date) =>
         .where((t) => !t.isCompletedOn(date))
         .length ==
     1;
+
+// The way into the timetable and grades (UC18): a square beside the progress
+// card on a phone, a row under it on desktop. Sized to the progress card's
+// ring plus its padding, so the two stand level
+class _TimetableCard extends ConsumerWidget {
+  final bool compact;
+  const _TimetableCard({this.compact = false});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final icon = Icon(Icons.calendar_view_week_outlined, color: AppColors.primary);
+    final label = Text(
+      s.timetable,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.titleSmall,
+    );
+
+    return TourAnchor(id: 'today.timetable', child: HoverLift(
+      child: Container(
+        width: compact ? 88 : double.infinity,
+        height: compact ? 72 + AppSpacing.cardPadding * 2 : null,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border, width: 1),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TimetableScreen()),
+            ),
+            child: Padding(
+              padding: compact
+                  ? const EdgeInsets.all(AppSpacing.sm)
+                  : const EdgeInsets.all(AppSpacing.cardPadding),
+              child: compact
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [icon, const SizedBox(height: AppSpacing.xs), label],
+                    )
+                  : Row(
+                      children: [
+                        icon,
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(child: label),
+                        Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
+    ));
+  }
+}
 
 class _SummaryCard extends ConsumerWidget {
   const _SummaryCard();
