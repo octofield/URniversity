@@ -1,5 +1,6 @@
 import '../l10n/app_strings.dart';
 import '../models/notification_settings.dart';
+import '../models/review.dart';
 import '../models/semester_goal.dart';
 import '../models/task.dart';
 import '../providers/settings_provider.dart';
@@ -20,7 +21,8 @@ class ScheduledNotification {
   // Task reminders have none: the title is the task name and the space below it
   // is taken by the action buttons
   final String? body;
-  // Only task reminders carry one, because only they have something to act on
+  // Task reminders carry the task; the weekly review carries a marker that
+  // opens the review. The others open the app and nothing more
   final String? payload;
 
   const ScheduledNotification({
@@ -45,6 +47,8 @@ List<ScheduledNotification> buildNotificationSchedule({
   required SemesterSettings semesterSettings,
   required AppStrings s,
   required DateTime now,
+  // Weeks already reviewed are not nagged about
+  List<Review> reviews = const [],
 }) {
   // The master switch is not checked here: NotificationSettings.isOn() folds it
   // into every kind, so there is one place that decides rather than two that
@@ -61,6 +65,9 @@ List<ScheduledNotification> buildNotificationSchedule({
   }
   if (settings.isOn(NotificationKind.goalDeadline)) {
     out.addAll(_goalDeadlines(goals, settings, semesterSettings, s, now, horizon));
+  }
+  if (settings.isOn(NotificationKind.weeklyReview)) {
+    out.addAll(_weeklyReviews(reviews, settings, s, now, horizon));
   }
 
   out.sort((a, b) => a.when.compareTo(b.when));
@@ -86,6 +93,7 @@ int _baseFor(NotificationKind kind) => switch (kind) {
       NotificationKind.taskDue => NotificationConstants.taskIdBase,
       NotificationKind.dailySummary => NotificationConstants.summaryIdBase,
       NotificationKind.goalDeadline => NotificationConstants.goalIdBase,
+      NotificationKind.weeklyReview => NotificationConstants.reviewIdBase,
     };
 
 // A one-off task with no due time has no moment to remind about — the daily
@@ -248,6 +256,35 @@ Iterable<ScheduledNotification> _goalDeadlines(
       when: fireAt,
       title: s.notifGoalTitle,
       body: s.notifGoalBody(entry.key, entry.value),
+    );
+  }
+}
+
+// Each Sunday evening in the horizon, unless that week has been reviewed
+// already — someone who did it on Saturday night should not be reminded
+Iterable<ScheduledNotification> _weeklyReviews(
+  List<Review> reviews,
+  NotificationSettings settings,
+  AppStrings s,
+  DateTime now,
+  DateTime horizon,
+) sync* {
+  final reviewedWeeks = {
+    for (final r in reviews)
+      if (r.period == ReviewPeriod.week) _dateOnly(r.periodStart),
+  };
+  var sunday = _dateOnly(now).add(Duration(days: DateTime.sunday - now.weekday));
+  for (; sunday.isBefore(horizon); sunday = sunday.add(const Duration(days: 7))) {
+    final fireAt = sunday.add(Duration(minutes: settings.weeklyReviewMinuteOfDay));
+    if (!fireAt.isAfter(now) || !fireAt.isBefore(horizon)) continue;
+    if (reviewedWeeks.contains(sunday.subtract(const Duration(days: 6)))) continue;
+    yield ScheduledNotification(
+      id: 0,
+      kind: NotificationKind.weeklyReview,
+      when: fireAt,
+      title: s.notifReviewTitle,
+      body: s.notifReviewBody,
+      payload: NotificationConstants.reviewPayload,
     );
   }
 }

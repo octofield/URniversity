@@ -27,6 +27,7 @@ import '../widgets/sheet_fields.dart';
 import '../widgets/semester_list_dialog.dart';
 import '../widgets/sort_sheet.dart';
 import '../widgets/coach_mark.dart';
+import '../widgets/goal_template_sheet.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
@@ -564,6 +565,13 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               ),
               onDone: () =>
                   ref.read(visionSortModeProvider.notifier).state = false,
+            ),
+            // Same sheet as the semester page: every template starts from a vision
+            IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: s.goalTemplates,
+              visualDensity: VisualDensity.compact,
+              onPressed: () => showGoalTemplateSheet(context, ref),
             ),
             IconButton(
               icon: const Icon(Icons.hub_outlined),

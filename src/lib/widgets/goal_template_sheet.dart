@@ -5,14 +5,17 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
+import '../providers/future_goals_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import 'sheet_body.dart';
 
 // Writes a template into the user's own data, one ordinary addGoal()/add() call
-// per row. Milestones carry the parent's categories, and nothing gets a
-// future_goal_id — only a goal linked by hand ever does (CLAUDE.md §9 rule 7).
+// per row. The vision comes first and only the top-level goals link to it —
+// milestones never carry a future_goal_id (CLAUDE.md §9 rule 7). A goal with no
+// category of its own takes the vision's, as linking by hand does, and its
+// milestones carry the goal's.
 //
 // addGoal() mints its own id per call, so a template with repeated rows cannot
 // collide the way a bare timestamp id once did
@@ -25,18 +28,26 @@ void applyGoalTemplate(
   final goals = ref.read(semesterGoalsProvider.notifier);
   final tasks = ref.read(tasksProvider.notifier);
 
+  final visionId = ref.read(futureGoalsProvider.notifier).addGoal(
+        title: template.vision.title(s),
+        categories: template.vision.categories,
+        startSemester: semester,
+      );
+
   for (final goal in template.goals) {
+    final categories = goal.categories.isEmpty ? template.vision.categories : goal.categories;
     final goalId = goals.addGoal(
       goal.title(s),
       semester,
-      categories: goal.categories,
+      categories: categories,
+      futureGoalId: visionId,
     );
     for (final milestone in goal.milestones) {
       final milestoneId = goals.addGoal(
         milestone.title(s),
         semester,
         parentId: goalId,
-        categories: goal.categories,
+        categories: categories,
       );
       for (final task in milestone.tasks) {
         tasks.add(task(s), linkedTargetId: milestoneId);

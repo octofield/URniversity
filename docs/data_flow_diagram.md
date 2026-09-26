@@ -60,6 +60,7 @@ flowchart TD
         SBTables[("Supabase 資料表\n(tasks / *_goals / ...)")]
         PrefsMode[("SharedPreferences\nis_guest_mode")]
         PrefsData[("SharedPreferences\nguest_* 系列 key")]
+        PrefsCache[("SharedPreferences\ncache_* 系列 key")]
     end
 
     P1["P1 auth_provider\n登入狀態監聽"]
@@ -79,6 +80,8 @@ flowchart TD
     P3 -- "session 消失 → 呼叫各 Provider.clear()" --> D1
     P3 -- "訪客登入時（合併選項）→ mergeToUser(uid)" --> D1
     D1 <-- "guest_* 本機資料讀寫" --> PrefsData
+    PrefsCache -- "load(uid) 先讀（同一帳號才用）" --> D1
+    D1 -- "登入狀態下每次清單變動寫回；clear() 刪除" --> PrefsCache
     D1 <-- "user_settings / tasks / ... 讀寫" --> SBTables
 
     P3 -- "language / dateFormat / semester 設定變化 → upsert" --> SBTables
@@ -89,14 +92,18 @@ flowchart TD
 
 1. **App 啟動**：`main.dart` 先呼叫 `preloadGuestMode()` 讀取 `is_guest_mode`，避免登入畫面閃爍；
    接著 `_AuthGate`（`main.dart`）依 `guestModeProvider` / `authStateProvider` 決定顯示登入頁或首頁。
-2. **登入成功**：`sync_provider.dart` 監聽 `authStateProvider`，依序呼叫八個資料 Provider 的 `load(uid)`
-   （tasks、future_goals、semester_goals、trash_items、user_categories、inspirations、journals、profile），
+2. **登入成功**：`sync_provider.dart` 監聽 `authStateProvider`，依序呼叫九個資料 Provider 的 `load(uid)`
+   （tasks、future_goals、semester_goals、trash_items、user_categories、inspirations、journals、reviews、profile），
    並額外呼叫 `_loadSettings()` 讀取 `user_settings` 中的 App 設定欄位。
+   繼承 `SyncedListNotifier` 的六個清單（tasks、semester_goals、future_goals、inspirations、journals、reviews）
+   在查詢之前先讀 D24 `cache_*`：`cache_owner` 是同一個帳號、而且清單還是空的，就先把上次的資料畫出來；
+   查詢回來再整份覆蓋。之後登入狀態下清單每次變動都寫回快取。
 3. **訪客登入合併**（`_handleGuestLogin`）：若使用者在訪客模式下選擇登入，依 `shouldMergeGuestDataProvider`
-   決定是否呼叫六個 `mergeToUser(uid)`（tasks / inspirations / journals / profile / semester_goals /
+   決定是否呼叫七個 `mergeToUser(uid)`（tasks / inspirations / journals / reviews / profile / semester_goals /
    future_goals，**不含** trash_items 與 user_categories，因為訪客模式本來就不保存這兩者），
    再呼叫 `guestModeProvider.notifier.disable()` 清除本機 guest_* key，最後重新以登入身分 `load(uid)`。
-4. **登出／回收桶清空／訪客模式清除**：呼叫各 Provider 的 `clear()`，只清記憶體狀態，不刪除雲端資料。
+4. **登出／回收桶清空／訪客模式清除**：呼叫各 Provider 的 `clear()`，清記憶體狀態與該清單的 `cache_*`，
+   `_clearAll` 再刪 `cache_owner`；不刪除雲端資料。
 
 ---
 
@@ -349,6 +356,41 @@ flowchart LR
 
 ---
 
+## Diagram 1-H：回顧（Phase 4）
+
+```mermaid
+flowchart TD
+    User(["使用者：任務頁回顧卡 / 週日通知 / 我的頁「回顧」"])
+
+    PR["reviews_provider\nReviewsNotifier"]
+    PT["tasks_provider"]
+    PS["semester_goals_provider"]
+    PJ["journal_provider"]
+    RS["core/review_stats.dart\n（純函式）"]
+    PN["notification_provider"]
+
+    DR[("D23 reviews")]
+    DT[("D1 tasks")]
+    DN[("D13 notification_settings")]
+
+    PT -- "任務清單" --> RS
+    PS -- "頂層目標與里程碑" --> RS
+    PJ -- "使用者寫的日記" --> RS
+    PR -- "已完成的回顧" --> RS
+    RS -- "dueReviewWindow：該不該出現回顧卡" --> User
+    RS -- "buildReviewStats：數字快照" --> PR
+    User -- "三段文字、專注目標、完成回顧" --> PR --> DR
+    User -- "挪到下週（截止 +7 天）" --> PT --> DT
+    PR -- "本週專注（activeFocus）" --> User
+    PR -- "已回顧的週不再提醒" --> PN
+    DN -- "weekly_review_*" --> PN
+```
+
+- 回顧**讀**任務、目標、日記，但只**寫**兩個地方：`reviews` 一筆，以及使用者勾選「挪到下週」的任務的截止時間。
+- 數字在打開回顧時算一次並凍結成快照（`stats`），之後任務變動不影響已存的回顧。
+
+---
+
 ## 靜態參考資料（唯讀，不經任何資料流）
 
 | 資料 | 來源 | 說明 |
@@ -417,4 +459,6 @@ flowchart LR
 | D19 | `task_sort` | 裝置本機 SharedPreferences（任務清單的排序方式） |
 | D20 | `target_sort` | 裝置本機 SharedPreferences（目標頁的排序方式；只影響顯示順序，不寫回 D2） |
 | D21 | `vision_sort` | 裝置本機 SharedPreferences（願景頁的排序方式；只影響顯示順序，不寫回 D3） |
+| D23 | `reviews` | Supabase 資料表（回顧：數字快照＋三段文字＋專注目標） |
+| D24 | `cache_*` 系列 key＋`cache_owner` | 裝置本機 SharedPreferences（登入帳號的清單快取，開 App 先畫、查詢回來覆蓋；登出即刪） |
 | D22 | `onboarding_done` | 裝置本機 SharedPreferences（新手導覽哪幾章跑過，StringList；不上雲、不進訪客資料清單） |

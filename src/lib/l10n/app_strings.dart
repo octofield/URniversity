@@ -231,6 +231,54 @@ abstract class AppStrings {
   String get unarchive;
 
 
+  // Reviews (Phase 4)
+  String get reviews;
+  String get reviewWeekTitle;
+  String get reviewMonthTitle;
+  String get reviewSemesterTitle;
+  String get reviewCardBody;
+  String get reviewStart;
+  String get reviewStepNumbers;
+  String get reviewStepReflect;
+  String get reviewStepPlan;
+  String reviewDoneOf(int done, int total);
+  String reviewChangeUp(int points);
+  String reviewChangeDown(int points);
+  String get reviewChangeSame;
+  String reviewStreak(int days);
+  String reviewJournals(int count);
+  String get reviewTargetsHeader;
+  String reviewTargetLine(int msDone, int msTotal, int done, int total);
+  String get reviewHeatmapTitle;
+  String get reviewHeatmapLegend;
+  String get reviewNothingPlanned;
+  String get reviewWentWell;
+  String get reviewWentWellHint;
+  String get reviewStuck;
+  String get reviewStuckHint;
+  String get reviewNextFocus;
+  String get reviewNextFocusHint;
+  String get reviewOptional;
+  String get reviewCarryTitle;
+  String get reviewCarryNone;
+  String reviewCarryAction(int count);
+  String reviewCarryDone(int count);
+  String get reviewFocusTitle;
+  String get reviewFocusNone;
+  String get reviewNext;
+  String get reviewBack;
+  String get reviewFinish;
+  String get reviewSaved;
+  String get reviewsEmpty;
+  String get reviewFocusThisWeek;
+  String get reviewDeleted;
+  String get notifReview;
+  String get notifReviewTime;
+  String get notifReviewTitle;
+  String get notifReviewBody;
+  String get tourReviewsTitle;
+  String get tourReviewsBody;
+
   // Tour chapters (Phase 3)
   String get tourGotIt;
   String get tourTryIt;
@@ -349,6 +397,55 @@ abstract class AppStrings {
   String get tplInternG2T1;
 
   // Journal full page & editor
+  // Goal templates: visions and the four added later
+  String get tplFreshmanVision;
+  String get tplExchangeVision;
+  String get tplInternVision;
+  String get tplGrad;
+  String get tplGradDesc;
+  String get tplGradVision;
+  String get tplGradG1;
+  String get tplGradG1M1;
+  String get tplGradG1M2;
+  String get tplGradG1T1;
+  String get tplGradG2;
+  String get tplGradG2M1;
+  String get tplGradG2M2;
+  String get tplGradG2T1;
+  String get tplCert;
+  String get tplCertDesc;
+  String get tplCertVision;
+  String get tplCertG1;
+  String get tplCertG1M1;
+  String get tplCertG1M2;
+  String get tplCertG1T1;
+  String get tplCertG2;
+  String get tplCertG2M1;
+  String get tplCertG2M2;
+  String get tplCertG2T1;
+  String get tplMajor;
+  String get tplMajorDesc;
+  String get tplMajorVision;
+  String get tplMajorG1;
+  String get tplMajorG1M1;
+  String get tplMajorG1M2;
+  String get tplMajorG1T1;
+  String get tplMajorG2;
+  String get tplMajorG2M1;
+  String get tplMajorG2M2;
+  String get tplMajorG2T1;
+  String get tplHealth;
+  String get tplHealthDesc;
+  String get tplHealthVision;
+  String get tplHealthG1;
+  String get tplHealthG1M1;
+  String get tplHealthG1M2;
+  String get tplHealthG1T1;
+  String get tplHealthG2;
+  String get tplHealthG2M1;
+  String get tplHealthG2M2;
+  String get tplHealthG2T1;
+
   String get allJournals;
   String get writeJournal;
 
@@ -357,6 +454,10 @@ abstract class AppStrings {
   String get versionLabel;
   String get developerMode;
   String get devTimeOverride;
+
+  // Developer mode: open a review
+  String get devOpenReview;
+  String get devOpenReviewHint;
 
   // Account actions
   String get logout;

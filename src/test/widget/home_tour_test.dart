@@ -289,6 +289,57 @@ void main() {
     });
   });
 
+  group('responsive', () {
+    setUp(() => setUpTestSupabase(seenTour: false));
+
+    Rect cardOf(WidgetTester tester, String text) => tester.getRect(
+          find.ancestor(of: find.text(text), matching: find.byType(Material)).first,
+        );
+
+    for (final size in const [Size(360, 640), Size(400, 800), Size(900, 700), Size(1400, 900)]) {
+      testWidgets('at ${size.width.toInt()}×${size.height.toInt()} the card sits on screen, clear of its target',
+          (tester) async {
+        await pumpApp(tester, width: size.width);
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+
+        final card = cardOf(tester, zh.tourTaskAddTitle);
+        final lit = hole(tester)!;
+        expect(card.left, greaterThanOrEqualTo(0));
+        expect(card.right, lessThanOrEqualTo(size.width));
+        expect(card.top, greaterThanOrEqualTo(0));
+        expect(card.bottom, lessThanOrEqualTo(size.height));
+        expect(card.overlaps(lit), isFalse);
+      });
+    }
+
+    testWidgets('on a wide window the card sits next to the add button', (tester) async {
+      await pumpApp(tester, width: 1400);
+      tester.view.physicalSize = const Size(1400, 900);
+      await tester.pumpAndSettle();
+
+      final card = cardOf(tester, zh.tourTaskAddTitle);
+      final fab = tester.getRect(find.byTooltip(zh.addTask));
+      // Beside it, not pinned to the far left of the screen
+      expect(card.right, lessThanOrEqualTo(fab.left));
+      expect(fab.left - card.right, lessThan(40));
+    });
+
+    testWidgets('on the desktop rail the card sits to the right of the tab it points at', (tester) async {
+      await pumpApp(tester, width: 900);
+      tester.view.physicalSize = const Size(900, 700);
+      await tester.pumpAndSettle();
+      // Skip through to "next: targets", which points at the rail
+      for (var i = 0; i < 4; i++) {
+        await tapAndSettle(tester, find.text(zh.tourSkipStep));
+      }
+      expect(find.text(zh.tourNextTargetTitle), findsOneWidget);
+
+      final card = cardOf(tester, zh.tourNextTargetTitle);
+      expect(card.left, greaterThan(hole(tester)!.right));
+    });
+  });
+
   group('guide', () {
     setUp(() => setUpTestSupabase());
 

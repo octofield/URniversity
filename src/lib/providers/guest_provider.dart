@@ -19,6 +19,7 @@ class _GuestModeNotifier extends StateNotifier<bool> {
     'guest_tasks',
     'guest_sem_goals',
     'guest_future_goals',
+    'guest_reviews',
   ];
 
   _GuestModeNotifier() : super(_initialGuestMode);

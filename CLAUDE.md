@@ -159,6 +159,7 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
    and one only in the database shows up as a sync failure (`23514`) after the
    user has typed. `SheetTextField`'s `maxLength` is required for this reason.
    See `docs/data_dictionary.md` D0.
+10. Always concern responsive designs.
 
 ---
 

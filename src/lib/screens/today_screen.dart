@@ -38,6 +38,7 @@ import '../widgets/swipe_switcher.dart';
 import '../widgets/sheet_fields.dart';
 import '../widgets/sort_sheet.dart';
 import '../widgets/coach_mark.dart';
+import '../widgets/review_prompt.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 
@@ -368,7 +369,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: AppSpacing.sm),
+                                    const ReviewPromptCard(),
                                     const _SummaryCard(),
+                                    const FocusChips(),
                                     const SizedBox(height: AppSpacing.lg),
                                     const _InspirationsQuickList(),
                                   ],
@@ -379,7 +382,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                         : const Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              ReviewPromptCard(),
                               _SummaryCard(),
+                              FocusChips(),
                               SizedBox(height: AppSpacing.lg),
                               _TasksSection(),
                               SizedBox(height: AppSpacing.lg),

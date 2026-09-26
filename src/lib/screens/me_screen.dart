@@ -35,6 +35,9 @@ import 'settings_screen.dart';
 import 'today_screen.dart' show showAddInspirationSheet;
 import '../widgets/sheet_fields.dart' show nearLimitCounter;
 import '../widgets/coach_mark.dart';
+import '../providers/reviews_provider.dart';
+import 'review_screen.dart' show reviewTitle, reviewRange;
+import 'reviews_screen.dart';
 
 class MeScreen extends ConsumerWidget {
   const MeScreen({super.key});
@@ -81,6 +84,8 @@ class MeScreen extends ConsumerWidget {
                           children: [
                             _InspirationSection(),
                             const SizedBox(height: AppSpacing.lg),
+                            const _ReviewSection(),
+                            const SizedBox(height: AppSpacing.lg),
                             _JournalSection(),
                           ],
                         ),
@@ -120,6 +125,8 @@ class MeScreen extends ConsumerWidget {
                       const TourAnchor(id: 'me.summary', child: _SummaryTiles()),
                       const SizedBox(height: AppSpacing.lg),
                       _InspirationSection(),
+                      const SizedBox(height: AppSpacing.lg),
+                      const _ReviewSection(),
                       const SizedBox(height: AppSpacing.lg),
                       _JournalSection(),
                     ],
@@ -676,6 +683,80 @@ void _showEditInspirationSheet(
 }
 
 // ─── Journal Section ──────────────────────────────────────────────────────────
+
+// The latest review and the way to all of them. Sits above the journal: both
+// are looking back, and the review is the one with a weekly rhythm
+class _ReviewSection extends ConsumerWidget {
+  const _ReviewSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final fmt = ref.watch(settingsProvider);
+    final latest = ref.watch(reviewsProvider).firstOrNull;
+    final theme = Theme.of(context);
+    void openAll() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewsScreen()));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TourAnchor(id: 'me.reviews', child: SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              Text(s.reviews, style: theme.textTheme.titleLarge),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
+                tooltip: s.reviews,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                onPressed: openAll,
+              ),
+            ],
+          ),
+        )),
+        const SizedBox(height: AppSpacing.sm),
+        InkWell(
+          onTap: openAll,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.cardPadding),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: latest == null
+                ? Text(s.reviewsEmpty, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${reviewTitle(latest.period, s)}$kDotSeparator'
+                        '${reviewRange(latest.periodStart, latest.periodEnd, fmt, s)}',
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      if (latest.stats.total > 0)
+                        Text(s.reviewDoneOf(latest.stats.done, latest.stats.total), style: theme.textTheme.bodySmall),
+                      if (latest.nextFocus != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          latest.nextFocus!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _JournalSection extends ConsumerWidget {
   @override

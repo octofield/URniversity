@@ -44,3 +44,8 @@ ALTER TABLE user_settings
   ADD CONSTRAINT user_settings_username_len CHECK (char_length(username) <= 30),
   ADD CONSTRAINT user_settings_school_len CHECK (char_length(school) <= 50),
   ADD CONSTRAINT user_settings_department_len CHECK (char_length(department) <= 50);
+
+-- 3. Tables created after this file declare their caps in their own CREATE
+--    TABLE, so there is nothing to retrofit. Listed here so this stays the one
+--    place that names every cap:
+--    reviews.went_well / stuck / next_focus  <= 500   (reviews_table.sql)

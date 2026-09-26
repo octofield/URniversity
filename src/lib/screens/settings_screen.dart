@@ -4,18 +4,21 @@ import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/input_limits.dart';
+import '../core/review_stats.dart';
 import '../core/sign_in_failure.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
 import '../core/app_version.dart';
 import '../l10n/app_strings.dart';
+import '../models/review.dart';
 import '../providers/auth_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/guest_provider.dart';
 import '../providers/inspirations_provider.dart';
 import '../providers/journal_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/reviews_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/settings_provider.dart';
@@ -23,6 +26,7 @@ import '../widgets/responsive_body.dart';
 import '../widgets/tour_guide_sheet.dart';
 import 'category_settings_screen.dart';
 import 'notification_settings_screen.dart';
+import 'review_screen.dart';
 import 'trash_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -201,6 +205,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () =>
                   ref.read(devModeProvider.notifier).setCustomTime(null),
             ),
+            ListTile(
+              leading: const Icon(Icons.auto_graph_outlined, color: AppColors.primary),
+              title: Text(s.devOpenReview),
+              subtitle: Text(s.devOpenReviewHint),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showDevReviewDialog(context, ref, s),
+            ),
           ],
           const Divider(),
           if (isGuest)
@@ -252,6 +263,37 @@ void _confirmExitGuest(BuildContext context, WidgetRef ref) {
           style: FilledButton.styleFrom(backgroundColor: AppColors.error),
           child: Text(s.exitAction),
         ),
+      ],
+    ),
+  );
+}
+
+// Developer mode: any review, due or not, so the flow can be checked without
+// waiting for Sunday evening. The windows follow the app's (overridable) date
+void _showDevReviewDialog(BuildContext context, WidgetRef ref, AppStrings s) {
+  final now = ref.read(reviewNowProvider);
+  final settings = ref.read(semesterSettingsProvider);
+  final fmt = ref.read(settingsProvider);
+  showDialog(
+    context: context,
+    builder: (ctx) => SimpleDialog(
+      title: Text(s.devOpenReview),
+      children: [
+        for (final period in ReviewPeriod.values)
+          () {
+            final window = latestReviewWindow(period, now, settings);
+            return ListTile(
+              title: Text(reviewTitle(period, s)),
+              subtitle: Text(reviewRange(window.start, window.end, fmt, s)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ReviewScreen(window: window)),
+                );
+              },
+            );
+          }(),
       ],
     ),
   );

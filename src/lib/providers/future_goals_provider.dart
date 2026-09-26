@@ -33,7 +33,8 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
     return item.copyWith(parentId: null);
   }
 
-  void addGoal({
+  // Returns the new id so a template can link its targets to the vision
+  String addGoal({
     String? parentId,
     required String title,
     List<String> categories = const [FutureCategories.other],
@@ -58,6 +59,7 @@ class FutureGoalsNotifier extends SyncedListNotifier<FutureGoal> {
     );
     state = [...state, goal];
     upsert(goal);
+    return goal.id;
   }
 
   void updateGoal(
