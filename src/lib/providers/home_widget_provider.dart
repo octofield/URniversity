@@ -6,6 +6,7 @@ import 'package:home_widget/home_widget.dart';
 import '../core/widget_snapshot.dart';
 import '../services/home_widget_background.dart';
 import '../services/home_widget_service.dart';
+import 'app_style_provider.dart';
 import 'categories_provider.dart';
 import 'future_goals_provider.dart';
 import 'notification_action_provider.dart';
@@ -31,8 +32,11 @@ final homeWidgetSyncProvider = Provider<void>((ref) {
     now: DateTime.now(),
   );
 
-  unawaited(HomeWidgetService.instance
-      .push(snapshot, languageCode: ref.watch(languageProvider).name));
+  unawaited(HomeWidgetService.instance.push(
+    snapshot,
+    languageCode: ref.watch(languageProvider).name,
+    styleName: ref.watch(appStyleProvider).name,
+  ));
 });
 
 // The + button names the kind it belongs to; these are the destinations

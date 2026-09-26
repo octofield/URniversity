@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/ui_symbols.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -57,6 +58,17 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
   late final AnimationController _particleCtrl =
       AnimationController(vsync: this, duration: const Duration(seconds: 3))
         ..repeat();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Ambient motion is the first thing "reduce motion" should silence
+    if (motionScale(context) == 0) {
+      _particleCtrl.stop();
+    } else if (!_particleCtrl.isAnimating) {
+      _particleCtrl.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -1180,7 +1192,7 @@ class _NodeCard extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             // Graph node labels are sized to the node box, not
                             // to the type scale
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10.5,
                               color: AppColors.textTertiary,
                             ),
@@ -1200,7 +1212,7 @@ class _NodeCard extends ConsumerWidget {
                       child: Text(
                         '$taskCount',
                         // Sized to the count badge, not to the type scale
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: AppColors.primary,
@@ -1208,8 +1220,8 @@ class _NodeCard extends ConsumerWidget {
                       ),
                     ),
                   if (node.isDone)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
                       child: Icon(Icons.check_circle,
                           size: 14, color: AppColors.success),
                     ),

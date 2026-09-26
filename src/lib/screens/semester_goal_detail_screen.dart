@@ -167,8 +167,8 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
         TourAnchor(id: 'detail.milestones', child: SemMilestoneSubtreeView(parentId: goalId)),
         TourAnchor(id: 'detail.addMilestone', child: ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.add, color: AppColors.primary),
-          title: Text(s.addMilestone, style: const TextStyle(color: AppColors.primary)),
+          leading: Icon(Icons.add, color: AppColors.primary),
+          title: Text(s.addMilestone, style: TextStyle(color: AppColors.primary)),
           onTap: () => showSemesterGoalSheet(context, ref, parentId: goalId),
         )),
 
@@ -217,8 +217,8 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
           ),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.add_link, color: AppColors.primary),
-          title: Text(s.addLinkedTask, style: const TextStyle(color: AppColors.primary)),
+          leading: Icon(Icons.add_link, color: AppColors.primary),
+          title: Text(s.addLinkedTask, style: TextStyle(color: AppColors.primary)),
           onTap: () => _showTaskSelectorForTarget(context, ref, goalId),
         ),
 
@@ -239,8 +239,8 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.add_link, color: AppColors.primary),
-              title: Text(s.addLinkedGoal, style: const TextStyle(color: AppColors.primary)),
+              leading: Icon(Icons.add_link, color: AppColors.primary),
+              title: Text(s.addLinkedGoal, style: TextStyle(color: AppColors.primary)),
               onTap: () => _showGoalSelectorForTarget(context, ref, goalId),
             ),
           ] else
@@ -262,7 +262,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
                     onPressed: () =>
                         ref.read(semesterGoalsProvider.notifier).linkFutureGoal(goalId, null),
                   ),
-                  const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textTertiary),
+                  Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textTertiary),
                 ],
               ),
               onTap: () => Navigator.push(
@@ -430,7 +430,7 @@ class _SemMilestoneTile extends ConsumerWidget {
                           }
                         },
                       ),
-                      const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textTertiary),
+                      Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textTertiary),
                     ],
                   ),
                 ],
@@ -505,7 +505,7 @@ void _showTaskSelectorForTarget(BuildContext context, WidgetRef ref, String targ
           builder: (_, dlgRef, _) {
             final tasks = dlgRef.watch(tasksProvider);
             if (tasks.isEmpty) {
-              return Text(s.noTasks, style: const TextStyle(color: AppColors.textTertiary));
+              return Text(s.noTasks, style: TextStyle(color: AppColors.textTertiary));
             }
             return ListView(
               shrinkWrap: true,
@@ -683,7 +683,7 @@ Widget _goalLinkTile(
           if (linked != null)
             GestureDetector(
               onTap: onClear,
-              child: const Icon(Icons.close, size: 18, color: AppColors.textTertiary),
+              child: Icon(Icons.close, size: 18, color: AppColors.textTertiary),
             ),
         ],
       ),

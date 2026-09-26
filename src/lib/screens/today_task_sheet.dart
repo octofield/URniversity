@@ -292,7 +292,7 @@ Widget _linkRow({
           if (onClear != null && active)
             GestureDetector(
               onTap: onClear,
-              child: const Icon(Icons.close, size: 16, color: AppColors.textTertiary),
+              child: Icon(Icons.close, size: 16, color: AppColors.textTertiary),
             ),
         ],
       ),

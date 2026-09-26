@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input_limits.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../models/inspiration.dart';
@@ -77,8 +78,9 @@ class _InspirationsScreenState extends ConsumerState<InspirationsScreen> {
                       const SizedBox(width: AppSpacing.xs),
                       AnimatedRotation(
                         turns: _archivedExpanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),
+                        duration: scaled(context, AppMotion.move),
+                        curve: AppMotion.moveCurve,
+                        child: Icon(Icons.expand_more, size: 18, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -86,8 +88,8 @@ class _InspirationsScreenState extends ConsumerState<InspirationsScreen> {
               ),
               const SizedBox(height: AppSpacing.sm),
               AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
+                duration: scaled(context, _archivedExpanded ? AppMotion.enter : AppMotion.exit),
+                curve: _archivedExpanded ? AppMotion.enterCurve : AppMotion.exitCurve,
                 alignment: Alignment.topCenter,
                 child: !_archivedExpanded
                     ? const SizedBox(width: double.infinity)

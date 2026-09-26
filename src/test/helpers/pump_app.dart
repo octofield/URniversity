@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:urniversity/core/config.dart';
+import 'package:urniversity/core/theme/app_colors.dart';
 import 'package:urniversity/core/theme/app_theme.dart';
 import 'package:urniversity/main.dart';
 import 'package:urniversity/providers/guest_provider.dart';
@@ -86,7 +87,7 @@ Future<ProviderContainer> pumpScreen(
     UncontrolledProviderScope(
       container: scope,
       child: MaterialApp(
-        theme: appTheme,
+        theme: buildAppTheme(AppColors.palette),
         locale: locale,
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,

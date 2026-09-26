@@ -3,16 +3,20 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/haptics.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../providers/settings_provider.dart';
+import 'coach_mark.dart' show TourAnchor;
 
-// Ticking a task off, made visible.
+// Ticking a task off, made visible (system_design.md §3-Q).
 //
-// Two layers, switchable in settings: the box itself pops, and — only when the
-// day's last outstanding task goes — a short burst of confetti. Both are
-// cosmetic; the write happens either way, so `off` changes nothing but the feel.
-
-const _popDuration = Duration(milliseconds: 220);
+// The row itself does most of the work now — its title is struck through and
+// it folds out of the list (AnimatedRows). This adds the two optional layers
+// the completion-effect setting controls: the box gives under the thumb and
+// springs back, and — only when the day's last outstanding task goes — a burst
+// of confetti from the progress ring. Both are cosmetic; the write happens
+// either way. Haptics have their own switch (core/haptics.dart)
 
 class TaskCheckbox extends ConsumerStatefulWidget {
   final bool value;
@@ -36,8 +40,25 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pop = AnimationController(
     vsync: this,
-    duration: _popDuration,
+    duration: AppMotion.move,
   );
+
+  // Pressed in, a touch past full size, then settled — out and back in one
+  // pass, so the box can never be left at another size
+  late final Animation<double> _scale = _pop.drive(TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 0.9).chain(CurveTween(curve: AppMotion.exitCurve)),
+      weight: 25,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 0.9, end: 1.08).chain(CurveTween(curve: AppMotion.enterCurve)),
+      weight: 40,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.08, end: 1.0).chain(CurveTween(curve: AppMotion.moveCurve)),
+      weight: 35,
+    ),
+  ]));
 
   @override
   void dispose() {
@@ -48,15 +69,13 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
   void _handleToggle() {
     final effect = ref.read(completionEffectProvider);
     final ticking = !widget.value;
+    final last = ticking && (widget.isLastOutstanding?.call() ?? false);
 
+    haptic(ref, !ticking ? HapticKind.select : last ? HapticKind.allDone : HapticKind.tick);
     if (effect != TaskCompletionEffect.off && ticking) {
+      _pop.duration = scaled(context, AppMotion.move);
       _pop.forward(from: 0);
-      // Also drawn over the page: ticking a task off usually takes the row out
-      // of the list on the very next frame, and the box's own animation goes
-      // with it. The overlay outlives the row, so the tick is always seen
-      showCompletionPop(context);
-      if (effect == TaskCompletionEffect.celebrate &&
-          (widget.isLastOutstanding?.call() ?? false)) {
+      if (effect == TaskCompletionEffect.celebrate && last) {
         showCompletionConfetti(context);
       }
     }
@@ -66,18 +85,7 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
   @override
   Widget build(BuildContext context) {
     return ScaleTransition(
-      // Out and back in one pass. A one-way tween left the box sitting at its
-      // enlarged size for good — the big square that stayed on screen
-      scale: _pop.drive(TweenSequence<double>([
-        TweenSequenceItem(
-          tween: Tween(begin: 1.0, end: 1.25).chain(CurveTween(curve: Curves.easeOut)),
-          weight: 40,
-        ),
-        TweenSequenceItem(
-          tween: Tween(begin: 1.25, end: 1.0).chain(CurveTween(curve: Curves.easeOutBack)),
-          weight: 60,
-        ),
-      ])),
+      scale: _scale,
       child: Checkbox(
         visualDensity: VisualDensity.compact,
         value: widget.value,
@@ -87,100 +95,18 @@ class _TaskCheckboxState extends ConsumerState<TaskCheckbox>
   }
 }
 
-// A tick that plays where the box was, whether or not the row is still there.
-void showCompletionPop(BuildContext context) {
-  final overlay = Overlay.maybeOf(context);
-  final box = context.findRenderObject() as RenderBox?;
-  if (overlay == null || box == null || !box.hasSize) return;
-
-  final centre = box.localToGlobal(box.size.center(Offset.zero));
-  late final OverlayEntry entry;
-  entry = OverlayEntry(
-    builder: (_) => Positioned.fill(
-      child: IgnorePointer(
-        child: _PopMark(
-          centre: centre,
-          onDone: () {
-            if (entry.mounted) entry.remove();
-          },
-        ),
-      ),
-    ),
-  );
-  overlay.insert(entry);
-}
-
-class _PopMark extends StatefulWidget {
-  final Offset centre;
-  final VoidCallback onDone;
-
-  const _PopMark({required this.centre, required this.onDone});
-
-  @override
-  State<_PopMark> createState() => _PopMarkState();
-}
-
-class _PopMarkState extends State<_PopMark> with SingleTickerProviderStateMixin {
-  late final AnimationController _run = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  )..forward();
-
-  @override
-  void initState() {
-    super.initState();
-    _run.addStatusListener((status) {
-      if (status == AnimationStatus.completed) widget.onDone();
-    });
-  }
-
-  @override
-  void dispose() {
-    _run.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _run,
-        builder: (_, _) {
-          final t = Curves.easeOut.transform(_run.value);
-          // Grows away from the row and fades, so it reads as "that one is done"
-          // rather than as something new appearing
-          final size = 26 + 22 * t;
-          return Stack(
-            children: [
-              Positioned(
-                left: widget.centre.dx - size / 2,
-                top: widget.centre.dy - size / 2 - 10 * t,
-                child: Opacity(
-                  opacity: (1 - t).clamp(0.0, 1.0),
-                  child: Container(
-                    width: size,
-                    height: size,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.primary,
-                    ),
-                    child: Icon(Icons.check,
-                        size: size * 0.62, color: AppColors.textOnPrimary),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-}
-
-// A burst over whatever is on screen. An overlay entry rather than part of the
-// row: the row is about to disappear into the completed section
+// A burst over whatever is on screen, from the day's progress ring when it is
+// in view — finishing the day belongs to the day, not to one row — and from
+// the box otherwise. An overlay entry, since the row is about to leave
 void showCompletionConfetti(BuildContext context) {
   final overlay = Overlay.maybeOf(context);
+  if (overlay == null || motionScale(context) == 0) return;
+  final ring = TourAnchor.rectOf('today.ring');
   final box = context.findRenderObject() as RenderBox?;
-  if (overlay == null || box == null || !box.hasSize) return;
+  final origin = ring?.center ??
+      (box != null && box.hasSize ? box.localToGlobal(box.size.center(Offset.zero)) : null);
+  if (origin == null) return;
 
-  final origin = box.localToGlobal(box.size.center(Offset.zero));
   late final OverlayEntry entry;
   entry = OverlayEntry(
     builder: (_) => Positioned.fill(
@@ -210,30 +136,34 @@ class _ConfettiBurst extends StatefulWidget {
 
 class _ConfettiBurstState extends State<_ConfettiBurst>
     with SingleTickerProviderStateMixin {
-  static const _colors = [
+  static final _colors = [
     AppColors.primary,
     AppColors.categoryExchange,
     AppColors.categoryCompetition,
     AppColors.categoryCert,
     AppColors.categoryPerformance,
+    AppColors.warning,
   ];
 
   late final AnimationController _run = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
+    duration: const Duration(milliseconds: 1100),
   )..forward();
 
   // Fixed at birth: recomputing per frame would make every piece jitter
   late final List<_Piece> _pieces = [
-    for (var i = 0; i < 18; i++)
+    for (var i = 0; i < 28; i++)
       () {
         final random = Random(i * 7919);
         return _Piece(
-          angle: -pi / 2 + (random.nextDouble() - 0.5) * pi * 0.9,
-          speed: 90 + random.nextDouble() * 110,
-          spin: (random.nextDouble() - 0.5) * 8,
+          // A fountain: mostly upward, fanned about 120 degrees
+          angle: -pi / 2 + (random.nextDouble() - 0.5) * pi * 0.66,
+          speed: 260 + random.nextDouble() * 260,
+          spin: (random.nextDouble() - 0.5) * 10,
+          flip: 6 + random.nextDouble() * 10,
           color: _colors[i % _colors.length],
-          size: 4 + random.nextDouble() * 4,
+          size: 5 + random.nextDouble() * 4,
+          round: i % 4 == 0,
         );
       }(),
   ];
@@ -259,6 +189,8 @@ class _ConfettiBurstState extends State<_ConfettiBurst>
           painter: _ConfettiPainter(
             origin: widget.origin,
             pieces: _pieces,
+            // In seconds, for the physics below
+            time: _run.value * 1.1,
             progress: _run.value,
           ),
         ),
@@ -269,44 +201,69 @@ class _Piece {
   final double angle;
   final double speed;
   final double spin;
+  // How fast it tumbles end over end, faked by squashing its width
+  final double flip;
   final Color color;
   final double size;
+  final bool round;
 
   const _Piece({
     required this.angle,
     required this.speed,
     required this.spin,
+    required this.flip,
     required this.color,
     required this.size,
+    required this.round,
   });
 }
 
 class _ConfettiPainter extends CustomPainter {
   final Offset origin;
   final List<_Piece> pieces;
+  final double time;
   final double progress;
 
-  _ConfettiPainter({required this.origin, required this.pieces, required this.progress});
+  _ConfettiPainter({
+    required this.origin,
+    required this.pieces,
+    required this.time,
+    required this.progress,
+  });
+
+  // Paper in air: quickly slowed by drag, then drifting down under gravity at a
+  // gentle terminal speed. Integrated in closed form so every frame agrees
+  static const _drag = 3.2;
+  static const _gravity = 900.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const gravity = 420.0;
     final paint = Paint();
+    final decay = (1 - exp(-_drag * time)) / _drag;
+    // The last 30% fades out
+    final alpha = progress < 0.7 ? 1.0 : (1 - (progress - 0.7) / 0.3).clamp(0.0, 1.0);
 
     for (final piece in pieces) {
-      final t = progress;
-      final dx = cos(piece.angle) * piece.speed * t;
-      final dy = sin(piece.angle) * piece.speed * t + 0.5 * gravity * t * t;
+      final vx = cos(piece.angle) * piece.speed;
+      final vy = sin(piece.angle) * piece.speed;
+      final dx = vx * decay;
+      final dy = vy * decay + _gravity / _drag * (time - decay);
       final position = origin + Offset(dx, dy);
 
-      paint.color = piece.color.withValues(alpha: (1 - t).clamp(0.0, 1.0));
+      paint.color = piece.color.withValues(alpha: alpha);
       canvas.save();
       canvas.translate(position.dx, position.dy);
-      canvas.rotate(piece.spin * t);
-      canvas.drawRect(
-        Rect.fromCenter(center: Offset.zero, width: piece.size, height: piece.size * 1.6),
-        paint,
-      );
+      canvas.rotate(piece.spin * time);
+      // A card turning over shows its edge: width follows cos of its tumble
+      canvas.scale(cos(piece.flip * time).abs().clamp(0.15, 1.0), 1);
+      if (piece.round) {
+        canvas.drawCircle(Offset.zero, piece.size / 2, paint);
+      } else {
+        canvas.drawRect(
+          Rect.fromCenter(center: Offset.zero, width: piece.size, height: piece.size * 1.6),
+          paint,
+        );
+      }
       canvas.restore();
     }
   }

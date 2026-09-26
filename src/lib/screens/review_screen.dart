@@ -1,8 +1,10 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input_limits.dart';
 import '../core/review_stats.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
@@ -41,8 +43,9 @@ class ReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
-  final _pages = PageController();
   int _step = 0;
+  // Which way the last step change went, so going back moves backwards
+  bool _back = false;
 
   late final ReviewStats _stats;
   late final List<double?> _heat;
@@ -90,7 +93,6 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
   @override
   void dispose() {
-    _pages.dispose();
     _wentWell.dispose();
     _stuck.dispose();
     _nextFocus.dispose();
@@ -98,8 +100,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   }
 
   void _goTo(int step) {
-    setState(() => _step = step);
-    _pages.animateToPage(step, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+    setState(() {
+      _back = step < _step;
+      _step = step;
+    });
   }
 
   // Moves each ticked task a week on, keeping its time of day
@@ -169,7 +173,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
+                            duration: scaled(context, AppMotion.move),
+                            curve: AppMotion.moveCurve,
                             height: 4,
                             decoration: BoxDecoration(
                               color: i <= _step ? AppColors.primary : AppColors.surfaceVariant,
@@ -192,12 +197,25 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
               ),
             ),
             Expanded(
-              child: PageView(
-                controller: _pages,
-                // Steps move with the buttons only: a stray swipe while typing
-                // in step two would otherwise throw the user back to step one
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
+              // Material's shared axis: the steps are a sequence, so the next
+              // one slides in a short way from the side it lies on while the
+              // current one fades out. Steps move with the buttons only — a
+              // stray swipe while typing would throw the user back a step.
+              // The typed text lives in this state's controllers, so a step
+              // leaving the tree loses nothing
+              child: PageTransitionSwitcher(
+                duration: scaled(context, AppMotion.page),
+                reverse: _back,
+                transitionBuilder: (child, primary, secondary) => SharedAxisTransition(
+                  animation: primary,
+                  secondaryAnimation: secondary,
+                  transitionType: SharedAxisTransitionType.horizontal,
+                  fillColor: Colors.transparent,
+                  child: child,
+                ),
+                child: KeyedSubtree(
+                  key: ValueKey(_step),
+                  child: [
                   _NumbersStep(stats: _stats, heat: _heat, s: s),
                   _ReflectStep(wentWell: _wentWell, stuck: _stuck, nextFocus: _nextFocus, s: s),
                   _PlanStep(
@@ -218,7 +236,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                     s: s,
                     fmt: fmt,
                   ),
-                ],
+                  ][_step],
+                ),
               ),
             ),
             SafeArea(

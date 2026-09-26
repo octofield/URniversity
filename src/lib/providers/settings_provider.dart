@@ -130,6 +130,37 @@ final completionEffectProvider =
   (ref) => CompletionEffectNotifier(),
 );
 
+// ── Haptics ───────────────────────────────────────────────────────────────────
+
+// Whether ticking, finishing the day and dropping a dragged row buzz the
+// phone. Its own switch rather than part of the completion effect: someone can
+// want the confetti in a silent room, or the buzz with no animation (D25)
+class HapticsNotifier extends StateNotifier<bool> {
+  HapticsNotifier() : super(true) {
+    _restore();
+  }
+
+  static const prefsKey = 'haptics_enabled';
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Only a stored value: this can land after a set() made meanwhile, and
+    // must not put the default back over it
+    final stored = prefs.getBool(prefsKey);
+    if (stored != null) state = stored;
+  }
+
+  Future<void> set(bool on) async {
+    state = on;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(prefsKey, on);
+  }
+}
+
+final hapticsProvider = StateNotifierProvider<HapticsNotifier, bool>(
+  (ref) => HapticsNotifier(),
+);
+
 // ── Developer mode ────────────────────────────────────────────────────────────
 
 class DevModeState {

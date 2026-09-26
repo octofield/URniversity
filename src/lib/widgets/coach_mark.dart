@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
@@ -615,7 +616,7 @@ class _CoachMarkViewState extends ConsumerState<_CoachMarkView>
       Scrollable.ensureVisible(
         ctx,
         alignment: 0.3,
-        duration: const Duration(milliseconds: 200),
+        duration: AppMotion.quick,
       );
     });
   }
@@ -730,8 +731,8 @@ class _CoachMarkViewState extends ConsumerState<_CoachMarkView>
                   // Glides from the last target to this one rather than jumping
                   : TweenAnimationBuilder<Rect?>(
                       tween: RectTween(end: hole),
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
+                      duration: scaled(context, AppMotion.move),
+                      curve: AppMotion.moveCurve,
                       builder: (context, rect, _) => AnimatedBuilder(
                         animation: _pulse,
                         builder: (context, _) => CustomPaint(
@@ -861,7 +862,7 @@ class _CoachMarkViewState extends ConsumerState<_CoachMarkView>
                       const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
-                          const Icon(Icons.touch_app_outlined, size: 18, color: AppColors.primary),
+                          Icon(Icons.touch_app_outlined, size: 18, color: AppColors.primary),
                           const SizedBox(width: AppSpacing.xs),
                           Expanded(
                             child: Text(
@@ -922,7 +923,7 @@ class SpotlightPainter extends CustomPainter {
 
   const SpotlightPainter(this.hole, {this.pulse});
 
-  static const _radius = Radius.circular(AppRadius.md);
+  static final _radius = Radius.circular(AppRadius.md);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -956,7 +957,7 @@ class SpotlightPainter extends CustomPainter {
     if (swell != null && swell > 0) {
       final ring = target.inflate(4 + swell * 14);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(ring, const Radius.circular(AppRadius.md + 8)),
+        RRect.fromRectAndRadius(ring, Radius.circular(AppRadius.md + 8)),
         Paint()
           ..color = AppColors.primary.withValues(alpha: (1 - swell) * 0.9)
           ..style = PaintingStyle.stroke

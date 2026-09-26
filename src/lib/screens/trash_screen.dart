@@ -27,7 +27,7 @@ class TrashScreen extends ConsumerWidget {
             TextButton(
               onPressed: () => _confirmEmptyTrash(context, ref, s),
               child: Text(s.emptyTrash,
-                  style: const TextStyle(color: AppColors.error)),
+                  style: TextStyle(color: AppColors.error)),
             ),
         ],
       ),
@@ -68,7 +68,7 @@ class TrashScreen extends ConsumerWidget {
               Navigator.pop(dlgCtx);
             },
             child: Text(s.emptyTrash,
-                style: const TextStyle(color: AppColors.error)),
+                style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -105,7 +105,7 @@ class _TrashTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.restore, color: AppColors.primary),
+              icon: Icon(Icons.restore, color: AppColors.primary),
               tooltip: s.restore,
               onPressed: () {
                 final popped = ref.read(trashProvider.notifier).pop(item.id);
@@ -121,7 +121,7 @@ class _TrashTile extends ConsumerWidget {
               },
             ),
             IconButton(
-              icon: const Icon(Icons.delete_forever, color: AppColors.error),
+              icon: Icon(Icons.delete_forever, color: AppColors.error),
               tooltip: s.permanentDelete,
               onPressed: () =>
                   ref.read(trashProvider.notifier).permanentDelete(item.id),

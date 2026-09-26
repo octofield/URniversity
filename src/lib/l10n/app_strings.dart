@@ -455,6 +455,34 @@ abstract class AppStrings {
   String get developerMode;
   String get devTimeOverride;
 
+  // App styles
+  String get appStyle;
+  String get styleLinen;
+  String get styleLinenDesc;
+  String get styleModern;
+  String get styleModernDesc;
+  String get styleMidnight;
+  String get styleMidnightDesc;
+  String get styleSage;
+  String get styleSageDesc;
+  String get styleOcean;
+  String get styleOceanDesc;
+  String get styleSakura;
+  String get styleSakuraDesc;
+  String get styleMono;
+  String get styleMonoDesc;
+
+  // App styles: random, and the Chinese typefaces
+  String get styleRandom;
+  String get styleRandomDesc;
+  String get cjkKai;
+  String get cjkSans;
+  String get cjkSerif;
+
+  // Haptics
+  String get haptics;
+  String get hapticsSubtitle;
+
   // Developer mode: open a review
   String get devOpenReview;
   String get devOpenReviewHint;

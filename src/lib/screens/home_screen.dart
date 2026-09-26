@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_spacing.dart';
 import '../widgets/coach_mark.dart';
 import '../widgets/draggable_fab.dart';
@@ -167,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final body = Stack(
       children: [
         // Soft top gradient so the page background is not one flat color
-        const Positioned(
+        Positioned(
           top: 0,
           left: 0,
           right: 0,
@@ -184,21 +185,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ),
-        IndexedStack(
+        _TabFade(
           index: _index,
-          children: const [
-            TodayScreen(),
-            SemesterScreen(),
-            FutureScreen(),
-            MeScreen(),
-          ],
+          child: IndexedStack(
+            index: _index,
+            children: const [
+              TodayScreen(),
+              SemesterScreen(),
+              FutureScreen(),
+              MeScreen(),
+            ],
+          ),
         ),
         // Both add buttons live in the page stack so they can be dragged
         // anywhere on it; the Scaffold's own floatingActionButton slot is
         // fixed to one corner
-        if (_index < 3)
-          DraggableFab(
-            storageKey: 'inspiration',
+        // The inspiration button shrinks away on the journal tab rather than
+        // vanishing, and stays in the tree so its dragged position is kept
+        DraggableFab(
+          storageKey: 'inspiration',
+          child: _FabPresence(
+            visible: _index < 3,
             child: TourAnchor(id: 'fab.inspiration', child: _VividFab(
               color: AppColors.categoryExchange,
               tooltip: s.addInspiration,
@@ -215,6 +222,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             )),
           ),
+        ),
         DraggableFab(storageKey: 'main', child: TourAnchor(id: 'fab.add', child: addButton)),
       ],
     );
@@ -254,11 +262,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: SizedBox(
                   width: railWidth - AppSpacing.sm * 2,
-                  child: const Divider(color: AppColors.border),
+                  child: Divider(color: AppColors.border),
                 ),
               ),
             ),
-            const VerticalDivider(width: 1, color: AppColors.border),
+            VerticalDivider(width: 1, color: AppColors.border),
             Expanded(child: body),
           ],
         ),
@@ -359,6 +367,8 @@ class _VividFab extends StatefulWidget {
 
 class _VividFabState extends State<_VividFab> {
   bool _hovered = false;
+  // Touch has no hover, so pressing is the feedback a phone gets
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -367,39 +377,136 @@ class _VividFabState extends State<_VividFab> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onPressed,
-          child: AnimatedScale(
-            scale: _hovered ? 1.08 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color.lerp(widget.color, Colors.white, 0.18)!,
-                    widget.color,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.color.withValues(alpha: _hovered ? 0.55 : 0.35),
-                    blurRadius: _hovered ? 26 : 14,
-                    offset: Offset(0, _hovered ? 10 : 6),
+        // The raw pointer, not onTapDown: the button can also be dragged, so a
+        // tap is only recognised after the press timeout — too late for the
+        // press to be felt on a quick tap
+        child: Listener(
+          onPointerDown: (_) => setState(() => _pressed = true),
+          onPointerUp: (_) => setState(() => _pressed = false),
+          onPointerCancel: (_) => setState(() => _pressed = false),
+          child: GestureDetector(
+            onTap: widget.onPressed,
+            child: AnimatedScale(
+              scale: _pressed ? 0.92 : _hovered ? 1.08 : 1.0,
+              duration: scaled(context, AppMotion.quick),
+              curve: _pressed ? AppMotion.exitCurve : AppMotion.enterCurve,
+              // Switching tabs changes the colour; it blends rather than jumps
+              child: TweenAnimationBuilder<Color?>(
+                tween: ColorTween(end: widget.color),
+                duration: scaled(context, AppMotion.move),
+                curve: AppMotion.moveCurve,
+                builder: (context, color, child) => AnimatedContainer(
+                  duration: scaled(context, AppMotion.quick),
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.lerp(color, Colors.white, 0.18)!,
+                        color!,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: _hovered ? 0.55 : 0.35),
+                        blurRadius: _hovered ? 26 : 14,
+                        offset: Offset(0, _hovered ? 10 : 6),
+                      ),
+                    ],
                   ),
-                ],
+                  child: child,
+                ),
+                // A new tab means a new action: the icon turns in, keyed on the
+                // colour because every tab's button has its own
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: scaled(context, AppMotion.move),
+                    switchInCurve: AppMotion.enterCurve,
+                    switchOutCurve: AppMotion.exitCurve,
+                    transitionBuilder: (child, animation) => RotationTransition(
+                      turns: Tween(begin: -0.25, end: 0.0).animate(animation),
+                      child: ScaleTransition(scale: animation, child: child),
+                    ),
+                    child: KeyedSubtree(key: ValueKey(widget.color), child: widget.child),
+                  ),
+                ),
               ),
-              child: Center(child: widget.child),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+// Material 3's quick fade for top-level destinations: the page arriving fades
+// and settles up from 98%. Deliberately no slide — the tabs are not a sequence,
+// and motion that implies one would say they were. The IndexedStack stays
+// underneath, so every tab keeps its state and scroll position
+class _TabFade extends StatefulWidget {
+  final int index;
+  final Widget child;
+
+  const _TabFade({required this.index, required this.child});
+
+  @override
+  State<_TabFade> createState() => _TabFadeState();
+}
+
+class _TabFadeState extends State<_TabFade> with SingleTickerProviderStateMixin {
+  late final AnimationController _run = AnimationController(
+    vsync: this,
+    duration: AppMotion.page,
+    value: 1,
+  );
+  late final Animation<double> _curve = CurvedAnimation(parent: _run, curve: AppMotion.enterCurve);
+
+  @override
+  void didUpdateWidget(_TabFade old) {
+    super.didUpdateWidget(old);
+    if (old.index == widget.index) return;
+    _run.duration = scaled(context, AppMotion.page);
+    _run.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _run.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _curve,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.98, end: 1.0).animate(_curve),
+          child: widget.child,
+        ),
+      );
+}
+
+// Grows in and shrinks away instead of popping, and takes no taps while gone
+class _FabPresence extends StatelessWidget {
+  final bool visible;
+  final Widget child;
+
+  const _FabPresence({required this.visible, required this.child});
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedScale(
+          scale: visible ? 1 : 0,
+          duration: scaled(context, visible ? AppMotion.enter : AppMotion.exit),
+          curve: visible ? AppMotion.enterCurve : AppMotion.exitCurve,
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: scaled(context, AppMotion.exit),
+            child: child,
+          ),
+        ),
+      );
 }

@@ -105,15 +105,21 @@ class TaskWidgetProvider : HomeWidgetProvider() {
         ) {
             val snapshot = WidgetData.snapshot(prefs)
             val state = WidgetData.readState(prefs)
+            val style = WidgetStyle.of(prefs)
 
             for (widgetId in ids) {
                 val views = RemoteViews(context.packageName, layoutFor(manager, widgetId))
 
-                bindChoice(context, views, R.id.tab_tasks, state.mode == WidgetData.MODE_TASKS,
+                // The card and the + in the app style's own shapes and colours
+                views.setInt(R.id.widget_root, "setBackgroundResource", style.background)
+                views.setInt(R.id.add_button, "setBackgroundResource", style.addPill)
+                setColorRes(context, views, R.id.empty_label, "setTextColor", style.muted)
+
+                bindChoice(context, views, style, R.id.tab_tasks, state.mode == WidgetData.MODE_TASKS,
                     action("mode", "value" to WidgetData.MODE_TASKS))
-                bindChoice(context, views, R.id.tab_targets, state.mode == WidgetData.MODE_TARGETS,
+                bindChoice(context, views, style, R.id.tab_targets, state.mode == WidgetData.MODE_TARGETS,
                     action("mode", "value" to WidgetData.MODE_TARGETS))
-                bindChoice(context, views, R.id.tab_goals, state.mode == WidgetData.MODE_GOALS,
+                bindChoice(context, views, style, R.id.tab_goals, state.mode == WidgetData.MODE_GOALS,
                     action("mode", "value" to WidgetData.MODE_GOALS))
 
                 // + adds whatever the current tab lists. It opens the app
@@ -135,14 +141,14 @@ class TaskWidgetProvider : HomeWidgetProvider() {
                     R.id.period_week to "week",
                     R.id.period_month to "month",
                 )) {
-                    bindChoice(context, views, viewId, state.period == period,
+                    bindChoice(context, views, style, viewId, state.period == period,
                         action("period", "value" to period))
                 }
 
                 val filterLabel = WidgetData.filterLabel(snapshot, state)
                     .ifEmpty { context.getString(R.string.widget_filter) }
                 views.setTextViewText(R.id.filter_label, filterLabel)
-                val filterColor = colorFor(state.mode == WidgetData.MODE_PICKER || state.filterId != null)
+                val filterColor = colorFor(style, state.mode == WidgetData.MODE_PICKER || state.filterId != null)
                 setColorRes(context, views, R.id.filter_label, "setTextColor", filterColor)
                 setColorRes(context, views, R.id.filter_arrow, "setColorFilter", filterColor)
                 views.setOnClickPendingIntent(R.id.filter_button,
@@ -159,7 +165,7 @@ class TaskWidgetProvider : HomeWidgetProvider() {
                     // Rows travel inside this one update. A service-backed list
                     // makes the system defer the update to the launcher, and the
                     // Pixel launcher on API 37 never applied those at all
-                    views.setRemoteAdapter(R.id.widget_list, collectionItems(context, snapshot, state))
+                    views.setRemoteAdapter(R.id.widget_list, collectionItems(context, snapshot, state, style))
                     manager.updateAppWidget(widgetId, views)
                 } else {
                     // The list is fed by WidgetListService. Each widget id needs its
@@ -182,11 +188,12 @@ class TaskWidgetProvider : HomeWidgetProvider() {
             context: Context,
             snapshot: JSONObject?,
             state: WidgetData.State,
+            style: WidgetStyle,
         ): RemoteViews.RemoteCollectionItems {
             val builder = RemoteViews.RemoteCollectionItems.Builder()
                 .setViewTypeCount(WidgetRowViews.VIEW_TYPE_COUNT)
             WidgetData.visibleRows(snapshot, state).forEachIndexed { index, row ->
-                builder.addItem(index.toLong(), WidgetRowViews.build(context, state, row))
+                builder.addItem(index.toLong(), WidgetRowViews.build(context, state, style, row))
             }
             return builder.build()
         }
@@ -198,17 +205,18 @@ class TaskWidgetProvider : HomeWidgetProvider() {
             else -> "task"
         }
 
-        private fun colorFor(selected: Boolean): Int =
-            if (selected) R.color.widget_accent else R.color.widget_muted
+        private fun colorFor(style: WidgetStyle, selected: Boolean): Int =
+            if (selected) style.accent else style.muted
 
         private fun bindChoice(
             context: Context,
             views: RemoteViews,
+            style: WidgetStyle,
             viewId: Int,
             selected: Boolean,
             uri: String,
         ) {
-            setColorRes(context, views, viewId, "setTextColor", colorFor(selected))
+            setColorRes(context, views, viewId, "setTextColor", colorFor(style, selected))
             views.setOnClickPendingIntent(viewId, actionIntent(context, uri))
         }
 

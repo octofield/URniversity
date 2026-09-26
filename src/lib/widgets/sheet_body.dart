@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 
@@ -14,6 +15,13 @@ Future<T?> showAppSheet<T>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // Rises with Material's emphasized curve and leaves quicker than it came
+    sheetAnimationStyle: AnimationStyle(
+      duration: scaled(context, AppMotion.enter),
+      reverseDuration: scaled(context, AppMotion.exit),
+      curve: AppMotion.enterCurve,
+      reverseCurve: AppMotion.exitCurve,
+    ),
     builder: builder,
   );
 }
@@ -69,7 +77,7 @@ class _SheetBodyState extends State<SheetBody> {
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),

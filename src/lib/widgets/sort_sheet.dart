@@ -45,7 +45,7 @@ void showSortSheet<E extends Enum>(
                         contentPadding: EdgeInsets.zero,
                         title: Text(entry.value),
                         trailing: entry.key == current
-                            ? const Icon(Icons.check, color: AppColors.primary)
+                            ? Icon(Icons.check, color: AppColors.primary)
                             : null,
                         selected: entry.key == current,
                         selectedColor: AppColors.primary,
@@ -138,8 +138,8 @@ class DragHandle<T extends Object> extends StatelessWidget {
       feedback: feedback,
       onDragStarted: onDragStarted,
       onDragEnd: (_) => onDragEnd(),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm, vertical: AppSpacing.md),
         child: Icon(Icons.drag_handle, color: AppColors.textSecondary),
       ),

@@ -170,7 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, size: 16, color: AppColors.error),
+              Icon(Icons.error_outline, size: 16, color: AppColors.error),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(

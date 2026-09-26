@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
+import '../core/haptics.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
@@ -18,6 +20,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/link_color_bar.dart';
 import '../widgets/drag_reorder.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/expanding_card.dart';
 import '../widgets/goal_template_sheet.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
@@ -85,6 +88,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => _draggingId != null,
       onAcceptWithDetails: (details) {
+        haptic(ref, HapticKind.select);
         final lastOrder =
             groups.isNotEmpty ? groups.last.parent.sortOrder : 0;
         ref
@@ -94,7 +98,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
       builder: (ctx, candidates, _) {
         final hovered = candidates.isNotEmpty;
         return AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: scaled(context, AppMotion.quick),
             height: hovered ? 36 : 8,
             decoration: hovered
                 ? BoxDecoration(
@@ -167,6 +171,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
         if (_hoveredId == goalId) setState(() => _hoveredId = null);
       },
       onAcceptWithDetails: (details) {
+        haptic(ref, HapticKind.select);
         switch (_hoverZone) {
           case DropZone.before:
             final prev =
@@ -280,7 +285,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final result = <Widget>[];
     for (int i = 0; i < children.length; i++) {
       result.add(
-          const Divider(height: 1, thickness: 1, color: AppColors.border));
+          Divider(height: 1, thickness: 1, color: AppColors.border));
       result.add(_buildDraggableRow(children[i],
           depth: depth,
           parentId: parentId,
@@ -300,23 +305,27 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
     final rootItems = groups.map((g) => g.parent).toList();
 
     return HoverLift(
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDraggableRow(parent,
-                depth: 0,
-                parentId: null,
-                siblings: rootItems,
-                siblingIndex: groupIdx),
-            ..._buildDescendantRows(parent.id, allGoals, 1),
-          ],
+      child: ExpandingCard(
+        id: parent.id,
+        detail: SemesterGoalDetailScreen(goalId: parent.id),
+        card: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDraggableRow(parent,
+                  depth: 0,
+                  parentId: null,
+                  siblings: rootItems,
+                  siblingIndex: groupIdx),
+              ..._buildDescendantRows(parent.id, allGoals, 1),
+            ],
+          ),
         ),
       ),
     );
@@ -529,8 +538,8 @@ class _SemesterOverviewCard extends ConsumerWidget {
             if (total > 0)
               TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0, end: progress),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeOutCubic,
+                duration: scaled(context, AppMotion.enter),
+                curve: AppMotion.enterCurve,
                 builder: (context, value, _) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -696,7 +705,7 @@ class _SemesterPickerState extends ConsumerState<_SemesterPicker> {
                           color: AppColors.primary,
                         ),
                   ),
-                  const Icon(Icons.arrow_drop_down,
+                  Icon(Icons.arrow_drop_down,
                       size: 18, color: AppColors.primary),
                 ],
               ),
@@ -770,12 +779,16 @@ class _SemGoalCardTile extends ConsumerWidget {
     // so the two sit on the same centre line instead of hanging from the top
     final hasSubContent = linkedVision != null || goal.notes != null || total > 0;
 
-    void openDetail() => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SemesterGoalDetailScreen(goalId: goal.id),
-          ),
-        );
+    // The card's header grows into the page; anything else opens normally
+    final expand = ExpandingCard.openerOf(context, goal.id);
+    void openDetail() => expand != null
+        ? expand()
+        : Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SemesterGoalDetailScreen(goalId: goal.id),
+            ),
+          );
 
     Future<void> deleteGoal() async {
       if (await confirmDelete(context, s)) {
@@ -962,8 +975,8 @@ class _SemGoalCardTile extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(AppRadius.full),
                           child: TweenAnimationBuilder<double>(
                             tween: Tween(begin: 0, end: done / total),
-                            duration: const Duration(milliseconds: 600),
-                            curve: Curves.easeOutCubic,
+                            duration: scaled(context, AppMotion.enter),
+                            curve: AppMotion.enterCurve,
                             builder: (_, v, _) => LinearProgressIndicator(
                               value: v,
                               minHeight: 4,
@@ -992,7 +1005,7 @@ class _SemGoalCardTile extends ConsumerWidget {
                       padding: EdgeInsets.zero,
                       onPressed: deleteGoal,
                     ),
-                    const Icon(Icons.arrow_forward_ios,
+                    Icon(Icons.arrow_forward_ios,
                         size: 14, color: AppColors.textTertiary),
                   ],
                 ),

@@ -460,7 +460,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                         width: 2.5,
                       ),
                     ),
-                    child: const Icon(Icons.person_outline, size: 22, color: AppColors.textTertiary),
+                    child: Icon(Icons.person_outline, size: 22, color: AppColors.textTertiary),
                   ),
                 ),
                 for (int i = 0; i < AppAvatars.presets.length; i++)
@@ -512,13 +512,13 @@ class _InspirationSection extends ConsumerWidget {
               const Spacer(),
               // Navigate to full inspirations page
               TourAnchor(id: 'me.inspirations.open', child: IconButton(
-                icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
+                icon: Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationsScreen())),
               )),
               IconButton(
-                icon: const Icon(Icons.add, color: AppColors.primary),
+                icon: Icon(Icons.add, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => showAddInspirationSheet(context, ref),
@@ -707,7 +707,7 @@ class _ReviewSection extends ConsumerWidget {
               Text(s.reviews, style: theme.textTheme.titleLarge),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
+                icon: Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 tooltip: s.reviews,
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -798,13 +798,13 @@ class _JournalSection extends ConsumerWidget {
               const Spacer(),
               // Navigate to full journals page
               TourAnchor(id: 'me.journals.open', child: IconButton(
-                icon: const Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
+                icon: Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalsScreen())),
               )),
               TourAnchor(id: 'me.journal.add', child: IconButton(
-                icon: const Icon(Icons.add, color: AppColors.primary),
+                icon: Icon(Icons.add, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
@@ -877,7 +877,7 @@ class _StreakChip extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.local_fire_department, size: 14, color: AppColors.primary),
+          Icon(Icons.local_fire_department, size: 14, color: AppColors.primary),
           const SizedBox(width: 2),
           Text(
             s.journalStreakDays(days),
@@ -1199,7 +1199,7 @@ Future<String?> _openSearchPicker(
               .toList();
           return Container(
             height: MediaQuery.of(ctx).size.height * 0.75,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
             ),
@@ -1233,7 +1233,7 @@ Future<String?> _openSearchPicker(
                       for (final option in filtered)
                         ListTile(
                           title: Text(option),
-                          trailing: option == current ? const Icon(Icons.check, color: AppColors.primary) : null,
+                          trailing: option == current ? Icon(Icons.check, color: AppColors.primary) : null,
                           onTap: () => Navigator.pop(ctx, option),
                         ),
                       const Divider(),

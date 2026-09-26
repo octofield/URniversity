@@ -4,6 +4,7 @@
      padding and type, a narrower + and the filter reduced to its arrow. Keep
      the two files in step when either changes. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"

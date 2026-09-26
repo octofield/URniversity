@@ -175,7 +175,15 @@
 | `test/widget/home_tour_test.dart` | 親手操作的章節：**光圈外點不到、光圈內點得到**、跟進真的 sheet 逐欄標示、**存了才前進、關掉沒存就倒回**、選擇器打開時導覽讓開、先跳過這步不留資料、上一步不跨越已完成的動作、每個分頁只播一次、沒建目標就跳過里程碑段、日記鈕先捲進畫面、有別的頁面在上面時等它關掉才開始、指南頁重播 | `2026-09-25-phase3-onboarding-chapters.md` 7–22 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
 | `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
-| `test/widget/completion_effect_test.dart` | 完成動畫：勾選後放大**再回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放；勾選會在 `Overlay` 上留下獨立的疊層，那一列離開清單也照播完 |
+| `test/widget/completion_effect_test.dart` | 完成效果：勾選框**先下壓、再微彈、最後回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放；只有當天最後一筆會在 `Overlay` 上放彩帶並自行清掉；系統要求減少動態時什麼都不動 | `2026-09-26-motion-redesign.md` 9–11 |
+| `test/widget/animated_rows_test.dart` | 清單列的進出（§3-Q）：第一次顯示不播動畫、移除的列先停留再收合、離場中的列點不到、新列展開、留下的列 state 不變、立刻加回的列不會遺失、減少動態時直接消失 | `2026-09-26-motion-redesign.md` 1–4 |
+| `test/widget/task_tick_motion_test.dart` | 打勾整段：刪除線正在畫、停留期間仍是全高、之後離開並出現在已完成區；「沒有任務」等最後一列離開才展開；從已完成區取消勾會回來；減少動態時立刻消失 | `2026-09-26-motion-redesign.md` 5–8 |
+| `test/widget/haptics_test.dart` | 觸覺回饋（D25）：打勾 light、最後一筆 medium、取消勾 selection；關閉時不震；完成效果關閉不影響震動；開關會記住 | `2026-09-26-motion-redesign.md` 12–14 |
+| `test/app_styles_test.dart` | 七種風格的 WCAG 對比（本文、次要、提示、白字對主色、主色對底色、淡主色上的文字）、邊框可見、亮暗與底色一致、圓角範圍；不認得的名稱退回暖棕 | `2026-09-26-app-styles.md` 1–3 |
+| `test/style_assets_test.dart` | `palettes.json` 與 `kStylePalettes` 一致（改了 Dart 沒重跑腳本會轉紅）；小工具色值等於調色盤；每個風格的圖示、啟動 logo、小工具 drawable 都在；manifest 有每個 alias、只有暖棕預設啟用；Kotlin 的風格清單與 `AppStyle` 同序 | `2026-09-26-style-extensions.md` 1–4 |
+| `test/app_style_random_test.dart` | 隨機：排除上一個；連續 50 次冷啟動不重複且七種都出現；預抽的下次會被採用；預抽無效或重複時重抽；固定風格照穿；選隨機立刻換並記住；雲端的選擇會套用 | `2026-09-26-style-extensions.md` 5–9 |
+| `test/widget/app_style_test.dart` | 設定頁列出七種並套用、深色主題生效、仍停在設定頁；畫面上的東西跟著換，連不依賴任何東西的 const widget 也會重畫（拿掉整棵樹重建會轉紅）；切換時舊畫面淡出；下次開啟記得；七種風格各跑四個分頁＋新增任務 sheet 沒有例外；手動選風格會送出 `setIcon`／`setSplash` 並寫給小工具，隨機只送 `setSplash` 不換圖示 | `2026-09-26-app-styles.md` 4–9、`2026-09-26-style-extensions.md` 10–11 |
+| `test/widget/motion_test.dart` | 分頁切換會淡入、各平台的頁面轉場、目標卡展開成詳情頁再縮回、新增鈕按下（含觸控）會縮小 | `2026-09-26-motion-redesign.md` 15–18 |
 | `test/widget/auth_layout_test.dart` | 登入／註冊頁的外殼（§2-A）：標語與每一個入口都在、註冊頁同一套外殼、矮螢幕仍可捲動 |
 | `test/widget/semester_dialog_test.dart` | 學期清單（§2-C）：開啟時停在當前學期、更早的往上捲得到、篩選版的「不限學期」在最上面 |
 | `test/widget/vision_filters_test.dart` | 願景頁的篩選（§2-C、§2-I）：分類排在學期上方、選一個分類會過濾清單、「更多分類」對話框只能挑不能改 |
@@ -212,6 +220,13 @@
    （當初一次弄紅 11 個）。要測導覽本身就傳 `setUpTestSupabase(seenTour: false)`。
    `pumpScreen()` 的 `MaterialApp` 也掛了 `tourRouteObserver`，導覽才看得到 sheet 的開關。
    這條與 `guest` 參數是同一個道理：**測試要先講清楚自己要的是哪一種起始狀態的使用者。**
+5. **打勾後的列會停留約 0.55 秒**（2026-09-26 新增，§3-Q）。刪除線、`AppMotion.hold`、收合都是
+   controller 驅動，`pumpAndSettle()` 會等完；只 `pump()` 一次就斷言「列不見了」會失敗。
+   反過來要測「還在」就刻意只 pump 到停留期間。要測減少動態，用
+   `tester.platformDispatcher.accessibilityFeaturesTestValue`，並在 tearDown 清掉。
+6. **`AppColors` 是全域狀態**（2026-09-26 新增，§3-R）。測試切換了風格，就要在 `tearDown`
+   用 `AppColors.use(kStylePalettes[AppStyle.linen]!)` 換回來，否則下一個測試會在別的風格下跑，
+   斷言顏色的測試就會莫名失敗。
 
 **平台相關的坑**：`flutter test` 的 `defaultTargetPlatform` **預設回報 android**，
 不是 host 平台。要測「不支援的平台」那條路徑必須用 `debugDefaultTargetPlatformOverride`，

@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Notifications (Phase 1). POST_NOTIFICATIONS is what Android 13+ prompts
          for; the scheduler uses inexact alarms on purpose, so SCHEDULE_EXACT_ALARM
@@ -10,7 +11,8 @@
     <application
         android:label="URniversity"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,7 +30,10 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <intent-filter>
+            <!-- Here only for `flutter run`, which looks for its launch activity
+                 among <activity> elements and never reads aliases; removed from
+                 the merged manifest, so the launcher shows the alias instead -->
+            <intent-filter tools:node="remove">
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
@@ -39,6 +44,87 @@
                 <data android:scheme="com.octofield.urniversity"/>
             </intent-filter>
         </activity>
+        <!-- The launcher icon, one alias per app style (system_design.md §3-R).
+             Exactly one is enabled at a time; MainActivity switches them when
+             the user picks a style. Everything else — notifications, the
+             widget, deep links — opens MainActivity itself and is unaffected -->
+        <activity-alias
+            android:name=".StyleLinen"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleModern"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_modern"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleMidnight"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_midnight"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleSage"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_sage"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleOcean"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_ocean"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleSakura"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_sakura"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleMono"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_mono"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
         <!-- flutter_local_notifications: receives the taps on the notification's
              action buttons. WITHOUT THIS DECLARATION THE BUTTONS DO NOTHING AT
              ALL and no error is reported anywhere (see the plugin's README) -->
