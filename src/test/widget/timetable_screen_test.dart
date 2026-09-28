@@ -16,6 +16,7 @@ import 'package:urniversity/providers/profile_provider.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart' show generateSemesters;
 import 'package:urniversity/providers/settings_provider.dart';
 import 'package:urniversity/providers/trash_provider.dart';
+import 'package:urniversity/screens/settings_screen.dart';
 import 'package:urniversity/screens/timetable_screen.dart';
 import 'package:urniversity/screens/today_screen.dart' show TodayScreen;
 import 'package:urniversity/widgets/timetable_grid.dart';
@@ -330,6 +331,19 @@ void main() {
       await tester.pumpAndSettle();
       return c;
     }
+
+    testWidgets('the switch in Settings and on the grades page is one setting', (tester) async {
+      final c = testContainer();
+      await pumpScreen(tester, const SettingsScreen(), container: c);
+      await tester.tap(find.widgetWithText(SwitchListTile, zh.creditCategories));
+      await tester.pumpAndSettle();
+      expect(c.read(gradeSettingsProvider).categoriesEnabled, isTrue);
+
+      // Switched off elsewhere, the one in Settings follows
+      await c.read(gradeSettingsProvider.notifier).set(c.read(gradeSettingsProvider).copyWith(categoriesEnabled: false));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(find.widgetWithText(SwitchListTile, zh.creditCategories)).value, isFalse);
+    });
 
     testWidgets('off: no categories anywhere, and adding files nothing', (tester) async {
       final c = await openAsCsie(tester);

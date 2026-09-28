@@ -18,6 +18,9 @@ class InputLimits {
   static const location = 50;
   // "CSIE1212", a serial number, a course id
   static const courseCode = 20;
+  // The admin backend's announcement and maintenance message (app_config)
+  static const announcement = 200;
+  static const maintenanceMessage = 200;
   // A course's credits: not text, but capped by courses' CHECK all the same
   static const courseCredits = 30;
 

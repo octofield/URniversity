@@ -8,6 +8,7 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../screens/review_screen.dart';
+import '../providers/remote_config_provider.dart';
 
 // The card on the task page while a review is due (§3-P). It goes away by
 // itself once that review is done or its window closes — no dismiss button to
@@ -18,7 +19,8 @@ class ReviewPromptCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final window = ref.watch(dueReviewProvider);
-    if (window == null) return const SizedBox.shrink();
+    // Switched off from the admin backend (kRemoteFeatures)
+    if (window == null || !ref.watch(featureOnProvider('reviews'))) return const SizedBox.shrink();
     final s = ref.watch(stringsProvider);
     final fmt = ref.watch(settingsProvider);
     final theme = Theme.of(context);

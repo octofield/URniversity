@@ -6,6 +6,7 @@ import '../providers/journal_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../widgets/coach_mark.dart';
+import '../providers/remote_config_provider.dart';
 
 // The four tour chapters, one per tab (kTourChapters). Each stop is one thing
 // to do; an `open` … `close` pair is the user doing it for real in the actual
@@ -40,7 +41,8 @@ List<CoachMarkStep> tourChapter(String id, WidgetRef ref, AppStrings s) {
         CoachMarkStep(close, anchor: 'task.submit', body: s.tourTaskSubmitBody),
         CoachMarkStep(open, anchor: 'today.summary', title: s.tourSummaryTitle, body: s.tourSummaryBody),
         CoachMarkStep(close, anchor: 'history.summary', body: s.tourHistoryBody),
-        CoachMarkStep(info, anchor: 'today.timetable', title: s.tourTimetableTitle, body: s.tourTimetableBody),
+        CoachMarkStep(info, anchor: 'today.timetable', title: s.tourTimetableTitle, body: s.tourTimetableBody,
+            when: () => ref.read(featureOnProvider('timetable'))),
         // After the progress and timetable cards, not before: the weekly view
         // has neither, and trying out the switch may well leave the user there
         CoachMarkStep(tap, anchor: 'today.viewSwitch', title: s.tourViewTitle, body: s.tourViewBody),
@@ -50,7 +52,8 @@ List<CoachMarkStep> tourChapter(String id, WidgetRef ref, AppStrings s) {
         CoachMarkStep(tap, anchor: 'nav.1', title: s.tourNextTargetTitle, body: s.tourNextTargetBody),
       ],
     'semester' => [
-        CoachMarkStep(info, anchor: 'semester.templates', title: s.tourTemplatesTitle, body: s.tourTemplatesBody),
+        CoachMarkStep(info, anchor: 'semester.templates', title: s.tourTemplatesTitle, body: s.tourTemplatesBody,
+            when: () => ref.read(featureOnProvider('goal_templates'))),
         CoachMarkStep(open, anchor: 'fab.add', title: s.tourTargetAddTitle, body: s.tourTargetAddBody, count: targets),
         CoachMarkStep(field, anchor: 'goal.title', body: s.tourTargetTitleBody),
         CoachMarkStep(field, anchor: 'goal.categories', body: s.tourTargetCategoryBody),

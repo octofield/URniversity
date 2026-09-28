@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/grade_scale.dart';
+import 'remote_config_provider.dart';
 
 // What the grades page needs to know about the degree (UC20): how many credits
 // it takes, and which pass mark applies. Kept on the device (D31) and, for an
@@ -130,4 +131,11 @@ class GradeSettingsNotifier extends StateNotifier<GradeSettings> {
 
 final gradeSettingsProvider = StateNotifierProvider<GradeSettingsNotifier, GradeSettings>(
   (ref) => GradeSettingsNotifier(),
+);
+
+// Whether credits by category shows anywhere: the user's own switch, and the
+// admin backend's (kRemoteFeatures) over it. The user's choice is kept either
+// way, so switching the feature back on restores it
+final creditCategoriesActiveProvider = Provider<bool>(
+  (ref) => ref.watch(gradeSettingsProvider).categoriesEnabled && ref.watch(featureOnProvider('credit_categories')),
 );

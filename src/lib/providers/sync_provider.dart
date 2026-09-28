@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -96,6 +97,7 @@ final syncProvider = Provider<void>((ref) {
         _loadTerms(ref, uid);
         _loadGradeSettings(ref, uid);
         _loadCreditCategories(ref, uid);
+        _recordActivity(uid);
       } else {
         _clearAll(ref);
       }
@@ -144,6 +146,7 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   unawaited(_loadTerms(ref, uid));
   unawaited(_loadGradeSettings(ref, uid));
   unawaited(_loadCreditCategories(ref, uid));
+  unawaited(_recordActivity(uid));
 }
 
 void _loadGuest(Ref ref) {
@@ -443,5 +446,28 @@ String _fmtToString(DateDisplayFormat fmt) {
     case DateDisplayFormat.mmdd: return 'mmdd';
     case DateDisplayFormat.yyyymmdd: return 'yyyymmdd';
     case DateDisplayFormat.longDate: return 'longDate';
+  }
+}
+
+// ── Activity, for the admin backend (D36) ──────────────────────────────────────
+//
+// One row a day per signed-in account that opened the app, for the daily,
+// weekly and monthly active counts. Nothing about what was done. A day already
+// recorded on this device is not sent again (D38 activity_day)
+
+const _activityDayKey = 'activity_day';
+
+Future<void> _recordActivity(String uid) async {
+  final now = DateTime.now();
+  final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  final p = await SharedPreferences.getInstance();
+  if (p.getString(_activityDayKey) == '$uid $day') return;
+  try {
+    await Supabase.instance.client.from('user_activity').upsert({'user_id': uid, 'day': day});
+    await p.setString(_activityDayKey, '$uid $day');
+  } catch (e) {
+    // Not a sync failure: nothing of the user's failed to save, and before
+    // admin.sql has run it would fail at every launch (hard rule 2 exception)
+    debugPrint('[activity] not recorded: $e');
   }
 }

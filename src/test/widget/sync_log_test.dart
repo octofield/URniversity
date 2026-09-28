@@ -1,3 +1,5 @@
+import 'dart:io' show SocketException;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,5 +46,50 @@ void main() {
     expect(find.textContaining('user_settings term_starts save'), findsOneWidget);
     expect(find.textContaining('code=23514 | new row violates check'), findsOneWidget);
     expect(find.byTooltip(zh.syncLogCopy), findsOneWidget);
+  });
+
+  group('reports to the admin backend', () {
+    late List<Map<String, dynamic>> sent;
+    setUp(() {
+      sent = [];
+      resetErrorUploads();
+      errorReportUser = () => 'u1';
+      errorReportSender = (row) async => sent.add(row);
+    });
+    tearDown(() {
+      errorReportUser = () => null;
+      resetErrorUploads();
+    });
+
+    test('ten a launch at most, with where it happened', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      for (var i = 0; i < 12; i++) {
+        c.read(reporter)(PostgrestException(message: 'boom $i', code: '23514'), 'courses upsert');
+      }
+      expect(sent.length, kMaxErrorUploads);
+      expect(sent.first['where'], 'courses upsert');
+      expect(sent.first['code'], '23514');
+      expect(sent.first['user_id'], 'u1');
+    });
+
+    test('not the network kind, and not for a guest', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      c.read(reporter)(const SocketException('offline'), 'tasks upsert');
+      expect(sent, isEmpty);
+      errorReportUser = () => null;
+      c.read(reporter)(const PostgrestException(message: 'x', code: '42501'), 'tasks upsert');
+      expect(sent, isEmpty);
+    });
+
+    test('a report that fails to send is not itself reported', () async {
+      errorReportSender = (row) async => throw Exception('no network');
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      c.read(reporter)(const PostgrestException(message: 'x', code: '42501'), 'tasks upsert');
+      await Future<void>.delayed(Duration.zero);
+      expect(c.read(syncLogProvider).length, 1);
+    });
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
+import '../core/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/theme/app_breakpoints.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_motion.dart';
@@ -22,25 +24,59 @@ import 'me_screen.dart';
 import 'journal_edit_screen.dart';
 import 'home_tour.dart';
 import 'timetable_screen.dart';
+import '../providers/remote_config_provider.dart';
+import '../widgets/announcement_banner.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  // Which tab to show, from the address (/tasks, /targets …, CLAUDE.md §13)
+  final int tab;
+  const HomeScreen({super.key, this.tab = 0});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _index = 0;
+  late int _index = widget.tab;
 
   // Set while a tour chapter is up. The overlay it inserts outlives this
   // widget, so it has to come down with the screen it is explaining —
   // otherwise signing out mid-tour leaves an unclickable scrim over the login page
   VoidCallback? _dismissTour;
 
-  void _onDestinationSelected(int i) {
+  // Every tab change goes through the address, so Back and Forward in a
+  // browser move between tabs and a reload stays on the one showing. The
+  // index is set at once too; the router then rebuilds this with the same tab.
+  // With a page open on top — the graph's "see the tasks" — only the index
+  // changes: go() would rebuild the stack and close that page. The address
+  // follows once the page is gone (_syncAddress)
+  void _select(int i) {
     setState(() => _index = i);
+    if (ModalRoute.of(context)?.isCurrent ?? true) _syncAddress();
+  }
+
+  void _syncAddress() {
+    if (!mounted || GoRouter.maybeOf(context) == null) return;
+    if (ModalRoute.of(context)?.isCurrent != true || widget.tab == _index) return;
+    context.go(AppRoutes.tabs[_index]);
+  }
+
+  // A page closing is when a tab picked underneath it reaches the address
+  void _syncAddressLater() => WidgetsBinding.instance.addPostFrameCallback((_) => _syncAddress());
+
+  void _onDestinationSelected(int i) {
+    _select(i);
     _scheduleChapterCheck();
+  }
+
+  // The address changed from outside: the browser's Back or Forward, or a link
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tab != oldWidget.tab && widget.tab != _index) {
+      setState(() => _index = widget.tab);
+      _scheduleChapterCheck();
+    }
   }
 
   @override
@@ -49,6 +85,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // A sheet or page closing is when a postponed chapter gets its turn — the
     // task sheet a notification opened on a cold start, say
     tourRouteObserver.addListener(_scheduleChapterCheck);
+    tourRouteObserver.addListener(_syncAddressLater);
     // After the first frame: the anchors have to be laid out before anything
     // can be measured, and _AuthGate has already decided this screen is the one
     _scheduleChapterCheck();
@@ -57,6 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     tourRouteObserver.removeListener(_scheduleChapterCheck);
+    tourRouteObserver.removeListener(_syncAddressLater);
     _dismissTour?.call();
     super.dispose();
   }
@@ -70,6 +108,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (ModalRoute.of(context)?.isCurrent != true) return;
       final chapter = kTourChapters[_index];
       if (force != chapter && ref.read(onboardingProvider).contains(chapter)) return;
+      // Switched off from the admin backend: no chapter starts by itself; the
+      // guide in Settings can still replay one
+      if (force != chapter && !ref.read(featureOnProvider('onboarding_tour'))) return;
       _dismissTour = CoachMarkOverlay.show(
         context,
         steps: tourChapter(chapter, ref, ref.read(stringsProvider)),
@@ -98,7 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // tasks" button, which sets the filter and then has to land the user on it
     ref.listen<int?>(pendingTabProvider, (_, tab) {
       if (tab == null) return;
-      setState(() => _index = tab);
+      _select(tab);
       ref.read(pendingTabProvider.notifier).state = null;
       _scheduleChapterCheck();
     });
@@ -110,7 +151,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(tourReplayProvider.notifier).state = null;
       _dismissTour?.call();
       _dismissTour = null;
-      setState(() => _index = kTourChapters.indexOf(chapter));
+      _select(kTourChapters.indexOf(chapter));
       _scheduleChapterCheck(chapter);
     });
 
@@ -141,10 +182,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (icon: Icons.person_outlined, selectedIcon: Icons.person, label: s.me),
     ];
 
-    void openTimetable() => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TimetableScreen()),
-        );
+    void openTimetable() => openPage(context, AppRoutes.timetable, () => const TimetableScreen());
+    // Switched off from the admin backend (kRemoteFeatures): no way in
+    final timetableOn = ref.watch(featureOnProvider('timetable'));
 
     final addButton = switch (_index) {
       1 => _VividFab(
@@ -172,7 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: const Icon(Icons.add, color: AppColors.textOnPrimary, size: 30)),
     };
 
-    final body = Stack(
+    final tabs = Stack(
       children: [
         // Soft top gradient so the page background is not one flat color
         Positioned(
@@ -234,6 +274,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ],
     );
 
+
+    // The admin backend's announcement, across the top of every tab. The tabs
+    // below then leave the status bar to it
+    final announcement = ref.watch(visibleAnnouncementProvider);
+    final body = announcement == null
+        ? tabs
+        : Column(
+            children: [
+              AnnouncementBanner(announcement: announcement),
+              Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: tabs)),
+            ],
+          );
+
     if (isDesktop) {
       final extended = width >= AppBreakpoints.wide;
       // NavigationRail's own collapsed/extended widths (Material defaults it
@@ -274,7 +327,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Divider(color: AppColors.border),
                     ),
                   ),
-                  if (extended)
+                  if (!timetableOn)
+                    const SizedBox.shrink()
+                  else if (extended)
                     SizedBox(
                       width: railWidth - AppSpacing.sm * 2,
                       child: ListTile(
@@ -352,14 +407,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 indent: AppSpacing.pageHorizontal,
                 endIndent: AppSpacing.pageHorizontal,
               ),
-              ListTile(
-                leading: const Icon(Icons.calendar_view_week_outlined),
-                title: Text(s.timetable),
-                onTap: () {
-                  Navigator.pop(context);
-                  openTimetable();
-                },
-              ),
+              if (timetableOn)
+                ListTile(
+                  leading: const Icon(Icons.calendar_view_week_outlined),
+                  title: Text(s.timetable),
+                  onTap: () {
+                    Navigator.pop(context);
+                    openTimetable();
+                  },
+                ),
             ],
           ),
         ),

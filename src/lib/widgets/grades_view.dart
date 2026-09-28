@@ -81,7 +81,7 @@ class _GradesViewState extends ConsumerState<GradesView> {
               note: percent == null ? null : s.percentEquivalent(_two(percent)),
             ),
             // Credits by category has its own, fuller breakdown below
-            if (!settings.categoriesEnabled)
+            if (!ref.watch(creditCategoriesActiveProvider))
               _Stat(
                 label: s.creditsEarned,
                 value: s.creditsOf(_credits(earned), settings.graduationCredits),

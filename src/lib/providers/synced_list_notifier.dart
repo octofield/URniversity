@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'dart:math';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' show ClientException;
@@ -46,6 +46,43 @@ void _report(StateController<List<SyncFailure>> log, StateController<Object?> cu
   debugPrint('[sync] ${describeSyncError(failure)}');
   log.state = [failure, ...log.state.take(kSyncLogSize - 1)];
   current.state = failure;
+  _upload(failure);
+}
+
+// Also sent to the admin backend's error list (sync_error_reports, D37), so a
+// failure that comes and goes on someone's phone can be seen without them.
+// Signed-in accounts only, ten a launch at most, and not the network kind —
+// that one cannot be sent either, and says nothing about the app
+const kMaxErrorUploads = 10;
+var _uploaded = 0;
+
+// Who is signed in, and how a report travels. Replaceable so tests can check
+// the rules above without reaching Supabase
+@visibleForTesting
+String? Function() errorReportUser = () => Supabase.instance.client.auth.currentUser?.id;
+@visibleForTesting
+Future<void> Function(Map<String, dynamic> row) errorReportSender =
+    (row) => Supabase.instance.client.from('sync_error_reports').insert(row);
+@visibleForTesting
+void resetErrorUploads() => _uploaded = 0;
+
+void _upload(SyncFailure failure) {
+  final uid = errorReportUser();
+  if (uid == null || _uploaded >= kMaxErrorUploads || isTransientSyncError(failure.error)) return;
+  _uploaded++;
+  final error = failure.error;
+  final message = describeSyncError(error);
+  errorReportSender({
+    'user_id': uid,
+    'where': failure.where.length > 100 ? failure.where.substring(0, 100) : failure.where,
+    'code': error is PostgrestException ? error.code : null,
+    'message': message.length > 500 ? message.substring(0, 500) : message,
+    'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+  }).catchError((Object e) {
+    // Not reported as a sync failure: that would upload again, and nothing of
+    // the user's is lost when a report does not arrive (hard rule 2 exception)
+    debugPrint('[sync] error report not sent: $e');
+  });
 }
 
 // PostgrestException.toString() drops details and hint, which are usually the

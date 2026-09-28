@@ -13,6 +13,7 @@ import '../providers/grade_settings_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/synced_list_notifier.dart' show reportSyncErrorFromWidget;
+import '../providers/remote_config_provider.dart';
 
 String _credits(double c) => c == c.roundToDouble() ? c.toInt().toString() : c.toStringAsFixed(1);
 
@@ -40,6 +41,60 @@ Future<void> fileCourses(WidgetRef ref, List<Course> courses) async {
   }
 }
 
+// Switches credits by category on or off, from the grades page or from
+// Settings. Switching on fills in what can be guessed — entry year from the
+// grade, department from the profile, its catalog name by likeness — so the
+// first look already shows numbers
+void setCreditCategoriesEnabled(WidgetRef ref, bool on) {
+  final settings = ref.read(gradeSettingsProvider);
+  final profile = ref.read(profileProvider);
+  final school = (ref.read(catalogSchoolsProvider).valueOrNull ?? const <CatalogSchool>[])
+      .where((x) => x.name == profile?.school)
+      .firstOrNull;
+  ref.read(gradeSettingsProvider.notifier).set(settings.copyWith(
+        categoriesEnabled: on,
+        entryYear: () => settings.entryYear ?? entryYearFrom(profile?.grade, profile?.gradeSetYear),
+        requirementDepartment: () => settings.requirementDepartment ?? profile?.department,
+        catalogDepartment: () =>
+            settings.catalogDepartment ?? guessCatalogDepartment(profile?.department, school?.audiences ?? const []),
+      ));
+}
+
+// The switch with its beta badge and caveat, the same on the grades page and
+// in Settings
+class CreditCategoriesSwitch extends ConsumerWidget {
+  final EdgeInsetsGeometry? contentPadding;
+  const CreditCategoriesSwitch({super.key, this.contentPadding});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Switched off from the admin backend: not offered at all
+    if (!ref.watch(featureOnProvider('credit_categories'))) return const SizedBox.shrink();
+    final s = ref.watch(stringsProvider);
+    final theme = Theme.of(context).textTheme;
+    return SwitchListTile(
+      contentPadding: contentPadding,
+      value: ref.watch(gradeSettingsProvider).categoriesEnabled,
+      onChanged: (on) => setCreditCategoriesEnabled(ref, on),
+      title: Row(
+        children: [
+          Flexible(child: Text(s.creditCategories)),
+          const SizedBox(width: AppSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+            ),
+            child: Text(s.creditCategoriesBeta, style: theme.labelSmall?.copyWith(color: AppColors.primary)),
+          ),
+        ],
+      ),
+      subtitle: Text(s.creditCategoriesHint, style: theme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+    );
+  }
+}
+
 String categoryName(CreditCategory? category, AppStrings s) => switch (category) {
       CreditCategory.required => s.categoryRequired,
       CreditCategory.elective => s.categoryElective,
@@ -54,19 +109,6 @@ String categoryName(CreditCategory? category, AppStrings s) => switch (category)
 class CreditCategoriesSection extends ConsumerWidget {
   const CreditCategoriesSection({super.key});
 
-  // Switching on fills in what can be guessed, so the first look shows numbers
-  void _enable(WidgetRef ref, bool on, CatalogSchool? school) {
-    final settings = ref.read(gradeSettingsProvider);
-    final profile = ref.read(profileProvider);
-    ref.read(gradeSettingsProvider.notifier).set(settings.copyWith(
-          categoriesEnabled: on,
-          entryYear: () => settings.entryYear ?? entryYearFrom(profile?.grade, profile?.gradeSetYear),
-          requirementDepartment: () => settings.requirementDepartment ?? profile?.department,
-          catalogDepartment: () =>
-              settings.catalogDepartment ?? guessCatalogDepartment(profile?.department, school?.audiences ?? const []),
-        ));
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(stringsProvider);
@@ -77,27 +119,8 @@ class CreditCategoriesSection extends ConsumerWidget {
         .where((x) => x.name == profile?.school)
         .firstOrNull;
 
-    final toggle = SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      value: settings.categoriesEnabled,
-      onChanged: (on) => _enable(ref, on, school),
-      title: Row(
-        children: [
-          Flexible(child: Text(s.creditCategories, style: theme.titleMedium)),
-          const SizedBox(width: AppSpacing.xs),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 1),
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-            child: Text(s.creditCategoriesBeta, style: theme.labelSmall?.copyWith(color: AppColors.primary)),
-          ),
-        ],
-      ),
-      subtitle: Text(s.creditCategoriesHint, style: theme.bodySmall?.copyWith(color: AppColors.textSecondary)),
-    );
-    if (!settings.categoriesEnabled) return toggle;
+    const toggle = CreditCategoriesSwitch(contentPadding: EdgeInsets.zero);
+    if (!ref.watch(creditCategoriesActiveProvider)) return toggle;
 
     // The school's published numbers for this entry year and department, when
     // it publishes any; otherwise the user's own

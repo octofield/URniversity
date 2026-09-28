@@ -67,7 +67,7 @@ class _CatalogSearchState extends ConsumerState<_CatalogSearch> {
     final s = ref.read(stringsProvider);
     // Filed as it is added, only when the user has credits by category on
     final settings = ref.read(gradeSettingsProvider);
-    final category = settings.categoriesEnabled
+    final category = ref.read(creditCategoriesActiveProvider)
         ? classifyCourse(kind: c.kind, requiredFor: c.requiredFor, catalogDepartment: settings.catalogDepartment).name
         : null;
     ref.read(coursesProvider.notifier).add(

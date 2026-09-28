@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/app_routes.dart';
 import '../core/input_limits.dart';
 import '../core/review_stats.dart';
 import '../core/sign_in_failure.dart';
@@ -31,6 +32,9 @@ import 'notification_settings_screen.dart';
 import 'review_screen.dart';
 import 'trash_screen.dart';
 import 'sync_log_screen.dart';
+import '../widgets/credit_categories_section.dart' show CreditCategoriesSwitch;
+import 'admin_screen.dart';
+import '../providers/admin_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -131,6 +135,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           notificationSettingsTile(context, s),
+          // Also on the grades page; either place switches the same setting
+          const CreditCategoriesSwitch(),
+          // Only for accounts in the admins table (supabase/admin.sql)
+          if (ref.watch(isAdminProvider).value ?? false)
+            ListTile(
+              leading: Icon(Icons.admin_panel_settings_outlined, color: AppColors.primary),
+              title: Text(s.adminTitle),
+              subtitle: Text(s.adminEntryHint),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => openPage(context, AppRoutes.admin, () => const AdminScreen()),
+            ),
           ListTile(
             title: Text(s.completionEffect),
             subtitle: Text(completionEffectLabel(completionEffect, s)),
@@ -262,7 +277,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
 
     return Scaffold(
-      appBar: AppBar(title: Text(s.settings)),
+      appBar: AppBar(title: Text(s.settings), leading: homeButtonIfFirst(context)),
       body: ResponsiveBody(child: list),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../core/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show FilteringTextInputFormatter, LengthLimitingTextInputFormatter;
@@ -48,6 +49,7 @@ import '../widgets/today_classes_strip.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'timetable_screen.dart';
+import '../providers/remote_config_provider.dart';
 
 // Split with `part` rather than separate libraries: every helper here is
 // library-private and used across all three files, so real imports would mean
@@ -136,10 +138,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
+              onPressed: () => openPage(context, AppRoutes.settings, () => const SettingsScreen()),
             ),
           ],
         ),
@@ -724,6 +723,7 @@ class _TimetableCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(featureOnProvider('timetable'))) return const SizedBox.shrink();
     final s = ref.watch(stringsProvider);
     final icon = Icon(Icons.calendar_view_week_outlined, color: AppColors.primary);
     final label = Text(
@@ -746,10 +746,7 @@ class _TimetableCard extends ConsumerWidget {
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TimetableScreen()),
-            ),
+            onTap: () => openPage(context, AppRoutes.timetable, () => const TimetableScreen()),
             child: Padding(
               padding: compact
                   ? const EdgeInsets.all(AppSpacing.sm)

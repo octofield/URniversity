@@ -12,6 +12,7 @@ import 'package:urniversity/providers/guest_provider.dart';
 import 'package:urniversity/providers/onboarding_provider.dart';
 import 'package:urniversity/providers/settings_provider.dart';
 import 'package:urniversity/widgets/coach_mark.dart';
+import 'package:urniversity/providers/remote_config_provider.dart';
 
 // Guest mode never reaches Supabase — SyncedListNotifier.upsert() returns right
 // after persistLocally() — so a widget test can drive the real screens with no
@@ -61,10 +62,28 @@ void setViewWidth(WidgetTester tester, double width, {double height = 1600}) {
 // Builds a container the tests can seed before the first frame. The detail
 // screens pop themselves when their goal is missing, so their data has to exist
 // before they are pumped, and addGoal() mints the id itself
-ProviderContainer testContainer({List<Override> overrides = const []}) {
-  final container = ProviderContainer(overrides: overrides);
+//
+// The admin backend's remote settings come from a fake by default (all
+// features on, no announcement, no maintenance): the real source would reach
+// Supabase, which tests never do. Pass [remoteConfig] to set them
+ProviderContainer testContainer({List<Override> overrides = const [], RemoteConfig? remoteConfig}) {
+  final container = ProviderContainer(overrides: [
+    remoteConfigSourceProvider.overrideWithValue(FakeRemoteConfigSource(remoteConfig)),
+    ...overrides,
+  ]);
   addTearDown(container.dispose);
   return container;
+}
+
+class FakeRemoteConfigSource implements RemoteConfigSource {
+  RemoteConfig? config;
+  FakeRemoteConfigSource([this.config]);
+
+  @override
+  Future<RemoteConfig?> fetch() async => config;
+
+  @override
+  Future<void> save(RemoteConfig next, String updatedBy) async => config = next;
 }
 
 // Wraps a screen the way main.dart does. Without the l10n delegates any

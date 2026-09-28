@@ -54,6 +54,11 @@ dependencies:
   # Flutter team's Material motion patterns; OpenContainer turns a goal card
   # into its detail page (system_design.md §3-Q)
   animations: ^2.0.11
+  # Web addresses per page (/tasks, /timetable …; CLAUDE.md §13). Path URLs
+  # rather than #/ come from flutter_web_plugins' usePathUrlStrategy
+  go_router: ^18.0.1
+  flutter_web_plugins:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

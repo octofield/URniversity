@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input_limits.dart';
@@ -34,6 +35,7 @@ import '../widgets/goal_template_sheet.dart';
 import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
+import '../providers/remote_config_provider.dart';
 
 class _FutGroup {
   final FutureGoal parent;
@@ -576,6 +578,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
                   ref.read(visionSortModeProvider.notifier).state = false,
             ),
             // Same sheet as the semester page: every template starts from a vision
+            if (ref.watch(featureOnProvider('goal_templates')))
             IconButton(
               icon: const Icon(Icons.auto_awesome_outlined),
               tooltip: s.goalTemplates,
@@ -594,10 +597,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
+              onPressed: () => openPage(context, AppRoutes.settings, () => const SettingsScreen()),
             ),
           ],
         ),

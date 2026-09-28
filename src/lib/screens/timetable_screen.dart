@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:animations/animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/app_routes.dart';
 import '../core/period_tables.dart';
 import '../core/review_stats.dart' show termAt;
 import '../core/theme/app_colors.dart';
@@ -23,6 +24,7 @@ import '../widgets/pull_to_close.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/swipe_switcher.dart';
 import '../widgets/timetable_grid.dart';
+import '../providers/remote_config_provider.dart';
 
 // The timetable and the grades (UC18, UC20). One screen with two views,
 // because a grade is entered on the course it belongs to
@@ -106,6 +108,11 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   // other school's catalog). No school to search — none yet, or offline —
   // opens adding by hand, which always works
   Future<void> _add() async {
+    // Catalog search switched off from the admin backend: by hand only
+    if (!ref.read(featureOnProvider('catalog_search'))) {
+      showCourseSheet(context, semester: _semester);
+      return;
+    }
     final mySchool = ref.read(profileProvider)?.school;
     List<CatalogSchool> all;
     try {
@@ -218,7 +225,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(_grades ? s.grades : s.timetable)),
+      appBar: AppBar(title: Text(_grades ? s.grades : s.timetable), leading: homeButtonIfFirst(context)),
       floatingActionButton: _grades
           ? null
           : FloatingActionButton.extended(

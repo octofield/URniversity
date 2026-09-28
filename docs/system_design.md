@@ -38,6 +38,38 @@ flowchart TD
 - 目前僅發行 Web 版本（`flutter run/build -d chrome`），行動裝置與桌面版尚未發行（見
   `README.md`「Next」小節）。
 
+### 1-A 網址（2026-09-28，`go_router`）
+
+網頁版每個主要頁面有自己的網址（`core/app_routes.dart`，路徑式網址、不帶 `#`）；手機版用同一套路由，只是看不到網址。
+
+| 網址 | 畫面 |
+|---|---|
+| `/` | 轉到 `/tasks` |
+| `/tasks`、`/targets`、`/visions`、`/me` | 四個分頁（同一個 `HomeScreen`，分頁由網址決定） |
+| `/timetable`、`/grades` | `TimetableScreen`（`grades: true`） |
+| `/settings` | `SettingsScreen` |
+| `/admin` | `AdminScreen`（非管理員只看到「沒有後台權限」） |
+| 其他 | 轉到 `/tasks`（包含 Android 交給路由的登入 deep link） |
+
+```mermaid
+flowchart TD
+    URL["網址"] --> R{"路徑"}
+    R -->|/ 或未知| T["/tasks"]
+    R -->|/tasks /targets /visions /me| G1["_AuthGate → HomeScreen(tab)\n同一個頁面 key，換分頁不重建"]
+    R -->|/timetable /grades /settings /admin| G2["_AuthGate → 該頁面"]
+    G1 --> M{"維護模式且不是管理員？"}
+    G2 --> M
+    M -->|是| MS["MaintenanceScreen"]
+    M -->|否| P["頁面"]
+    Tap["點分頁"] --> Cur{"分頁上方有開著的頁面？"}
+    Cur -->|否| Go["context.go(新分頁網址)\n瀏覽器上一頁／下一頁可用"]
+    Cur -->|是| Idx["只換分頁；頁面關閉後網址才更新\n（go 會關掉上面的頁面）"]
+```
+
+- `_AuthGate` 包住每一條路由：未登入時在原網址顯示登入頁，登入後停在要去的頁面。維護模式只取代頁面，不取代登入頁（管理員要能登入）。
+- 主要頁面用 `openPage()`（`context.push`，網址跟著變，上一頁回到原處）；直接輸入網址開啟時底下沒有頁面，AppBar 左上改成回任務頁的按鈕（`homeButtonIfFirst`）。
+- 詳情頁、sheet、日記、回收桶等沒有自己的網址，照舊 `Navigator.push`。
+
 ### 1-B 畫面導覽架構
 
 ```mermaid
@@ -67,7 +99,8 @@ flowchart TD
 
     Today -.->|進度卡點擊| History["TaskHistoryScreen\n完成度歷史"]
     Semester -.->|頁首 icon| Graph["OverviewGraphScreen\n關聯圖"]
-    Today -.->|課表卡／今天的課| Timetable["TimetableScreen\n課表｜成績"]
+    Today -.->|課表卡／今天的課 · /timetable| Timetable["TimetableScreen\n課表｜成績"]
+    Settings2["SettingsScreen · /settings"] -.->|管理員才有的「後台」| AdminS["AdminScreen · /admin"]
     Home -.->|側邊欄「課表」| Timetable
     Future -.->|頁首 icon| Graph
     Semester -.-> SemDetail["SemesterGoalDetailScreen"]
@@ -475,6 +508,18 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 **輸出**：週課表格線（§3-S）、頁首「第 N 週」、任務頁「今天的課」（上課中加粗、下一堂標記、上完的變淡；沒課或不在上課週就不佔空間）、
 上課前提醒、小工具「課表」分頁；成績頁三格（本學期 GPA、累積 GPA 與百分制、已修／畢業學分）、GPA 趨勢線、試算結果、依學期分組的課程與等第。
 開啟依學系分類學分時，「已修學分」一格換成四條進度（必修、通識、選修、總計，各為「已修／門檻」）、門檻來源說明，以及「N 門課還沒分類 · 自動分類」。
+
+### 2-O 後台（`/admin`，2026-09-28）
+
+只給 `admins` 表裡的帳號（D34）；設定頁也只有管理員看得到「後台」一列。寬螢幕左側分頁、手機上方分頁，右上「重新整理」。
+
+| 分頁 | 輸入 | 輸出 |
+|---|---|---|
+| 總覽 | — | 使用者總數、今日新增、日／週／月活躍；近 30 天每日新增與活躍的長條圖；學校前 10 名；「訪客不在統計內」 |
+| 使用量 | — | 任務、目標、願景、日記、靈感、課程、回顧：總筆數、使用人數、近 30 天每日新增 |
+| 設定與錯誤 | — | 風格、語言分佈；學分分類開啟人數；近 7 天錯誤依位置＋代碼分組；最近 50 筆錯誤（可選取複製） |
+| 控制 | 六個功能開關；公告文字（≤ 200）、重要（警告色）、開始／結束日期；維護模式開關與訊息（≤ 200） | 按「儲存」寫入 D35；顯示最後修改時間與修改者。改了公告文字就是新公告（新 id），按掉舊公告的人會再看到 |
+| 使用者 | 搜尋 email、暱稱、學校（Enter 送出）；上一頁／下一頁（每頁 50） | email、暱稱、學校、學系、註冊與最後登入日期、是否停用；「停用／恢復」要先確認 |
 
 ### 2-M 引導式回顧（Phase 4）
 
@@ -1370,6 +1415,41 @@ flowchart TD
     U -->|否| W["使用者自填三個數字；總計用畢業學分"]
 ```
 
+### 3-U 遠端設定：功能開關、公告、維護模式（`providers/remote_config_provider.dart`）
+
+- 啟動時先套用本機快取（D38），再讀 D35 覆蓋並更新快取；讀不到就維持快取，沒有快取就是全開。這不算同步失敗（使用者沒有資料遺失）。
+- 功能開關（缺 key 就是開）：
+
+  | key | 關掉時 |
+  |---|---|
+  | `timetable` | 任務頁課表卡、今天的課、側邊欄課表、小工具點課的開啟、上課提醒、導覽的課表一站都不見 |
+  | `catalog_search` | 新增課程直接開手動新增 |
+  | `credit_categories` | 設定與成績頁都不提供學分分類；使用者自己的選擇保留（`creditCategoriesActiveProvider` = 自己開 且 遠端開） |
+  | `reviews` | 回顧卡與週回顧提醒不出現 |
+  | `onboarding_tour` | 章節不自動播放（設定 › 新手指南仍可重播） |
+  | `goal_templates` | 目標頁、願景頁的範本鈕與導覽的範本一站不見 |
+
+- 公告：在開始（含）與結束（不含）之間、而且這台裝置沒按掉這個 id，就在分頁最上方顯示；下方分頁不再重複留狀態列空間。
+- 維護模式：`_AuthGate` 在要顯示頁面時，若維護中而且 `isAdminProvider` 不是 true，就改顯示 `MaintenanceScreen`（「重新檢查」會重讀 D35）。登入頁照常，管理員登入後即可通過。
+
+```mermaid
+flowchart TD
+    A["啟動"] --> B["套用 app_config_cache"]
+    B --> C{"讀得到 app_config？"}
+    C -->|是| D["套用並寫入快取"]
+    C -->|否| E["維持快取（沒有快取＝全開）"]
+    D --> F{"_AuthGate 要顯示頁面"}
+    E --> F
+    F --> G{"maintenance.enabled？"}
+    G -->|否| H["顯示頁面；featureOn(key) 決定入口"]
+    G -->|是| I{"isAdmin？"}
+    I -->|是| H
+    I -->|否| J["MaintenanceScreen"]
+```
+
+**同步失敗上傳與活躍紀錄**：`reportSyncError` 在寫進同步紀錄的同時上傳 D37（登入帳號、每次開啟最多 10 筆、網路類不傳、傳不出去不再回報）；
+登入帳號每天第一次開 App 寫 D36 一列。兩者都不是使用者資料，失敗只 debugPrint。
+
 ---
 
 ## 4. 系統操作步驟（主要使用案例）
@@ -1674,6 +1754,18 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 5. 學期回顧會多一行該學期 GPA。
 6. （選用，測試中）打開「依學系分類學分」→ 確認入學年度、學系、目錄裡的系名 → 看必修／通識／選修／總計各自的進度；
    舊的課按「自動分類」補上類別，個別的課在課程 sheet 改。
+
+### UC21　管理員看統計（2026-09-28）
+
+1. 在 Supabase SQL 編輯器執行 `supabase/admin.sql`，把自己的 user id 加進 `admins`。
+2. 設定 › 後台（或直接開 `/admin`）。
+3. 總覽看使用者、活躍；使用量看各功能；設定與錯誤看分佈與最近的失敗；右上重新整理。
+
+### UC22　發公告、關功能、維護
+
+1. 後台 › 控制：切換功能開關、填公告（可選重要、起訖日）、或開維護模式並寫訊息 → 儲存。
+2. 所有人下次開 App（或維護畫面按「重新檢查」）生效；管理員不受維護模式影響。
+3. 後台 › 使用者：搜尋帳號 → 停用（確認）→ 對方無法再登入；恢復同樣要確認。
 
 ### UC17　每週回顧（Phase 4）
 

@@ -13,6 +13,7 @@ import 'courses_provider.dart';
 import 'reviews_provider.dart';
 import 'settings_provider.dart';
 import 'tasks_provider.dart';
+import 'remote_config_provider.dart';
 
 class NotificationSettingsNotifier extends StateNotifier<NotificationSettings> {
   NotificationSettingsNotifier() : super(NotificationSettings.initial) {
@@ -64,10 +65,15 @@ final notificationSettingsProvider =
 // adding a task, completing one, or changing a setting all recompute it the
 // same way and there is no cache to go stale
 final notificationScheduleProvider = Provider<List<ScheduledNotification>>((ref) {
+  // A feature switched off from the admin backend takes its reminders with it
+  final settings = ref.watch(notificationSettingsProvider).copyWith(
+        weeklyReviewEnabled: ref.watch(featureOnProvider('reviews')) ? null : false,
+        classStartEnabled: ref.watch(featureOnProvider('timetable')) ? null : false,
+      );
   return buildNotificationSchedule(
     tasks: ref.watch(tasksProvider),
     goals: ref.watch(semesterGoalsProvider),
-    settings: ref.watch(notificationSettingsProvider),
+    settings: settings,
     semesterSettings: ref.watch(semesterSettingsProvider),
     s: ref.watch(stringsProvider),
     now: DateTime.now(),

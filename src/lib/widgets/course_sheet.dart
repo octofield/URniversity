@@ -293,7 +293,7 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
         ),
         // Only with credits by category on (§3-T); a course typed by hand has
         // no catalog to file it by, so the user says
-        if (ref.watch(gradeSettingsProvider).categoriesEnabled) ...[
+        if (ref.watch(creditCategoriesActiveProvider)) ...[
           const SizedBox(height: AppSpacing.md),
           Text(s.creditCategory, style: theme.titleSmall),
           const SizedBox(height: AppSpacing.xs),

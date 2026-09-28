@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/review_stats.dart' show termAt;
 import '../core/theme/app_colors.dart';
@@ -11,6 +12,7 @@ import '../providers/settings_provider.dart';
 import '../screens/timetable_screen.dart';
 import 'coach_mark.dart' show TourAnchor;
 import 'course_sheet.dart' show formatMinute;
+import '../providers/remote_config_provider.dart';
 
 // "Today's classes" on the task page (UC18): a line of chips, the one on now
 // in bold, the next marked, the ones over faded. Takes no space at all on a
@@ -20,6 +22,7 @@ class TodayClassesStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(featureOnProvider('timetable'))) return const SizedBox.shrink();
     final day = ref.watch(dateProvider);
     final nowDay = ref.watch(effectiveNowProvider);
     final settings = ref.watch(semesterSettingsProvider);
@@ -65,10 +68,7 @@ class TodayClassesStrip extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(AppRadius.md),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                    ),
+                    onTap: () => openPage(context, AppRoutes.timetable, () => const TimetableScreen()),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                       child: Row(

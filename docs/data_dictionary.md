@@ -43,6 +43,7 @@
   | `courses.course_code`、`courses.serial_no` | 20 | `CHECK`（`courses.sql`） |
   | `courses.catalog_id` | 80 | `CHECK`（`courses.sql`，2026-09-27 由 60 放寬；App 不讓使用者輸入，來自目錄 id） |
   | `courses.credits`（數值，不是文字） | 0–30 | `CHECK`（`courses.sql`）；App 端 `InputLimits.courseCredits`，超過顯示錯誤不存 |
+  | `app_config.announcement->text`、`app_config.maintenance->message` | 200 | `CHECK`（`admin.sql`）；`InputLimits.announcement` / `.maintenanceMessage`，只有管理員會輸入 |
   | `user_settings.app_style` | 20 | `user_settings_app_style_len`（在 `supabase/app_style.sql`；值只由 App 從列舉寫入，沒有對應的 `InputLimits`） |
   | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
@@ -854,3 +855,87 @@ RLS 只開 `SELECT TO anon, authenticated`。
 - 台大：教務處「臺大必修課程查詢」（`curri.aca.ntu.edu.tw`），JSON API 取得入學年度與學系清單，每系每年一頁 HTML，讀頁面上的「合計」與「最低畢業學分」兩列。抓最近 7 屆，只有學士班，2026-09-27 實測 645 筆中 638 筆可讀（學士後護理學系頁面格式不同，需自填）。系所代碼用清單的 `value`（含組別，例如醫學系 40100）。以資工系 114 入學為例：51／24／53／128。
 - 清大：只公告 PDF（每系每年一份），目前沒有內建，清大學生自己填三個門檻（D8-B `credits_*`）。
 
+---
+
+## D34. `admins`（管理員名單，2026-09-28）
+
+建表：`supabase/admin.sql`。**沒有任何 RLS 政策**，API 讀寫不到；只由 SECURITY DEFINER 函式 `is_admin()` 查。
+使用者在 SQL 編輯器手動 `INSERT INTO admins (user_id) VALUES ('<user id>')`。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `user_id` | text (PK) | `auth.users.id` |
+| `added_at` | timestamptz | |
+
+讀取處理程序：`isAdminProvider`（`src/lib/providers/admin_provider.dart`）呼叫 `rpc('is_admin')`，登入、登出時重新問；訪客、讀不到（離線、沒跑 SQL）都當作否。
+
+---
+
+## D35. `app_config`（遠端設定，只有一列）
+
+建表：`supabase/admin.sql`。RLS：`anon`、`authenticated` 都能 SELECT（訪客也要套用開關與維護模式）；只有 `is_admin()` 能 UPDATE。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | int (PK) | 恆為 1 |
+| `flags` | jsonb | 功能開關 `{"timetable": false, …}`；**沒有的 key 視為開**。key 清單 `kRemoteFeatures`：`timetable`、`catalog_search`、`credit_categories`、`reviews`、`onboarding_tour`、`goal_templates` |
+| `announcement` | jsonb | `{id, text ≤ 200, level: info／warning, starts_at, ends_at}`；null 是沒有公告。改了文字就換新 id |
+| `maintenance` | jsonb | `{enabled, message ≤ 200}` |
+| `updated_at`、`updated_by` | timestamptz、text | 最後由哪個管理員（email）儲存 |
+
+讀寫處理程序：`RemoteConfigNotifier`（`remote_config_provider.dart`）。啟動時先套用本機快取（D38 `app_config_cache`），再讀雲端覆蓋並更新快取；讀不到就維持快取（沒有快取＝全開、無公告、無維護）。後台「控制」分頁儲存時 UPDATE。
+
+---
+
+## D36. `user_activity`（每日活躍）
+
+建表：`supabase/admin.sql`。主鍵 (`user_id`, `day`)。RLS：只能寫、讀自己的。
+
+登入帳號每天第一次開 App 時由 `sync_provider._recordActivity` upsert 一列（本機 D38 `activity_day` 記住今天已送過）。
+只記「哪天開過」，不記做了什麼。後台用它算 DAU／WAU／MAU。寫入失敗只 debugPrint，不出現同步失敗提示（沒有使用者資料遺失；沒跑 SQL 前每次都會失敗）。
+
+---
+
+## D37. `sync_error_reports`（App 回報的同步失敗）
+
+建表：`supabase/admin.sql`。RLS：只能新增自己的；只有 `is_admin()` 能讀。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `id` | bigserial (PK) | |
+| `user_id` | text | |
+| `at` | timestamptz | |
+| `where` | text ≤ 100 | 同 D8 同步紀錄的位置，例如 `courses upsert` |
+| `code` | text ≤ 20 | PostgREST 錯誤代碼 |
+| `message` | text ≤ 500 | `describeSyncError` 的內容 |
+| `platform` | text ≤ 20 | `web`、`android`、`iOS`… |
+| `app_version` | text ≤ 20 | 目前不填 |
+
+寫入：`reportSyncError` 的同時上傳（`synced_list_notifier.dart` `_upload`）。只有登入帳號、每次開 App 最多 10 筆、網路類錯誤不傳；上傳失敗只 debugPrint，**不再回報**（避免無限循環）。
+
+---
+
+## D38. 裝置本機儲存 — `app_config_cache`、`dismissed_announcement`、`activity_day`
+
+媒介：SharedPreferences（`String`）。
+
+| key | 讀寫處理程序 | 內容 |
+|---|---|---|
+| `app_config_cache` | `RemoteConfigNotifier` | D35 的 JSON，離線啟動時套用 |
+| `dismissed_announcement` | `DismissedAnnouncementNotifier`（`widgets/announcement_banner.dart`） | 在這台裝置按掉的公告 id；新公告 id 不同就會再出現 |
+| `activity_day` | `sync_provider._recordActivity` | `"<user id> <YYYY-MM-DD>"`，今天已寫過 D36 就不再送 |
+
+三個都不是使用者資料，不上雲、不在訪客資料清單、登出不清。
+
+---
+
+## 後台的統計函式（`supabase/admin.sql`）
+
+全部 SECURITY DEFINER，第一行 `_require_admin()`，非管理員得到 42501 錯誤。**不讀任何使用者內容**（任務標題、日記內文等），只算筆數、日期與帳號資料。
+
+| 函式 | 回傳 |
+|---|---|
+| `is_admin()` | bool |
+| `admin_stats()` | jsonb：`users`（總數、今日、近 30 天每日、學校前 10）、`active`（DAU/WAU/MAU、近 30 天每日）、`features`（七張內容表的總數、使用人數、近 30 天每日；沒有 `created_at` 的表由 id 開頭的毫秒時間推算）、`settings`（風格、語言、學分分類開啟人數）、`errors`（近 7 天依位置＋代碼分組、最近 50 筆） |
+| `admin_list_users(search, page)` | email、註冊、最後登入、是否停用、暱稱、學校、學系；每頁 50 |
+| `admin_set_user_disabled(target, disabled)` | 設 `auth.users.banned_until`；不能停用自己 |

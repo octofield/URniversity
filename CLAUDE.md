@@ -129,6 +129,8 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
 | A vibration | `haptic(ref, HapticKind.…)` | `core/haptics.dart` |
 | Colours, corner radii of the current style | `AppColors`, `AppRadius` | `core/theme/app_colors.dart`, `app_radius.dart` |
 | Width breakpoints | `AppBreakpoints.desktop` / `.wide` | `core/theme/app_breakpoints.dart` |
+| Opening a page that has an address | `openPage(context, AppRoutes.x, () => const XScreen())` | `core/app_routes.dart` |
+| Whether a switchable feature is on (admin backend) | `ref.watch(featureOnProvider('key'))`, keys in `kRemoteFeatures` | `providers/remote_config_provider.dart` |
 
 ### Hard rules
 
@@ -242,6 +244,36 @@ The user picks one of several styles (colours, typeface and corner radius togeth
   Kotlin or layouts; go through `WidgetStyle`.
 - **A new style is also a launcher alias** (`AndroidManifest.xml`), a `LaunchTheme.<Style>`
   and an entry in `MainActivity`'s and `WidgetStyle`'s lists — the assets test checks all four.
+
+## 13. Routes
+
+The app runs on `go_router` (`MaterialApp.router`, path URLs via `usePathUrlStrategy()`), so every
+main page has a web address. `system_design.md` §1 is the source of truth; `core/app_routes.dart`
+holds the paths.
+
+| Address | Shows |
+|---|---|
+| `/` | Redirects to `/tasks` |
+| `/tasks` · `/targets` · `/visions` · `/me` | The four tabs: one `HomeScreen`, the address picks the tab |
+| `/timetable` | `TimetableScreen` |
+| `/grades` | `TimetableScreen(grades: true)` |
+| `/settings` | `SettingsScreen` |
+| `/admin` | `AdminScreen` — admins only (the `admins` table, `supabase/admin.sql`) |
+
+- **Every route sits behind `_AuthGate`.** A signed-out visitor sees the login page at the address they
+  asked for, then lands there. Maintenance mode replaces the page, never the login page.
+- **Unknown addresses go to `/tasks`** — including sign-in deep links the router is handed on Android.
+- **Changing tabs goes through the address** (`context.go`), so browser Back/Forward work. With a page
+  open on top, only the index changes and the address catches up when the page closes — `go()` would
+  otherwise close that page.
+- **A main page is opened with `openPage()`** (`context.push`, which also sets the address), never a
+  bare `Navigator.push`. Detail pages, sheets, journals and the trash have no address of their own and
+  keep using `Navigator.push`.
+- **A page reached by typing its address has nothing to go back to**: give its `AppBar` the
+  `leading: homeButtonIfFirst(context)`.
+- **A new main page** gets a constant in `AppRoutes`, a `GoRoute` in `main.dart`'s `_buildRouter()`,
+  its path in the `pages` set there, a row in the table above and in `system_design.md` §1, and a case
+  in `test/widget/routes_test.dart`.
 
 ---
 

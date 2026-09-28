@@ -535,3 +535,42 @@ flowchart TD
 - 各校的時間字串只在腳本裡讀（`common.periods_to_sessions` 加各校節次表），App 拿到的就是時段；新增一所學校＝一個 Python 模組＋`schools.json` 一筆，App 從 D32 自動多出那所學校的搜尋入口。
 - 一門課的時段在同一列，所以新增、修改、刪除、還原、訪客合併都是一次寫入。
 - GPA、及格學分、目標試算都是由 D27 即時算出，不另外存；只有學期回顧把當時的 GPA 存進 D23 的 `stats`。
+
+---
+
+## Diagram 1-J：後台與遠端設定（2026-09-28）
+
+```mermaid
+flowchart TD
+    Admin(["管理員：/admin"])
+    User(["所有使用者（含訪客）"])
+
+    PRC["remote_config_provider\nRemoteConfigNotifier"]
+    PAd["admin_provider\nisAdminProvider／adminStatsProvider／adminUsersProvider"]
+    PSync["sync_provider\n_recordActivity"]
+    PErr["synced_list_notifier\nreportSyncError → _upload"]
+
+    DAdm[("D34 admins")]
+    DCfg[("D35 app_config")]
+    DAct[("D36 user_activity")]
+    DErr[("D37 sync_error_reports")]
+    DLocal[("D38 app_config_cache／dismissed_announcement／activity_day")]
+    DAll[("auth.users、user_settings、七張內容表")]
+
+    DCfg -- "啟動時讀（anon 可讀）" --> PRC
+    PRC <--> DLocal
+    PRC -- "功能開關、公告、維護模式" --> User
+    PSync -- "每天一次（登入帳號）" --> DAct
+    PErr -- "同步失敗（登入、最多 10 筆、非網路錯誤）" --> DErr
+    Admin --> PAd
+    PAd -- "rpc is_admin" --> DAdm
+    PAd -- "rpc admin_stats（SECURITY DEFINER，只算數）" --> DAll
+    DAct --> PAd
+    DErr --> PAd
+    PAd -- "rpc admin_list_users／admin_set_user_disabled" --> DAll
+    Admin -- "控制分頁儲存（UPDATE，只有管理員）" --> DCfg
+```
+
+- 統計只能透過 SECURITY DEFINER 函式取得，因為每張表的 RLS 都只讓人讀自己的資料；函式內先檢查 `is_admin()`。
+- 訪客資料只在裝置上，不在任何統計內。
+- 遠端設定讀不到時用本機快取；沒有快取就是全開、無公告、無維護。

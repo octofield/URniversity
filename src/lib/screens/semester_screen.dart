@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_breakpoints.dart';
@@ -31,6 +32,7 @@ import '../widgets/coach_mark.dart';
 import 'overview_graph_screen.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
+import '../providers/remote_config_provider.dart';
 
 class _SemGroup {
   final SemesterGoal parent;
@@ -409,6 +411,8 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
               onDone: () =>
                   ref.read(targetSortModeProvider.notifier).state = false,
             ),
+            // Switched off from the admin backend (kRemoteFeatures)
+            if (ref.watch(featureOnProvider('goal_templates')))
             TourAnchor(id: 'semester.templates', child: IconButton(
               icon: const Icon(Icons.auto_awesome_outlined),
               tooltip: s.goalTemplates,
@@ -427,10 +431,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
+              onPressed: () => openPage(context, AppRoutes.settings, () => const SettingsScreen()),
             ),
           ],
         ),

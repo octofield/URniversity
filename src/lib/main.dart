@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/app_routes.dart';
 import 'core/config.dart';
 import 'core/theme/app_motion.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_styles.dart';
 import 'core/theme/app_theme.dart';
+import 'providers/admin_provider.dart';
 import 'providers/app_style_provider.dart';
 import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
@@ -26,6 +30,7 @@ import 'screens/timetable_screen.dart';
 import 'screens/today_screen.dart';
 import 'providers/password_recovery_provider.dart';
 import 'providers/profile_provider.dart';
+import 'providers/remote_config_provider.dart';
 import 'providers/reviews_provider.dart';
 import 'screens/review_screen.dart';
 import 'providers/settings_provider.dart';
@@ -33,13 +38,20 @@ import 'providers/sync_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/maintenance_screen.dart';
 import 'widgets/coach_mark.dart';
 import 'widgets/style_crossfade.dart';
 import 'screens/splash_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/setup_profile_screen.dart';
+import 'screens/admin_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Addresses without "#/" on the web (/tasks, not /#/tasks), and a page
+  // pushed on top of a tab gets its own address too (CLAUDE.md §13)
+  usePathUrlStrategy();
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   // Before anything is drawn: even the wait screen wears the style, matching
   // the system splash, and a random launch is drawn exactly once
   await preloadAppStyle();
@@ -125,6 +137,9 @@ class App extends ConsumerStatefulWidget {
 }
 
 class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
+  // Made once: a new router on every build would forget where the user is
+  late final GoRouter _router = _buildRouter();
+
   @override
   void initState() {
     super.initState();
@@ -215,10 +230,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     // only then navigates
     _handlePendingOpen(ref);
 
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      // Lets the first-run tour follow the user into sheets and pages
-      navigatorObservers: [tourRouteObserver],
+    return MaterialApp.router(
+      routerConfig: _router,
       scaffoldMessengerKey: _messengerKey,
       title: 'URniversity',
       debugShowCheckedModeBanner: false,
@@ -235,30 +248,72 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         Locale('en'),
         Locale('ja'),
       ],
-      home: const _AuthGate(),
     );
   }
 }
 
+// Every address, and what it shows (CLAUDE.md §13). Each page sits behind
+// _AuthGate, so a signed-out visitor to /timetable signs in right there and
+// then sees the timetable. Anything unknown — a mistyped address, or a sign-in
+// deep link on Android, which the router is handed too — lands on the tasks
+GoRouter _buildRouter() {
+  const pages = {AppRoutes.timetable, AppRoutes.grades, AppRoutes.settings, AppRoutes.admin};
+  return GoRouter(
+    navigatorKey: _navigatorKey,
+    // Lets the first-run tour follow the user into sheets and pages
+    observers: [tourRouteObserver],
+    initialLocation: AppRoutes.tasks,
+    redirect: (context, state) {
+      final path = state.uri.path;
+      if (AppRoutes.tabs.contains(path) || pages.contains(path)) return null;
+      return AppRoutes.tasks;
+    },
+    routes: [
+      GoRoute(path: AppRoutes.timetable, builder: (_, _) => const _AuthGate(child: TimetableScreen())),
+      GoRoute(path: AppRoutes.grades, builder: (_, _) => const _AuthGate(child: TimetableScreen(grades: true))),
+      GoRoute(path: AppRoutes.settings, builder: (_, _) => const _AuthGate(child: SettingsScreen())),
+      // Anyone can open the address; AdminScreen shows nothing to a non-admin
+      GoRoute(path: AppRoutes.admin, builder: (_, _) => const _AuthGate(child: AdminScreen())),
+      // The four tabs are one page under one key, so moving between them keeps
+      // HomeScreen — its tab state, scroll positions, dragged buttons — and
+      // only tells it which tab to show
+      GoRoute(
+        path: '/:tab',
+        pageBuilder: (_, state) => NoTransitionPage(
+          key: const ValueKey('home'),
+          child: _AuthGate(child: HomeScreen(tab: AppRoutes.tabs.indexOf(state.uri.path))),
+        ),
+      ),
+    ],
+  );
+}
+
 class _AuthGate extends ConsumerWidget {
-  const _AuthGate();
+  // What this address shows once the user is in: a tab of HomeScreen, or a page
+  final Widget child;
+  const _AuthGate({required this.child});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Maintenance mode (admin backend) stands in for every page, but not for
+    // the login page: an admin signs in there and is let through
+    final maintenance = ref.watch(remoteConfigProvider).maintenance && !(ref.watch(isAdminProvider).value ?? false);
+    final child = maintenance ? const MaintenanceScreen() : this.child;
+
     // Checked before guest mode: opening a reset link while browsing as a guest
     // must still land on the password screen
     if (ref.watch(passwordRecoveryProvider)) return const ResetPasswordScreen();
 
     final isGuest = ref.watch(guestModeProvider);
     if (isGuest) {
-      return ref.watch(pendingGuestLoginProvider) ? const LoginScreen() : const HomeScreen();
+      return ref.watch(pendingGuestLoginProvider) ? const LoginScreen() : child;
     }
 
     final authState = ref.watch(authStateProvider);
     return authState.when(
       loading: () {
         final session = Supabase.instance.client.auth.currentSession;
-        return session != null ? const HomeScreen() : const LoginScreen();
+        return session != null ? child : const LoginScreen();
       },
       error: (_, _) => const LoginScreen(),
       data: (authData) {
@@ -266,7 +321,7 @@ class _AuthGate extends ConsumerWidget {
 
         // Profile null = still loading; show HomeScreen to avoid flash for returning users.
         final profile = ref.watch(profileProvider);
-        if (profile == null) return const HomeScreen();
+        if (profile == null) return child;
 
         // Email users with no username get the one-time setup screen.
         final user = ref.watch(currentUserProvider);
@@ -275,7 +330,7 @@ class _AuthGate extends ConsumerWidget {
           return const SetupProfileScreen();
         }
 
-        return const HomeScreen();
+        return child;
       },
     );
   }
@@ -343,10 +398,12 @@ void _handlePendingOpen(WidgetRef ref) {
     // A class on the widget, or its + on the classes tab
     case 'timetable':
     case 'newCourse':
-      open((ctx) => Navigator.push(
-            ctx,
-            MaterialPageRoute(builder: (_) => const TimetableScreen()),
-          ));
+      // The timetable switched off from the admin backend: nothing to open
+      if (!ref.read(featureOnProvider('timetable'))) {
+        ref.read(pendingOpenProvider.notifier).state = null;
+      } else {
+        open((ctx) => GoRouter.of(ctx).push(AppRoutes.timetable));
+      }
 
     // The Sunday reminder. Opens whichever review is due; if it was already
     // done from another device, there is nothing to open and the request ends

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_routes.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input_limits.dart';
@@ -59,10 +60,7 @@ class MeScreen extends ConsumerWidget {
             TourAnchor(id: 'me.settings', child: IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
+              onPressed: () => openPage(context, AppRoutes.settings, () => const SettingsScreen()),
             )),
           ],
         ),
