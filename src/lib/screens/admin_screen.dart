@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/app_routes.dart';
@@ -15,6 +16,8 @@ import '../providers/settings_provider.dart';
 import '../providers/synced_list_notifier.dart' show newRowId, reportSyncErrorFromWidget;
 import '../widgets/responsive_body.dart';
 import '../widgets/style_picker_sheet.dart' show appStyleChoiceName;
+import '../core/theme/app_motion.dart';
+import '../widgets/swipe_switcher.dart';
 
 // The admin backend (/admin, system_design.md §2-O, UC21–UC22): numbers across
 // all accounts, the switches every app obeys, and the account list. Only for
@@ -26,8 +29,38 @@ class AdminScreen extends ConsumerStatefulWidget {
   ConsumerState<AdminScreen> createState() => _AdminScreenState();
 }
 
-class _AdminScreenState extends ConsumerState<AdminScreen> {
+class _AdminScreenState extends ConsumerState<AdminScreen> with SingleTickerProviderStateMixin {
+  static const _sections = 5;
   int _tab = 0;
+  // Which way the last change went, so the sections slide the matching way
+  bool _forward = true;
+  // The phone's tab strip, kept in step with swipes and the wide layout's rail
+  late final TabController _tabs = TabController(length: _sections, vsync: this);
+
+  @override
+  void initState() {
+    super.initState();
+    // Touched here, not first in dispose: a late controller made while the
+    // widget is leaving the tree has nothing to tick with
+    _tabs.addListener(() {
+      if (!_tabs.indexIsChanging && _tabs.index != _tab) _show(_tabs.index);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  void _show(int i) {
+    if (i < 0 || i >= _sections || i == _tab) return;
+    setState(() {
+      _forward = i > _tab;
+      _tab = i;
+    });
+    if (_tabs.index != i) _tabs.animateTo(i);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +77,33 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
       Icons.people_outline,
     ];
 
-    Widget page() => switch (_tab) {
-          0 => const _Overview(),
-          1 => const _Usage(),
-          2 => const _SettingsAndErrors(),
-          3 => const _Controls(),
-          _ => const _Users(),
-        };
+    // A swipe to the left moves to the next section, to the right back — the
+    // way the timetable and grades move — sliding in on the shared axis
+    final page = SwipeSwitcher(
+      onNext: _tab < _sections - 1 ? () => _show(_tab + 1) : null,
+      onPrevious: _tab > 0 ? () => _show(_tab - 1) : null,
+      child: PageTransitionSwitcher(
+        duration: scaled(context, AppMotion.page),
+        reverse: !_forward,
+        transitionBuilder: (child, primary, secondary) => SharedAxisTransition(
+          animation: primary,
+          secondaryAnimation: secondary,
+          transitionType: SharedAxisTransitionType.horizontal,
+          fillColor: Colors.transparent,
+          child: child,
+        ),
+        child: KeyedSubtree(
+          key: ValueKey(_tab),
+          child: switch (_tab) {
+            0 => const _Overview(),
+            1 => const _Usage(),
+            2 => const _SettingsAndErrors(),
+            3 => const _Controls(),
+            _ => const _Users(),
+          },
+        ),
+      ),
+    );
 
     final Widget body = switch (isAdmin) {
       AsyncData(value: true) => wide
@@ -58,7 +111,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
               children: [
                 NavigationRail(
                   selectedIndex: _tab,
-                  onDestinationSelected: (i) => setState(() => _tab = i),
+                  onDestinationSelected: _show,
                   labelType: NavigationRailLabelType.all,
                   destinations: [
                     for (var i = 0; i < titles.length; i++)
@@ -66,43 +119,42 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                   ],
                 ),
                 VerticalDivider(width: 1, color: AppColors.border),
-                Expanded(child: ResponsiveBody(maxWidth: 960, child: page())),
+                Expanded(child: ResponsiveBody(maxWidth: 960, child: page)),
               ],
             )
-          : page(),
+          : page,
       AsyncData() => Center(child: Text(s.adminNoAccess)),
       _ => const Center(child: CircularProgressIndicator()),
     };
 
-    return DefaultTabController(
-      length: titles.length,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(s.adminTitle),
-          leading: homeButtonIfFirst(context),
-          actions: [
-            if (isAdmin.value == true)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: s.adminRefresh,
-                onPressed: () {
-                  ref.invalidate(adminStatsProvider);
-                  ref.invalidate(adminUsersProvider);
-                  ref.read(remoteConfigProvider.notifier).refresh();
-                },
-              ),
-          ],
-          // Phones: the sections as scrolling tabs under the title
-          bottom: isAdmin.value == true && !wide
-              ? TabBar(
-                  isScrollable: true,
-                  onTap: (i) => setState(() => _tab = i),
-                  tabs: [for (final t in titles) Tab(text: t)],
-                )
-              : null,
-        ),
-        body: body,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(s.adminTitle),
+        leading: homeButtonIfFirst(context),
+        actions: [
+          if (isAdmin.value == true)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: s.adminRefresh,
+              onPressed: () {
+                ref.invalidate(adminStatsProvider);
+                ref.invalidate(adminUsersProvider);
+                ref.read(remoteConfigProvider.notifier).refresh();
+              },
+            ),
+        ],
+        // Phones: the sections as scrolling tabs under the title
+        bottom: isAdmin.value == true && !wide
+            ? TabBar(
+                controller: _tabs,
+                isScrollable: true,
+                tabs: [for (final t in titles) Tab(text: t)],
+              )
+            : null,
       ),
+      // Clear of Android's navigation bar and the iPhone's home indicator: the
+      // lists set their own padding, which drops the automatic inset
+      body: SafeArea(top: false, child: body),
     );
   }
 }

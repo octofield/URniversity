@@ -122,8 +122,8 @@ BEGIN
         'total', (SELECT count(*) FROM %1$I),
         'users', (SELECT count(DISTINCT user_id) FROM %1$I),
         'daily', (SELECT coalesce(jsonb_object_agg(d, n), '{}'::jsonb) FROM (
-                    SELECT _row_time(id)::date AS d, count(*) AS n FROM %1$I
-                    WHERE _row_time(id) >= %2$L GROUP BY 1) x)
+                    SELECT _row_time(id::text)::date AS d, count(*) AS n FROM %1$I
+                    WHERE _row_time(id::text) >= %2$L GROUP BY 1) x)
       )$q$, t, since)
     INTO result;
     feature := feature || jsonb_build_object(t, result);
@@ -184,7 +184,9 @@ BEGIN
     SELECT u.id::text, u.email::text, u.created_at, u.last_sign_in_at,
            coalesce(u.banned_until > now(), false), s.username, s.school, s.department
     FROM auth.users u
-    LEFT JOIN user_settings s ON s.user_id = u.id::text
+    -- Both sides as text: user_settings.user_id is uuid in some databases and
+    -- text in others (a uuid = text comparison fails with 42883)
+    LEFT JOIN user_settings s ON s.user_id::text = u.id::text
     WHERE search = ''
        OR u.email ILIKE '%' || search || '%'
        OR s.username ILIKE '%' || search || '%'

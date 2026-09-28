@@ -11,6 +11,7 @@ import 'package:urniversity/screens/home_screen.dart';
 import 'package:urniversity/screens/maintenance_screen.dart';
 import 'package:urniversity/screens/settings_screen.dart';
 import 'package:urniversity/screens/timetable_screen.dart';
+import 'package:urniversity/widgets/swipe_switcher.dart';
 
 import '../helpers/pump_app.dart';
 
@@ -171,6 +172,31 @@ void main() {
       expect(find.text(zh.adminDau), findsOneWidget);
       expect(find.text('7'), findsOneWidget);
       expect(find.text(zh.adminGuestsNote), findsOneWidget);
+    });
+
+    testWidgets('on a phone a swipe moves between sections, and the tab strip follows', (tester) async {
+      await openAdmin(tester, _FakeAdmin());
+      await tester.fling(find.byType(SwipeSwitcher), const Offset(-300, 0), 800);
+      await tester.pumpAndSettle();
+      expect(find.text(zh.adminUsage(900, 35)), findsOneWidget, reason: 'the usage section');
+      expect(DefaultTabController.maybeOf(tester.element(find.byType(TabBar))), isNull);
+      final strip = tester.widget<TabBar>(find.byType(TabBar));
+      expect(strip.controller!.index, 1);
+
+      await tester.fling(find.byType(SwipeSwitcher), const Offset(300, 0), 800);
+      await tester.pumpAndSettle();
+      expect(find.text(zh.adminDau), findsOneWidget, reason: 'back on the overview');
+    });
+
+    testWidgets('the sections stay clear of the phone\'s navigation bar', (tester) async {
+      await openAdmin(tester, _FakeAdmin());
+      expect(
+        find.descendant(
+          of: find.byType(Scaffold),
+          matching: find.byWidgetPredicate((w) => w is SafeArea && !w.top && w.bottom),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('settings and errors: styles, languages and where it fails', (tester) async {

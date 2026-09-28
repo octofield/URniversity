@@ -40,7 +40,8 @@ class SyncLogScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: ResponsiveBody(
+      // Clear of the phone's navigation bar: the list sets its own padding
+      body: SafeArea(top: false, child: ResponsiveBody(
         child: log.isEmpty
             ? Center(
                 child: Text(s.syncLogEmpty, style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
@@ -64,7 +65,7 @@ class SyncLogScreen extends ConsumerWidget {
                   );
                 },
               ),
-      ),
+      )),
     );
   }
 }
