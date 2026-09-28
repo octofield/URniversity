@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/credit_categories.dart';
 import '../core/input_limits.dart';
 import '../core/period_tables.dart';
 import '../core/theme/app_colors.dart';
@@ -11,12 +12,14 @@ import '../models/course.dart';
 import '../providers/courses_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/grade_settings_provider.dart';
 import '../providers/trash_provider.dart';
 import '../utils/category_helpers.dart' show categoryColorPresets;
 import 'confirm_dialog.dart';
 import 'grade_chips.dart';
 import 'sheet_body.dart';
 import 'sheet_fields.dart';
+import 'credit_categories_section.dart' show categoryName;
 
 String formatMinute(int minute) =>
     '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
@@ -90,6 +93,7 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
   late int _color = widget.existing?.color ?? ref.read(coursesProvider.notifier).nextColor(widget.semester);
   late String? _grade = widget.existing?.grade;
   late bool _countsInGpa = widget.existing?.countsInGpa ?? true;
+  late String? _category = widget.existing?.category;
   late final List<_MeetingDraft> _meetings = widget.existing != null
       ? [
           for (final m in widget.existing!.sessions)
@@ -127,8 +131,14 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
     super.dispose();
   }
 
+  double get _creditsValue => double.tryParse(_credits.text.trim()) ?? 0;
+
+  // Credits above the database's cap would be rejected on the way up, after
+  // the sheet had closed as if saved
   bool get _valid =>
-      _title.text.trim().isNotEmpty && _meetings.every((m) => m.end > m.start);
+      _title.text.trim().isNotEmpty &&
+      _creditsValue <= InputLimits.courseCredits &&
+      _meetings.every((m) => m.end > m.start);
 
   void _save() {
     if (!_valid) {
@@ -136,7 +146,7 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
       return;
     }
     final notifier = ref.read(coursesProvider.notifier);
-    final credits = double.tryParse(_credits.text.trim()) ?? 0;
+    final credits = _creditsValue;
     final teacher = _teacher.text.trim();
     final sessions = [for (final m in _meetings) m.toSession()];
     final existing = widget.existing;
@@ -147,6 +157,7 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
         teacher: teacher.isEmpty ? null : teacher,
         credits: credits,
         color: _color,
+        category: _category,
         sessions: sessions,
       );
     } else {
@@ -158,6 +169,7 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
         sessions: sessions,
         grade: () => _grade,
         countsInGpa: _countsInGpa,
+        category: _category,
       ));
     }
     Navigator.pop(context);
@@ -222,6 +234,9 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
             ),
           ],
         ),
+        if (_showErrors && _creditsValue > InputLimits.courseCredits)
+          Text(s.courseCreditsTooMany(InputLimits.courseCredits),
+              style: theme.bodySmall?.copyWith(color: AppColors.error)),
         const SizedBox(height: AppSpacing.md),
         Text(s.courseMeetings, style: theme.titleSmall),
         const SizedBox(height: AppSpacing.xs),
@@ -276,6 +291,25 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
               ),
           ],
         ),
+        // Only with credits by category on (§3-T); a course typed by hand has
+        // no catalog to file it by, so the user says
+        if (ref.watch(gradeSettingsProvider).categoriesEnabled) ...[
+          const SizedBox(height: AppSpacing.md),
+          Text(s.creditCategory, style: theme.titleSmall),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              for (final c in CreditCategory.values)
+                ChoiceChip(
+                  label: Text(categoryName(c, s)),
+                  selected: _category == c.name,
+                  onSelected: (_) => setState(() => _category = c.name),
+                ),
+            ],
+          ),
+        ],
         // Grades only mean something once the course exists (Phase 6)
         if (isEdit) ...[
           const SizedBox(height: AppSpacing.md),

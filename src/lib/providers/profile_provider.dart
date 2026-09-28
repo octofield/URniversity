@@ -29,7 +29,7 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
       // null state = not loaded; const UserProfile() = loaded but no DB row (new user)
       state = row != null ? UserProfile.fromRow(row) : const UserProfile();
     } catch (e) {
-      reportSyncError(ref, e);
+      reportSyncError(ref, e, where: 'user_settings profile load');
     }
   }
 
@@ -58,9 +58,9 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
     _userId = userId;
     if (state != null) {
       try {
-        await _db.from('user_settings').upsert(state!.toRow(userId));
+        await runWithRetry(() => _db.from('user_settings').upsert(state!.toRow(userId)));
       } catch (e) {
-      reportSyncError(ref, e);
+      reportSyncError(ref, e, where: 'user_settings profile merge');
     }
     }
   }
@@ -72,10 +72,8 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
       _persistLocally();
       return;
     }
-    await _db
-        .from('user_settings')
-        .upsert({'user_id': _userId, 'username': username})
-        .catchError((Object e) => reportSyncError(ref, e));
+    await runWithRetry(() => _db.from('user_settings').upsert({'user_id': _userId, 'username': username}))
+        .catchError((Object e) => reportSyncError(ref, e, where: 'user_settings username'));
   }
 
   // Called from SetupProfileScreen — only sets username and avatar, preserves rest.
@@ -93,11 +91,11 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
       _persistLocally();
       return;
     }
-    await _db.from('user_settings').upsert({
+    await runWithRetry(() => _db.from('user_settings').upsert({
       'user_id': _userId,
       'username': username.isNotEmpty ? username : null,
       'avatar_index': avatarIndex,
-    }).catchError((Object e) => reportSyncError(ref, e));
+    })).catchError((Object e) => reportSyncError(ref, e, where: 'user_settings profile setup'));
   }
 
   Future<void> updateInfo({
@@ -122,26 +120,24 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
       _persistLocally();
       return;
     }
-    await _db
-        .from('user_settings')
-        .upsert(updated.toRow(_userId!))
-        .catchError((Object e) => reportSyncError(ref, e));
+    await runWithRetry(() => _db.from('user_settings').upsert(updated.toRow(_userId!)))
+        .catchError((Object e) => reportSyncError(ref, e, where: 'user_settings profile'));
   }
 
   Future<void> deleteAllData(String userId) async {
     final tables = ['tasks', 'future_goals', 'semester_goals', 'inspirations',
-        'journals', 'trash_items', 'user_categories'];
+        'journals', 'trash_items', 'user_categories', 'reviews', 'courses'];
     for (final table in tables) {
       try {
         await _db.from(table).delete().eq('user_id', userId);
       } catch (e) {
-      reportSyncError(ref, e);
+      reportSyncError(ref, e, where: '$table delete all');
     }
     }
     try {
       await _db.from('user_settings').delete().eq('user_id', userId);
     } catch (e) {
-      reportSyncError(ref, e);
+      reportSyncError(ref, e, where: 'user_settings delete all');
     }
     clear();
   }

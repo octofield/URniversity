@@ -75,3 +75,13 @@ def test_every_school_has_a_module_and_a_period_table():
         # Periods run forwards and never overlap
         for (_, _, end), (_, start, _) in zip(periods, periods[1:]):
             assert end < start, code
+
+
+def test_required_for_is_merged_across_a_keys_records():
+    rows = common.finish('ntu', '115-1', [
+        record('1', audience=['A'], required_for=['A']),
+        record('1', audience=['B'], required_for=[]),
+        record('1', audience=['C'], required_for=['C', 'A']),
+    ], STAMP)
+    assert rows[0]['required_for'] == ['A', 'C']
+    assert rows[0]['kind'] is None

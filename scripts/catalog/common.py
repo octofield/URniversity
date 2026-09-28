@@ -20,7 +20,14 @@ UPSERT_BATCH = 500
 
 # Matches supabase/course_catalog.sql: text is cut, never rejected
 LIMITS = {'title': 100, 'teacher': 50, 'course_code': 20, 'serial_no': 20, 'class_no': 10,
-          'required': 10, 'audience': 200, 'time_text': 100}
+          'required': 10, 'audience': 200, 'time_text': 100, 'audience_name': 50}
+
+# A course's place in the credits to graduate, when the school's data says so
+# (system_design.md §3-T): general education (with the common Chinese and
+# English), or not counted at all (physical education). None: the student's
+# department decides between required and elective
+KIND_GENERAL = 'general'
+KIND_EXCLUDED = 'excluded'
 ID_MAX = 80
 MAX_SESSIONS = 20
 
@@ -106,10 +113,11 @@ def finish(school, semester, records, stamp):
     for r in records:
         key = r['key']
         if key not in merged:
-            merged[key] = dict(r, audiences=[])
-        for a in r.get('audience') or []:
-            if a and a not in merged[key]['audiences']:
-                merged[key]['audiences'].append(a)
+            merged[key] = dict(r, audiences=[], required_by=[])
+        for field, into in (('audience', 'audiences'), ('required_for', 'required_by')):
+            for a in r.get(field) or []:
+                if a and a not in merged[key][into]:
+                    merged[key][into].append(a)
     return [
         {
             'id': ('%s_%s_%s' % (school, semester, key))[:ID_MAX],
@@ -125,6 +133,10 @@ def finish(school, semester, records, stamp):
             'audience': _cut('、'.join(r['audiences']), 'audience'),
             'time_text': _cut(r.get('time_text'), 'time_text'),
             'sessions': (r.get('sessions') or [])[:MAX_SESSIONS],
+            # The audiences it is compulsory for, as the school names them:
+            # the app files it as "required" for a student of one of them
+            'required_for': [a[:LIMITS['audience_name']] for a in r['required_by']],
+            'kind': r.get('kind'),
             'updated_at': stamp,
         }
         for key, r in merged.items()
@@ -180,18 +192,29 @@ def write_semester(env, school, semester, rows, stamp, prune=True):
     }), prefer='return=minimal')
 
 
-def record_school(env, code, semesters):
-    """catalog_schools: the app's list of schools it can search, and for which
-    semesters. Semesters written before are kept."""
+def record_school(env, code, semesters, audiences=()):
+    """catalog_schools: the app's list of schools it can search, for which
+    semesters, and every department name the catalog files required courses
+    under (the list a student picks their own from). What was written before
+    is kept."""
     info = load_schools()[code]
     existing = _rest(env, 'GET', 'catalog_schools?' + urllib.parse.urlencode({
-        'code': 'eq.' + code, 'select': 'semesters',
+        'code': 'eq.' + code, 'select': 'semesters,audiences',
     })) or []
-    known = set(existing[0]['semesters'] or []) if existing else set()
+    old = existing[0] if existing else {}
     _rest(env, 'POST', 'catalog_schools', [{
         'code': code,
         'name': info['name'],
         'short_name': info['short_name'],
-        'semesters': sorted(known | set(semesters)),
+        'semesters': sorted(set(old.get('semesters') or []) | set(semesters)),
+        'audiences': sorted(set(old.get('audiences') or []) | set(audiences)),
         'updated_at': now_stamp(),
     }], prefer='resolution=merge-duplicates,return=minimal')
+
+
+def write_requirements(env, rows):
+    """degree_requirements: each department's credits to graduate by entry
+    year, replaced whole for the (school, entry year, department) it names."""
+    for i in range(0, len(rows), UPSERT_BATCH):
+        _rest(env, 'POST', 'degree_requirements?on_conflict=school,entry_year,department',
+              rows[i:i + UPSERT_BATCH], prefer='resolution=merge-duplicates,return=minimal')

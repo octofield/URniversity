@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:animations/animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/period_tables.dart';
 import '../core/review_stats.dart' show termAt;
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/timetable.dart';
 import '../l10n/app_strings.dart';
@@ -12,12 +14,14 @@ import '../providers/courses_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/semester_goals_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/synced_list_notifier.dart' show reportSyncErrorFromWidget;
 import '../utils/semester_helpers.dart';
 import '../widgets/catalog_search_sheet.dart';
 import '../widgets/course_sheet.dart';
 import '../widgets/grades_view.dart';
+import '../widgets/pull_to_close.dart';
 import '../widgets/responsive_body.dart';
-import '../widgets/sheet_body.dart';
+import '../widgets/swipe_switcher.dart';
 import '../widgets/timetable_grid.dart';
 
 // The timetable and the grades (UC18, UC20). One screen with two views,
@@ -35,6 +39,8 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   late bool _grades = widget.grades;
   // The semester the week shows; starts on the one running today
   late String _semester = termAt(ref.read(effectiveNowProvider), ref.read(semesterSettingsProvider));
+  // Which way the last change went, so the pages slide the matching way
+  bool _forward = true;
 
   List<String> get _semesters {
     // Regular terms only (no breaks), newest last, and always the one showing
@@ -45,11 +51,42 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     return all;
   }
 
-  void _step(int delta) {
+  String? _neighbour(int delta) {
     final list = _semesters;
     final i = list.indexOf(_semester) + delta;
-    if (i < 0 || i >= list.length) return;
-    setState(() => _semester = list[i]);
+    return i < 0 || i >= list.length ? null : list[i];
+  }
+
+  void _show({required bool grades, required String semester, required bool forward}) {
+    setState(() {
+      _grades = grades;
+      _semester = semester;
+      _forward = forward;
+    });
+  }
+
+  void _step(int delta) {
+    final other = _neighbour(delta);
+    if (other != null) _show(grades: _grades, semester: other, forward: delta > 0);
+  }
+
+  // The pages in one line, a semester's week then its grades: … last term's
+  // grades · this week · this term's grades · next term's week … A swipe to the
+  // left moves along it, to the right moves back
+  void _next() {
+    if (!_grades) {
+      _show(grades: true, semester: _semester, forward: true);
+    } else if (_neighbour(1) case final next?) {
+      _show(grades: false, semester: next, forward: true);
+    }
+  }
+
+  void _previous() {
+    if (_grades) {
+      _show(grades: false, semester: _semester, forward: false);
+    } else if (_neighbour(-1) case final previous?) {
+      _show(grades: true, semester: previous, forward: false);
+    }
   }
 
   Future<void> _editTerm(AppStrings s) async {
@@ -64,58 +101,29 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     if (result != null) await ref.read(termsProvider.notifier).set(_semester, result);
   }
 
-  void _add(AppStrings s) {
+  // Straight into the user's own school's search, the other schools with a
+  // catalog this semester one chip away (a cross-registered course is in the
+  // other school's catalog). No school to search — none yet, or offline —
+  // opens adding by hand, which always works
+  Future<void> _add() async {
     final mySchool = ref.read(profileProvider)?.school;
-    showAppSheet(
-      context,
-      builder: (sheetCtx) => SheetBody(
-        // ListTiles draw their ink on the nearest Material, which the sheet's
-        // own coloured box would otherwise hide
-        child: Material(
-          type: MaterialType.transparency,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // One search per school with a catalog for this semester, the
-              // user's own first. Offered to everyone: a cross-registered
-              // course is still in the other school's catalog. Unreachable
-              // (offline) leaves adding by hand, which always works
-              Consumer(builder: (_, ref, _) {
-                final schools = ref.watch(catalogSchoolsProvider);
-                if (schools.isLoading) return const LinearProgressIndicator();
-                final here = [
-                  for (final school in schools.valueOrNull ?? const <CatalogSchool>[])
-                    if (school.semesters.contains(_semester)) school,
-                ]..sort((a, b) => (b.name == mySchool ? 1 : 0) - (a.name == mySchool ? 1 : 0));
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final school in here)
-                      ListTile(
-                        leading: const Icon(Icons.search),
-                        title: Text(s.searchSchoolCourses(school.shortName)),
-                        subtitle: Text(school.name),
-                        onTap: () {
-                          Navigator.pop(sheetCtx);
-                          showCatalogSearch(context, school: school, semester: _semester);
-                        },
-                      ),
-                  ],
-                );
-              }),
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: Text(s.addManually),
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  showCourseSheet(context, semester: _semester);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    List<CatalogSchool> all;
+    try {
+      all = await ref.read(catalogSchoolsProvider.future);
+    } catch (e) {
+      reportSyncErrorFromWidget(ref, e, where: 'catalog_schools read');
+      all = const [];
+    }
+    if (!mounted) return;
+    final here = [
+      for (final school in all)
+        if (school.semesters.contains(_semester)) school,
+    ]..sort((a, b) => (b.name == mySchool ? 1 : 0) - (a.name == mySchool ? 1 : 0));
+    if (here.isEmpty) {
+      showCourseSheet(context, semester: _semester);
+    } else {
+      showCatalogSearch(context, schools: here, semester: _semester);
+    }
   }
 
   @override
@@ -174,7 +182,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               ButtonSegment(value: true, label: Text(s.grades), icon: const Icon(Icons.school_outlined)),
             ],
             selected: {_grades},
-            onSelectionChanged: (v) => setState(() => _grades = v.first),
+            onSelectionChanged: (v) => _show(grades: v.first, semester: _semester, forward: v.first),
           ),
         ],
       ),
@@ -214,18 +222,43 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
       floatingActionButton: _grades
           ? null
           : FloatingActionButton.extended(
-              onPressed: () => _add(s),
+              onPressed: _add,
               icon: const Icon(Icons.add),
               label: Text(s.addCourse),
             ),
-      body: ResponsiveBody(
-        // The week needs more room than a list does
-        maxWidth: 960,
-        child: Column(
-          children: [
-            header,
-            Expanded(child: _grades ? GradesView(semester: _semester) : week),
-          ],
+      // Pulled down from the top, either page closes
+      body: PullToClose(
+        child: ResponsiveBody(
+          // The week needs more room than a list does
+          maxWidth: 960,
+          child: Column(
+            children: [
+              PullToCloseHandle(child: header),
+              Expanded(
+                child: SwipeSwitcher(
+                  onNext: _next,
+                  onPrevious: _previous,
+                  // Material's shared axis, as between the review's steps: the
+                  // page arriving slides in from the side it lies on
+                  child: PageTransitionSwitcher(
+                    duration: scaled(context, AppMotion.page),
+                    reverse: !_forward,
+                    transitionBuilder: (child, primary, secondary) => SharedAxisTransition(
+                      animation: primary,
+                      secondaryAnimation: secondary,
+                      transitionType: SharedAxisTransitionType.horizontal,
+                      fillColor: Colors.transparent,
+                      child: child,
+                    ),
+                    child: KeyedSubtree(
+                      key: ValueKey('$_semester $_grades'),
+                      child: _grades ? GradesView(semester: _semester) : week,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

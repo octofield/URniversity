@@ -26,6 +26,12 @@ _CODE = re.compile(r'([MTWRFSU])([1-9nabcd])')
 # The summer term (30) is left out: the app has no summer semester
 _TERMS = {'10': '1', '20': '2'}
 
+# Common courses counted with general education: College Chinese (CL) and
+# the English programme (LANG). Physical education (PE) does not count toward
+# graduation at all
+_GENERAL_DEPTS = ('CL', 'LANG')
+_EXCLUDED_DEPTS = ('PE',)
+
 _cache = {}
 
 
@@ -66,16 +72,31 @@ def parse_time(text):
     return sorted(out, key=lambda s: (s['weekday'], s['start_minute']))
 
 
+def kind_of(item):
+    """general: a general education course (it has a 通識類別) or a common one;
+    excluded: physical education. None otherwise."""
+    dept = re.match(r'\d{5}([A-Z]+)', item.get('科號') or '')
+    dept = dept.group(1) if dept else ''
+    if (item.get('通識類別') or '').strip() or dept in _GENERAL_DEPTS:
+        return common.KIND_GENERAL
+    if dept in _EXCLUDED_DEPTS:
+        return common.KIND_EXCLUDED
+    return None
+
+
 def to_record(item):
     course_no = item['科號']
     code = ' '.join(course_no[5:].split())
     entries = [e.split() for e in (item.get('必選修說明') or '').split('\t') if e.strip()]
-    audiences = []
+    audiences, required_for = [], []
     for e in entries:
-        # "分環所115M" -> "分環所": the year and degree say nothing to a student
-        name = re.sub(r'\d{3}[A-Z]$', '', e[0])
+        # "分環所115M", "數學系115BA" -> the department alone: the entry year
+        # and class say nothing to a student looking for their own
+        name = re.sub(r'\d{3}[A-Z]+$', '', e[0])
         if name not in audiences:
             audiences.append(name)
+        if len(e) > 1 and e[-1] == '必修' and name not in required_for:
+            required_for.append(name)
     try:
         credits = float(item.get('學分數') or '')
     except ValueError:
@@ -92,6 +113,8 @@ def to_record(item):
         'audience': audiences,
         'time_text': '；'.join(' '.join(' '.join(p).split()) for p in _lines(item.get('教室與上課時間'))),
         'sessions': parse_time(item.get('教室與上課時間')),
+        'required_for': required_for,
+        'kind': kind_of(item),
     }
 
 

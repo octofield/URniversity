@@ -30,6 +30,7 @@ import 'category_settings_screen.dart';
 import 'notification_settings_screen.dart';
 import 'review_screen.dart';
 import 'trash_screen.dart';
+import 'sync_log_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -226,6 +227,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: Text(s.devOpenReviewHint),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showDevReviewDialog(context, ref, s),
+            ),
+            ListTile(
+              leading: Icon(Icons.sync_problem_outlined, color: AppColors.primary),
+              title: Text(s.syncLog),
+              subtitle: Text(s.syncLogHint),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SyncLogScreen()),
+              ),
             ),
           ],
           const Divider(),

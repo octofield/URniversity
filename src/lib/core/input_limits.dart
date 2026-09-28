@@ -18,6 +18,8 @@ class InputLimits {
   static const location = 50;
   // "CSIE1212", a serial number, a course id
   static const courseCode = 20;
+  // A course's credits: not text, but capped by courses' CHECK all the same
+  static const courseCredits = 30;
 
   // ── Persisted inside JSON, so only the app enforces them ──────────────────
   static const categoryName = 20;

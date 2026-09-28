@@ -8,12 +8,13 @@ import '../models/course.dart';
 import 'course_sheet.dart' show formatMinute;
 
 // The week at a glance (system_design.md §3-S): a column per day, Monday to
-// Friday unless something meets at the weekend, and time running down. At NTU
-// the rail names the periods ("3｜10:20"); elsewhere it shows the hours.
+// Friday unless something meets at the weekend, and a row per period of the
+// user's school, like a printed timetable ("3｜10:20"); a school without a
+// period table gets a row per hour.
 //
 // A Stack of Positioned blocks rather than rows of cells: a meeting is placed
-// by its minutes, so 10:20–12:10 sits exactly where it runs, and nothing needs
-// IntrinsicHeight (which has cut off content here before)
+// through rowPosition, so 10:20–12:10 fills periods 3–4 exactly, and nothing
+// needs IntrinsicHeight (which has cut off content here before)
 class TimetableGrid extends StatelessWidget {
   final List<Course> courses;
   final List<ClassPeriod>? periods;
@@ -35,30 +36,25 @@ class TimetableGrid extends StatelessWidget {
 
   static const _railWidth = 48.0;
   static const _headerHeight = 32.0;
+  // A period is 50 minutes; an hour row is a little taller for its 60
+  static const _periodHeight = 56.0;
   static const _hourHeight = 60.0;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
     final sessions = [for (final c in courses) ...c.sessions];
-    final bounds = gridBounds(sessions);
-    final minutes = (bounds.endHour - bounds.startHour) * 60;
-    const perMinute = _hourHeight / 60;
-    double y(int minute) => (minute - bounds.startHour * 60) * perMinute;
+    final days = gridBounds(sessions).days;
+    final rows = gridRows(periods, sessions);
+    // Hour rows carry no label; period rows do
+    final byPeriod = rows.first.label.isNotEmpty;
+    final rowHeight = byPeriod ? _periodHeight : _hourHeight;
+    double y(int minute) => rowPosition(rows, minute) * rowHeight;
+    final lineColor = AppColors.border.withValues(alpha: 0.6);
 
     return LayoutBuilder(builder: (context, constraints) {
-      final dayWidth = (constraints.maxWidth - _railWidth) / bounds.days;
-      final height = minutes * perMinute;
-
-      // Rail labels: the periods at NTU, the hours elsewhere
-      final railLabels = <(double, String)>[
-        if (periods != null)
-          for (final p in periods!)
-            if (p.start >= bounds.startHour * 60 && p.end <= bounds.endHour * 60)
-              (y(p.start), '${p.label}\n${formatMinute(p.start)}')
-        else
-          for (var h = bounds.startHour; h < bounds.endHour; h++) (y(h * 60), formatMinute(h * 60)),
-      ];
+      final dayWidth = (constraints.maxWidth - _railWidth) / days;
+      final height = rows.length * rowHeight;
 
       final blocks = <Widget>[
         for (final c in courses)
@@ -67,16 +63,16 @@ class TimetableGrid extends StatelessWidget {
               left: _railWidth + (m.weekday - 1) * dayWidth + 1.5,
               top: y(m.startMinute) + 1,
               width: dayWidth - 3,
-              height: (m.endMinute - m.startMinute) * perMinute - 2,
+              height: y(m.endMinute) - y(m.startMinute) - 2,
               child: _Block(course: c, session: m, onTap: () => onTapCourse(c)),
             ),
       ];
 
       final nowMinute = now == null ? null : now!.hour * 60 + now!.minute;
       final showNow = now != null &&
-          now!.weekday <= bounds.days &&
-          nowMinute! >= bounds.startHour * 60 &&
-          nowMinute < bounds.endHour * 60;
+          now!.weekday <= days &&
+          nowMinute! >= rows.first.start &&
+          nowMinute < rows.last.end;
 
       return Column(
         children: [
@@ -86,7 +82,7 @@ class TimetableGrid extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(width: _railWidth),
-                for (var d = 1; d <= bounds.days; d++)
+                for (var d = 1; d <= days; d++)
                   SizedBox(
                     width: dayWidth,
                     child: Center(
@@ -106,15 +102,15 @@ class TimetableGrid extends StatelessWidget {
             height: height,
             child: Stack(
               children: [
-                // Hour lines, and a tap target per empty cell
-                for (var h = bounds.startHour; h < bounds.endHour; h++)
+                // A line under each row, and a tap target per empty cell
+                for (var i = 0; i <= rows.length; i++)
                   Positioned(
                     left: _railWidth,
                     right: 0,
-                    top: y(h * 60),
-                    child: Container(height: 1, color: AppColors.border.withValues(alpha: 0.6)),
+                    top: i == rows.length ? height - 1 : i * rowHeight,
+                    child: Container(height: 1, color: lineColor),
                   ),
-                for (var d = 1; d <= bounds.days; d++)
+                for (var d = 1; d <= days; d++)
                   Positioned(
                     left: _railWidth + (d - 1) * dayWidth,
                     top: 0,
@@ -122,26 +118,32 @@ class TimetableGrid extends StatelessWidget {
                     width: dayWidth,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      // The hour tapped, whole: a new course usually starts on one
+                      // The row tapped, from its start: a new course usually
+                      // begins with a period (or on the hour)
                       onTapUp: (details) => onTapEmpty(
                         d,
-                        bounds.startHour * 60 + (details.localPosition.dy / perMinute) ~/ 60 * 60,
+                        rows[(details.localPosition.dy / rowHeight).floor().clamp(0, rows.length - 1)].start,
                       ),
                       child: Container(
                         decoration: BoxDecoration(
                           color: now?.weekday == d ? AppColors.primaryLight.withValues(alpha: 0.35) : null,
-                          border: Border(left: BorderSide(color: AppColors.border.withValues(alpha: 0.6))),
+                          // The last day closes the grid on the right, so the
+                          // week does not look as if it ran on past the edge
+                          border: Border(
+                            left: BorderSide(color: lineColor),
+                            right: d == days ? BorderSide(color: lineColor) : BorderSide.none,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                for (final (top, label) in railLabels)
+                for (var i = 0; i < rows.length; i++)
                   Positioned(
                     left: 0,
                     width: _railWidth - 4,
-                    top: top,
+                    top: i * rowHeight + 2,
                     child: Text(
-                      label,
+                      byPeriod ? '${rows[i].label}\n${formatMinute(rows[i].start)}' : formatMinute(rows[i].start),
                       textAlign: TextAlign.center,
                       style: theme.labelSmall?.copyWith(color: AppColors.textTertiary, height: 1.2),
                     ),

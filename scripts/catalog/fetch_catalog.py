@@ -10,6 +10,11 @@ Run by hand once a semester, from the repository root:
     python scripts/catalog/fetch_catalog.py --school=ntu,nthu          (each school's defaults)
     python scripts/catalog/fetch_catalog.py --school=all --dry-run     (fetch and parse, write nothing)
     python scripts/catalog/fetch_catalog.py --school=ntu --allow-partial   (escape hatch)
+    python scripts/catalog/fetch_catalog.py --school=ntu --skip-requirements
+
+A school that publishes its departments' credits to graduate (NTU) has those
+fetched in the same run, into degree_requirements — once a semester, with the
+catalog. --skip-requirements leaves them as they are.
 
 Needs scripts/catalog/.env with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
 (the service role key bypasses RLS and must never leave this machine; .env is
@@ -58,6 +63,7 @@ def main(argv):
 
     dry_run = '--dry-run' in argv
     allow_partial = '--allow-partial' in argv
+    skip_requirements = '--skip-requirements' in argv
     env = common.load_env()
     if not dry_run and not (env.get('SUPABASE_URL') and env.get('SUPABASE_SERVICE_ROLE_KEY')):
         print('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in scripts/catalog/.env')
@@ -65,6 +71,7 @@ def main(argv):
 
     failed_any = False
     report = []
+    requirement_report = []
     for code in codes:
         module = REGISTRY[code]
         try:
@@ -75,6 +82,7 @@ def main(argv):
             continue
         print('%s: %s' % (code, ', '.join(wanted)))
         written = []
+        audiences = set()
         for semester in wanted:
             print('  %s ...' % semester)
             try:
@@ -103,15 +111,32 @@ def main(argv):
             # A partial write never prunes: a missing page is not a cancelled course
             common.write_semester(env, code, semester, rows, stamp, prune=fetched.complete)
             written.append(semester)
+            audiences |= {a for r in rows for a in r['required_for']}
             print('  %s written: %d courses' % (semester, len(rows)))
         if written:
-            common.record_school(env, code, written)
+            common.record_school(env, code, written, audiences)
+
+        if skip_requirements or not hasattr(module, 'fetch_requirements'):
+            continue
+        print('  credits to graduate ...')
+        try:
+            requirements, missing = module.fetch_requirements()
+        except Exception as e:  # noqa: BLE001 - the catalog above is written already
+            print('  credits to graduate failed: %s' % e)
+            failed_any = True
+            continue
+        requirement_report.append((code, len(requirements), missing))
+        if not dry_run and requirements:
+            common.write_requirements(env, requirements)
 
     print('\nschool  semester   source     parsed     courses    unread times')
     for code, semester, source, parsed, courses, unread, complete, note in report:
         flag = '' if complete else '   ⚠ incomplete'
         print('  %-6s%-11s%-11d%-11d%-11d%d%s%s' % (code, semester, source, parsed, courses, unread, flag,
                                                    ('   ' + note) if note else ''))
+    for code, count, missing in requirement_report:
+        print('  %-6scredits to graduate: %d department-years%s' % (
+            code, count, ('   %d unreadable, e.g. %s' % (len(missing), missing[:3])) if missing else ''))
     return 1 if failed_any else 0
 
 

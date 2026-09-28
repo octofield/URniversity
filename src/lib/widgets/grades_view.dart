@@ -15,6 +15,7 @@ import '../providers/grade_settings_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import 'course_sheet.dart';
+import 'credit_categories_section.dart';
 import 'gpa_trend_chart.dart';
 import 'grade_chips.dart' show gradeName;
 
@@ -79,15 +80,17 @@ class _GradesViewState extends ConsumerState<GradesView> {
               value: total == null ? kEmptyValue : _two(total),
               note: percent == null ? null : s.percentEquivalent(_two(percent)),
             ),
-            _Stat(
-              label: s.creditsEarned,
-              value: s.creditsOf(_credits(earned), settings.graduationCredits),
-              progress: (earned / settings.graduationCredits).clamp(0.0, 1.0),
-            ),
+            // Credits by category has its own, fuller breakdown below
+            if (!settings.categoriesEnabled)
+              _Stat(
+                label: s.creditsEarned,
+                value: s.creditsOf(_credits(earned), settings.graduationCredits),
+                progress: (earned / settings.graduationCredits).clamp(0.0, 1.0),
+              ),
           ];
           // Three across when there is room; otherwise the credits card takes
           // the full width under the two GPAs
-          if (c.maxWidth >= 520) {
+          if (c.maxWidth >= 520 || cards.length < 3) {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -112,6 +115,8 @@ class _GradesViewState extends ConsumerState<GradesView> {
           const SizedBox(height: AppSpacing.xs),
           Text(s.gradesOtherSchool, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
         ],
+        const SizedBox(height: AppSpacing.md),
+        const CreditCategoriesSection(),
         if (trend.length >= 2) ...[
           const SizedBox(height: AppSpacing.lg),
           Text(s.gpaTrend, style: theme.titleMedium),
@@ -293,7 +298,8 @@ class _DegreeSetupState extends ConsumerState<_DegreeSetup> {
               child: FilledButton(
                 onPressed: () {
                   final credits = int.tryParse(_credits.text) ?? GradeSettings.defaultCredits;
-                  ref.read(gradeSettingsProvider.notifier).set(GradeSettings(
+                  // copyWith: the credits-by-category settings stay as they are
+                  ref.read(gradeSettingsProvider.notifier).set(ref.read(gradeSettingsProvider).copyWith(
                         graduationCredits: credits.clamp(1, 400),
                         level: _level,
                       ));

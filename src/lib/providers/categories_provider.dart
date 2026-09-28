@@ -52,14 +52,13 @@ class CategoriesNotifier extends StateNotifier<List<CategoryEntry>> {
 
   void _persist() {
     if (_userId == null) return;
-    _db.from('user_categories').upsert(
-      {
-        'user_id': _userId,
-        'ordered_list': [for (final c in state) c.id],
-        'styles': {for (final c in state) c.id: c.toJson()},
-      },
-      onConflict: 'user_id',
-    ).catchError((Object e) => reportSyncError(ref, e));
+    final row = {
+      'user_id': _userId,
+      'ordered_list': [for (final c in state) c.id],
+      'styles': {for (final c in state) c.id: c.toJson()},
+    };
+    runWithRetry(() => _db.from('user_categories').upsert(row, onConflict: 'user_id'))
+        .catchError((Object e) => reportSyncError(ref, e, where: 'user_categories upsert'));
   }
 
   void add(String name) {

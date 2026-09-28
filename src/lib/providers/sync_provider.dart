@@ -56,7 +56,10 @@ final syncProvider = Provider<void>((ref) {
   // not a change of setting
   ref.listen(appStyleChoiceProvider, (prev, next) => _saveStyle(ref));
   ref.listen(termsProvider, (prev, next) => _saveTerms(ref));
-  ref.listen(gradeSettingsProvider, (prev, next) => _saveGradeSettings(ref));
+  ref.listen(gradeSettingsProvider, (prev, next) {
+    _saveGradeSettings(ref);
+    _saveCreditCategories(ref);
+  });
 
   var handlingGuestLogin = false;
 
@@ -92,6 +95,7 @@ final syncProvider = Provider<void>((ref) {
         _loadStyle(ref, uid);
         _loadTerms(ref, uid);
         _loadGradeSettings(ref, uid);
+        _loadCreditCategories(ref, uid);
       } else {
         _clearAll(ref);
       }
@@ -139,6 +143,7 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   unawaited(_loadStyle(ref, uid));
   unawaited(_loadTerms(ref, uid));
   unawaited(_loadGradeSettings(ref, uid));
+  unawaited(_loadCreditCategories(ref, uid));
 }
 
 void _loadGuest(Ref ref) {
@@ -210,7 +215,7 @@ Future<void> _loadSettings(Ref ref, String uid) async {
       ref.read(showDayCounterProvider.notifier).state = showCounter;
     }
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings load');
   }
 }
 
@@ -220,7 +225,7 @@ Future<void> _saveSettings(Ref ref) async {
   if (ref.read(guestModeProvider)) return;
   try {
     final sem = ref.read(semesterSettingsProvider);
-    await Supabase.instance.client.from('user_settings').upsert({
+    await runWithRetry(() => Supabase.instance.client.from('user_settings').upsert({
       'user_id': uid,
       'language': _langToString(ref.read(languageProvider)),
       'date_format': _fmtToString(ref.read(settingsProvider)),
@@ -228,9 +233,9 @@ Future<void> _saveSettings(Ref ref) async {
       'semester_start_months': sem.startMonths,
       'default_task_view': ref.read(defaultTaskViewProvider),
       'show_day_counter': ref.read(showDayCounterProvider),
-    });
+    }));
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings save');
   }
 }
 
@@ -255,7 +260,7 @@ Future<void> _loadStyle(Ref ref, String uid) async {
     if (name == null) return;
     await ref.read(appStyleProvider.notifier).applyChoice(name);
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings app_style load');
   }
 }
 
@@ -266,12 +271,12 @@ Future<void> _saveStyle(Ref ref) async {
   try {
     // Only these two columns: an upsert updates just the columns it names, so
     // the rest of the row is left as it is
-    await Supabase.instance.client.from('user_settings').upsert({
+    await runWithRetry(() => Supabase.instance.client.from('user_settings').upsert({
       'user_id': uid,
       'app_style': ref.read(appStyleChoiceProvider),
-    });
+    }));
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings app_style save');
   }
 }
 
@@ -285,7 +290,7 @@ Future<void> _loadTerms(Ref ref, String uid) async {
     final cloud = await fetchCloudTerms(uid);
     if (cloud.isNotEmpty) await ref.read(termsProvider.notifier).merge(cloud);
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings term_starts load');
   }
 }
 
@@ -296,12 +301,12 @@ Future<void> _saveTerms(Ref ref) async {
   final terms = ref.read(termsProvider);
   if (terms.isEmpty) return;
   try {
-    await Supabase.instance.client.from('user_settings').upsert({
+    await runWithRetry(() => Supabase.instance.client.from('user_settings').upsert({
       'user_id': uid,
       'term_starts': {for (final e in terms.entries) e.key: e.value.toJson()},
-    });
+    }));
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings term_starts save');
   }
 }
 
@@ -318,12 +323,13 @@ Future<void> _loadGradeSettings(Ref ref, String uid) async {
         .maybeSingle();
     final credits = row?['graduation_credits'] as int?;
     if (credits == null) return;
-    await ref.read(gradeSettingsProvider.notifier).set(GradeSettings(
+    // copyWith: credits by category arrive on their own and must survive this
+    await ref.read(gradeSettingsProvider.notifier).set(ref.read(gradeSettingsProvider).copyWith(
           graduationCredits: credits,
           level: degreeLevelFromName(row?['degree_level'] as String?),
         ));
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings graduation_credits load');
   }
 }
 
@@ -334,13 +340,75 @@ Future<void> _saveGradeSettings(Ref ref) async {
   if (!ref.read(gradeSettingsProvider.notifier).confirmed) return;
   final settings = ref.read(gradeSettingsProvider);
   try {
-    await Supabase.instance.client.from('user_settings').upsert({
+    await runWithRetry(() => Supabase.instance.client.from('user_settings').upsert({
       'user_id': uid,
       'graduation_credits': settings.graduationCredits,
       'degree_level': settings.level.name,
-    });
+    }));
   } catch (e) {
-    reportSyncError(ref, e);
+    reportSyncError(ref, e, where: 'user_settings graduation_credits save');
+  }
+}
+
+// ── Credits by category ────────────────────────────────────────────────────────
+//
+// Separate again: the columns come with the 2026-09-27 courses.sql, and are
+// only ever written once the user has switched the feature on
+// (GradeSettingsNotifier.categoriesTouched)
+
+const _creditCategoryColumns =
+    'credit_categories_enabled, entry_year, requirement_department, catalog_department, '
+    'credits_required, credits_general, credits_elective';
+
+Future<void> _loadCreditCategories(Ref ref, String uid) async {
+  try {
+    final row = await Supabase.instance.client
+        .from('user_settings')
+        .select(_creditCategoryColumns)
+        .eq('user_id', uid)
+        .maybeSingle();
+    final enabled = row?['credit_categories_enabled'] as bool?;
+    // Never switched on for this account: keep this device's choice
+    if (enabled == null) return;
+    await ref.read(gradeSettingsProvider.notifier).set(ref.read(gradeSettingsProvider).copyWith(
+          categoriesEnabled: enabled,
+          entryYear: () => row!['entry_year'] as int?,
+          requirementDepartment: () => row!['requirement_department'] as String?,
+          catalogDepartment: () => row!['catalog_department'] as String?,
+          requiredCredits: () => row!['credits_required'] as int?,
+          generalCredits: () => row!['credits_general'] as int?,
+          electiveCredits: () => row!['credits_elective'] as int?,
+        ));
+  } on PostgrestException catch (e) {
+    // 42703, no such column: courses.sql has not been re-run, so no account
+    // has these settings to load. Not a failure worth a message at every
+    // sign-in to someone who never switched the feature on
+    if (e.code == '42703') return;
+    reportSyncError(ref, e, where: 'user_settings credit categories load');
+  } catch (e) {
+    reportSyncError(ref, e, where: 'user_settings credit categories load');
+  }
+}
+
+Future<void> _saveCreditCategories(Ref ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return;
+  if (ref.read(guestModeProvider)) return;
+  if (!ref.read(gradeSettingsProvider.notifier).categoriesTouched) return;
+  final s = ref.read(gradeSettingsProvider);
+  try {
+    await runWithRetry(() => Supabase.instance.client.from('user_settings').upsert({
+      'user_id': uid,
+      'credit_categories_enabled': s.categoriesEnabled,
+      'entry_year': s.entryYear,
+      'requirement_department': s.requirementDepartment,
+      'catalog_department': s.catalogDepartment,
+      'credits_required': s.requiredCredits,
+      'credits_general': s.generalCredits,
+      'credits_elective': s.electiveCredits,
+    }));
+  } catch (e) {
+    reportSyncError(ref, e, where: 'user_settings credit categories save');
   }
 }
 

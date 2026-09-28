@@ -40,6 +40,7 @@ class CoursesNotifier extends SyncedListNotifier<Course> {
     double credits = 0,
     int? color,
     String? catalogId,
+    String? category,
     List<CourseSession> sessions = const [],
   }) {
     final course = Course(
@@ -52,6 +53,7 @@ class CoursesNotifier extends SyncedListNotifier<Course> {
       credits: credits,
       color: color ?? nextColor(semester),
       catalogId: catalogId,
+      category: category,
       sessions: sessions,
       createdAt: DateTime.now(),
     );

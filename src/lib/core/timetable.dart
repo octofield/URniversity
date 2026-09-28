@@ -1,4 +1,5 @@
 import '../models/course.dart';
+import 'period_tables.dart';
 
 // The rules behind the timetable (system_design.md §3-S). Pure functions, like
 // review_stats.dart, so each is unit-tested and the screens only draw them.
@@ -91,4 +92,39 @@ List<MeetingState> meetingStates(List<ClassMeeting> today, DateTime now) {
     if (s.weekday > days) days = s.weekday;
   }
   return (startHour: start, endHour: end, days: days);
+}
+
+// The grid's rows, top to bottom (§3-S). With the school's period table, one
+// row per period, like a printed timetable: the periods that start between
+// 08:00 and 18:00, stretched to take in every session, breaks taking no room.
+// Without a table — or when a session lies beyond the table's first or last
+// period, where no row could hold it — one row per whole hour of gridBounds
+List<ClassPeriod> gridRows(List<ClassPeriod>? periods, List<CourseSession> sessions) {
+  final fits = periods != null &&
+      periods.isNotEmpty &&
+      sessions.every((s) => s.startMinute >= periods.first.start && s.endMinute <= periods.last.end);
+  if (!fits) {
+    final b = gridBounds(sessions);
+    return [
+      for (var h = b.startHour; h < b.endHour; h++) ClassPeriod('', h * 60, (h + 1) * 60),
+    ];
+  }
+  bool daytime(ClassPeriod p) => p.start >= 8 * 60 && p.start < 18 * 60;
+  bool used(ClassPeriod p) => sessions.any((s) => s.startMinute < p.end && p.start < s.endMinute);
+  final first = periods.indexWhere((p) => daytime(p) || used(p));
+  final last = periods.lastIndexWhere((p) => daytime(p) || used(p));
+  return periods.sublist(first, last + 1);
+}
+
+// Where a minute sits on the grid, counted in rows: inside a row by its share
+// of that row, in a break on the boundary below it, and clamped at both ends.
+// Blocks, the now line and taps all go through this, so a meeting typed by the
+// clock rather than by period still lands where it runs
+double rowPosition(List<ClassPeriod> rows, int minute) {
+  for (var i = 0; i < rows.length; i++) {
+    final r = rows[i];
+    if (minute < r.start) return i.toDouble();
+    if (minute <= r.end) return i + (minute - r.start) / (r.end - r.start);
+  }
+  return rows.length.toDouble();
 }

@@ -13,19 +13,48 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // while nothing had been saved
 final syncErrorProvider = StateProvider<Object?>((ref) => null);
 
+// One failed sync and where it happened ("courses upsert", "user_settings
+// term_starts"). "Sync failed" alone could not be traced when it came and went
+const kSyncLogSize = 20;
+
+class SyncFailure {
+  final DateTime at;
+  final String where;
+  final Object error;
+
+  const SyncFailure(this.at, this.where, this.error);
+}
+
+// The last [kSyncLogSize] failures, newest first, for the developer-mode sync
+// log. Memory only: it is for reporting what just happened
+final syncLogProvider = StateProvider<List<SyncFailure>>((ref) => const []);
+
 // Records a failed write for the UI to pick up. Free function so the providers
 // that do not extend [SyncedListNotifier] can report the same way.
 //
 // Also logs at the source rather than in the UI: a failure during sign-in
 // happens before HomeScreen is mounted, so nothing would ever display it
-void reportSyncError(Ref ref, Object error) {
-  debugPrint('[sync] ${describeSyncError(error)}');
-  ref.read(syncErrorProvider.notifier).state = error;
+void reportSyncError(Ref ref, Object error, {String where = ''}) =>
+    _report(ref.read(syncLogProvider.notifier), ref.read(syncErrorProvider.notifier), error, where);
+
+// The same, from a widget
+void reportSyncErrorFromWidget(WidgetRef ref, Object error, {String where = ''}) =>
+    _report(ref.read(syncLogProvider.notifier), ref.read(syncErrorProvider.notifier), error, where);
+
+void _report(StateController<List<SyncFailure>> log, StateController<Object?> current, Object error, String where) {
+  final failure = SyncFailure(DateTime.now(), where, error);
+  debugPrint('[sync] ${describeSyncError(failure)}');
+  log.state = [failure, ...log.state.take(kSyncLogSize - 1)];
+  current.state = failure;
 }
 
 // PostgrestException.toString() drops details and hint, which are usually the
 // only parts that say which column or policy rejected the write
 String describeSyncError(Object error) {
+  if (error is SyncFailure) {
+    final inner = describeSyncError(error.error);
+    return error.where.isEmpty ? inner : '${error.where}: $inner';
+  }
   if (error is! PostgrestException) return error.toString();
   final parts = <String>[
     if (error.code != null) 'code=${error.code}',
@@ -132,7 +161,13 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
   // Runs after either load path, for subclasses that backfill rows
   Future<void> afterLoad() async {}
 
-  void reportSyncError(Object error) => ref.read(syncErrorProvider.notifier).state = error;
+  // Named with the table and what was being done, for the sync log
+  void reportSyncError(Object error, [String op = '']) => _report(
+        ref.read(syncLogProvider.notifier),
+        ref.read(syncErrorProvider.notifier),
+        error,
+        op.isEmpty ? table : '$table $op',
+      );
 
   Future<void> load(String userId) async {
     if (_userId == userId) return;
@@ -155,7 +190,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     } catch (e) {
       // Leaving _userId null lets a later load() retry instead of no-oping
       _userId = null;
-      reportSyncError(e);
+      reportSyncError(e, 'load');
     }
   }
 
@@ -272,7 +307,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       try {
         await db.from(table).upsert({...toJson(item), 'user_id': userId});
       } catch (e) {
-        reportSyncError(e);
+        reportSyncError(e, 'merge');
       }
     }
   }
@@ -286,7 +321,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     final row = {...toJson(item), 'user_id': _userId};
     unawaited(
       runWithRetry(() => db.from(table).upsert(row))
-          .catchError((Object e) => reportSyncError(e)),
+          .catchError((Object e) => reportSyncError(e, 'upsert')),
     );
   }
 
@@ -298,7 +333,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     if (_userId == null) return;
     unawaited(
       runWithRetry(() => db.from(table).delete().eq('id', id))
-          .catchError((Object e) => reportSyncError(e)),
+          .catchError((Object e) => reportSyncError(e, 'delete')),
     );
   }
 

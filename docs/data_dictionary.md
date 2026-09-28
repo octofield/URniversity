@@ -41,6 +41,8 @@
   | `courses.title` | 100 | `CHECK` 寫在 `supabase/courses.sql` 的 CREATE TABLE |
   | `courses.teacher`；課程時段的教室（`sessions` 內的 `location`） | 50 | `teacher` 有 CHECK；`location` 在 jsonb 裡，**只有 App 端擋**（`InputLimits.location`） |
   | `courses.course_code`、`courses.serial_no` | 20 | `CHECK`（`courses.sql`） |
+  | `courses.catalog_id` | 80 | `CHECK`（`courses.sql`，2026-09-27 由 60 放寬；App 不讓使用者輸入，來自目錄 id） |
+  | `courses.credits`（數值，不是文字） | 0–30 | `CHECK`（`courses.sql`）；App 端 `InputLimits.courseCredits`，超過顯示錯誤不存 |
   | `user_settings.app_style` | 20 | `user_settings_app_style_len`（在 `supabase/app_style.sql`；值只由 App 從列舉寫入，沒有對應的 `InputLimits`） |
   | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
@@ -293,6 +295,11 @@
 | `term_starts` | jsonb | ✗ | `null` | 各學期的開學日與上課週數：`{"115-1": {"first_day": "2026-09-07", "weeks": 16}}`（D30 的雲端副本）。由 `supabase/courses.sql` 新增，**單獨讀寫**（`_loadTerms` / `_saveTerms`） |
 | `graduation_credits` | int | ✗ | `null`（＝128） | 畢業學分（Phase 6），1–400。與 `degree_level` 一起**單獨讀寫**（`_loadGradeSettings` / `_saveGradeSettings`） |
 | `degree_level` | text | ✗ | `null`（＝`bachelor`） | `bachelor`（C- 及格）/ `graduate`（B- 及格） |
+| `credit_categories_enabled` | bool | ✗ | `null`（＝關） | 「依學系分類學分」開關（2026-09-27）。下面六欄與它一起**單獨讀寫**（`_loadCreditCategories` / `_saveCreditCategories`），而且**只有開過一次之後才寫**，沒重跑 `courses.sql` 也不影響沒用這功能的人 |
+| `entry_year` | int | ✗ | `null` | 入學學年度（民國），50–300；預設由 `grade`、`grade_set_year` 推算 |
+| `requirement_department` | text | ✗ | `null` | 查 D33 用的學系全名，≤ 50；預設是 `department` |
+| `catalog_department` | text | ✗ | `null` | 目錄裡的系名（簡稱，例如「資工系」），≤ 50；比對 D29 `required_for` 判斷必修 |
+| `credits_required`、`credits_general`、`credits_elective` | int | ✗ | `null` | 學校沒公告時使用者自填的三個門檻，0–400 |
 | `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono`，或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
 
 **特別說明：**
@@ -745,7 +752,8 @@ key 名稱是 `cache_` 加上資料表名稱（`SyncedListNotifier.cacheKey`）�
 | `grade` | text | ✗ | `null` | Phase 6：`A+`…`C-`、`F`、`X`，或 `pass` / `fail` / `withdrawn`；`null` 是還沒給分 |
 | `counts_in_gpa` | bool | ✓ | `true` | 關掉就不計入 GPA（例如服務學習） |
 | `color` | bigint | ✓ | — | ARGB；新增時自動挑這學期還沒用過的顏色 |
-| `catalog_id` | text | ✗ | `null` | 從哪一筆 D29 課程目錄加入；**不是外鍵**（目錄每學期重抓） |
+| `catalog_id` | text | ✗ | `null` | 從哪一筆 D29 課程目錄加入，≤ 80（2026-09-27 由 60 放寬，配合帶學校前綴的 id）；**不是外鍵**（目錄每學期重抓） |
+| `category` | text | ✗ | `null` | 學分類別：`required` / `elective` / `general` / `excluded`（不計畢業學分，例如體育）；`null` 是還沒分類。只在「依學系分類學分」開啟時設定；**只有非 null 時才寫進 JSON**，所以沒重跑 SQL 的資料庫也收得下沒分類的課 |
 | `sessions` | jsonb | ✓ | `[]` | 每週的上課時段陣列，每個 `{weekday 1–7, start_minute, end_minute, location}`，最多 20 個 |
 | `created_at` | timestamptz | ✓ | `now()` | |
 
@@ -773,6 +781,8 @@ RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
 | `audience` | text | 所有列出這門課的授課對象，用「、」連接 |
 | `time_text` | text | 學校原文，只用來顯示，例如台大 `三6,7 (基醫508)`、清大 `BMES醫環618 W2W3W4` |
 | `sessions` | jsonb | **腳本已讀好的時段**，格式與 D27 `courses.sessions` 相同，CHECK 陣列且最多 20 段。加入課程時直接複製過去，App 不再解析任何學校的時間字串 |
+| `required_for` | text[] | 這門課對哪些授課對象是必修（學校寫的系名，例如台大「資工系」、清大「數學系」，去掉年級與班別）。台大取 NOL 每列的「必/選修」，清大取 `必選修說明` |
+| `kind` | text | `general`（通識，含國文、英文等共同課）／`excluded`（體育，不計畢業學分）／`null`。台大：通識課另從 NOL 通識查詢頁依領域（a、A1–A8、b）抓流水號，課號 `Common…` 是共同課，`PE…` 是體育；清大：有 `通識類別` 或科號系所為 CL、LANG 是通識，PE 是體育 |
 | `updated_at` | timestamptz | 這次寫入的時間；完整抓取後，同校同學期中早於這次的列會被刪掉（學校已停開的課） |
 
 來源：
@@ -796,10 +806,14 @@ RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
 
 ---
 
-## D31. 裝置本機儲存 — `graduation_credits`、`degree_level`
+## D31. 裝置本機儲存 — `graduation_credits`、`degree_level`，以及學分分類設定
 
-媒介：SharedPreferences（`int`、`String`）。讀寫處理程序：`GradeSettingsNotifier`（`src/lib/providers/grade_settings_provider.dart`）。
+媒介：SharedPreferences（`int`、`String`、`bool`）。讀寫處理程序：`GradeSettingsNotifier`（`src/lib/providers/grade_settings_provider.dart`）。
 成績頁第一次開啟時在頁內問一次；登入帳號另同步 D8-B 的同名欄位。沒存過時用 128 學分、學士班。
+
+2026-09-27 加上「依學系分類學分」的 key，名稱與 D8-B 欄位相同：`credit_categories_enabled`、`entry_year`、
+`requirement_department`、`catalog_department`、`credits_required`、`credits_general`、`credits_elective`。
+`credit_categories_enabled` 這把 key 存在，就代表使用者開過這個功能（`categoriesTouched`），之後才會同步到雲端。
 
 ---
 
@@ -814,6 +828,29 @@ RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
 | `name` | text | 學校全名，與 App 學校清單（`taiwan_universities.dart`）及 D8-B `user_settings.school` 同一寫法，用來把使用者自己的學校排第一 |
 | `short_name` | text | 「台大」「清大」，組成「搜尋{簡稱}課程」 |
 | `semesters` | text[] | 有目錄的學期；舊的保留，新寫的加進去 |
+| `audiences` | text[] | 目錄裡出現過的所有系名（來自 `required_for`），讓使用者從中選「你的系在課程目錄的名稱」 |
 | `updated_at` | timestamptz | |
 
 **為什麼要這張表**：「新增課程」依它列出每個學校的搜尋入口，所以新增一所學校只要跑腳本，不用發新版 App。
+
+---
+
+## D33. `degree_requirements`（各系畢業學分，2026-09-27，公開唯讀）
+
+讀取處理程序：`SupabaseCatalogSource.requirements(school, entryYear)` → `degreeRequirementsProvider`（成績頁開啟「依學系分類學分」時才查）。
+寫入：`scripts/catalog/fetch_catalog.py --school=ntu` 與課程目錄同一次執行（`--skip-requirements` 可略過）。建表：`supabase/course_catalog.sql`。
+RLS 只開 `SELECT TO anon, authenticated`。
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| `school` | text (PK) | 學校代碼，同 D29 |
+| `entry_year` | int (PK) | 入學學年度（民國） |
+| `department` | text (PK) | 學系全名（學校查詢系統的寫法，例如「資訊工程學系」），≤ 50 |
+| `required`、`general`、`elective` | int | 系訂必修、共同＋通識、選修的學分數，0–400 |
+| `total` | int | 最低畢業學分 |
+| `updated_at` | timestamptz | |
+
+來源：
+- 台大：教務處「臺大必修課程查詢」（`curri.aca.ntu.edu.tw`），JSON API 取得入學年度與學系清單，每系每年一頁 HTML，讀頁面上的「合計」與「最低畢業學分」兩列。抓最近 7 屆，只有學士班，2026-09-27 實測 645 筆中 638 筆可讀（學士後護理學系頁面格式不同，需自填）。系所代碼用清單的 `value`（含組別，例如醫學系 40100）。以資工系 114 入學為例：51／24／53／128。
+- 清大：只公告 PDF（每系每年一份），目前沒有內建，清大學生自己填三個門檻（D8-B `credits_*`）。
+

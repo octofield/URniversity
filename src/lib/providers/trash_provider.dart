@@ -43,22 +43,25 @@ class TrashNotifier extends StateNotifier<List<TrashItem>> {
     state = [];
     if (_userId == null) return;
     try {
-      await _db.from('trash_items').delete().eq('user_id', _userId!);
+      await runWithRetry(() => _db.from('trash_items').delete().eq('user_id', _userId!));
     } catch (e) {
-      reportSyncError(ref, e);
+      reportSyncError(ref, e, where: 'trash_items empty');
     }
   }
 
+  // Still an insert: trash_items may have no UPDATE policy for an upsert to
+  // use. The failures retried are ones where the request never went through
   void _insertRow(TrashItem item) {
     if (_userId == null) return;
-    _db.from('trash_items')
-        .insert({...item.toRow(), 'user_id': _userId})
-        .catchError((Object e) => reportSyncError(ref, e));
+    final row = {...item.toRow(), 'user_id': _userId};
+    runWithRetry(() => _db.from('trash_items').insert(row))
+        .catchError((Object e) => reportSyncError(ref, e, where: 'trash_items insert'));
   }
 
   void _deleteRow(String trashId) {
     if (_userId == null) return;
-    _db.from('trash_items').delete().eq('id', trashId).catchError((Object e) => reportSyncError(ref, e));
+    runWithRetry(() => _db.from('trash_items').delete().eq('id', trashId))
+        .catchError((Object e) => reportSyncError(ref, e, where: 'trash_items delete'));
   }
 
   void addTask(Task task) {

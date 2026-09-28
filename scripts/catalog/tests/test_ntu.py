@@ -96,3 +96,38 @@ def test_a_gap_makes_two_sessions():
 def test_what_it_cannot_read_gives_nothing():
     assert ntu.parse_time('') == []
     assert ntu.parse_time('請洽系所辦') == []
+
+
+# Credits by category (system_design.md §3-T)
+
+def test_required_for_collects_the_audiences_it_is_compulsory_for():
+    rows = rows_of('nol_page_no_serial.html')
+    assert rows[0]['required_for'][:2] == ['生技系', '生科系']
+    elective = {r['serial_no']: r for r in rows_of('nol_page.html')}['40428']
+    assert elective['required_for'] == []
+
+
+def test_common_courses_count_as_general_education():
+    assert rows_of('nol_page_no_serial.html')[0]['kind'] == common.KIND_GENERAL
+    assert {r['serial_no']: r for r in rows_of('nol_page.html')}['40428']['kind'] is None
+
+
+def test_the_general_education_page_gives_serials_and_its_total():
+    html = fixture('gen_ed_page.html')
+    serials = {r['serial_no'] for r in ntu.parse_rows(html)}
+    assert '49992' in serials
+    assert ntu.total_count(html) == 324
+    row = {'serial_no': '49992', 'course_code': 'CHIN1096'}
+    assert ntu.kind_of(row, serials) == common.KIND_GENERAL
+    assert ntu.kind_of({'serial_no': '1', 'course_code': 'PE1012'}, serials) == common.KIND_EXCLUDED
+
+
+def test_a_departments_credits_to_graduate():
+    # CSIE, entry year 114: required 51, general 24, elective 53, total 128
+    assert ntu.parse_requirement_totals(fixture('requirements_9020_114.html')) == (51, 24, 53, 128)
+    assert ntu.parse_requirement_totals('<html><body>No data</body></html>') is None
+
+
+def test_a_department_with_a_group_reads_by_its_full_code():
+    # Medicine, fetched as dpt=40100 (the form's value) rather than 4010
+    assert ntu.parse_requirement_totals(fixture('requirements_40100_114.html')) == (201, 24, 0, 225)

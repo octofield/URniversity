@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS course_catalog (
 
 -- For a table made by the first version of this file
 ALTER TABLE course_catalog ADD COLUMN IF NOT EXISTS sessions jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- Credits by category (2026-09-27, D29): the audiences — as the school names
+-- its departments — the course is compulsory for, and whether it is general
+-- education (with the common Chinese and English) or not counted toward
+-- graduation at all (physical education). The app files an added course by
+-- these; re-run the script to fill them
+ALTER TABLE course_catalog ADD COLUMN IF NOT EXISTS required_for text[] NOT NULL DEFAULT '{}';
+ALTER TABLE course_catalog ADD COLUMN IF NOT EXISTS kind text;
+ALTER TABLE course_catalog DROP CONSTRAINT IF EXISTS course_catalog_kind_check;
+ALTER TABLE course_catalog ADD CONSTRAINT course_catalog_kind_check CHECK (kind IN ('general', 'excluded'));
 ALTER TABLE course_catalog ALTER COLUMN school DROP DEFAULT;
 ALTER TABLE course_catalog DROP CONSTRAINT IF EXISTS course_catalog_sessions_check;
 ALTER TABLE course_catalog ADD CONSTRAINT course_catalog_sessions_check
@@ -70,9 +79,37 @@ CREATE TABLE IF NOT EXISTS catalog_schools (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
+-- Every department name the catalog files required courses under, for a
+-- student to pick their own from (D32)
+ALTER TABLE catalog_schools ADD COLUMN IF NOT EXISTS audiences text[] NOT NULL DEFAULT '{}';
+
 ALTER TABLE catalog_schools ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "catalog_schools_read" ON catalog_schools;
 CREATE POLICY "catalog_schools_read" ON catalog_schools
+  FOR SELECT TO anon, authenticated
+  USING (true);
+
+-- Each department's credits to graduate, by entry year (D33), as the school
+-- publishes them: required, general education (with the common courses),
+-- elective, and the total. Written by the script with the catalog, read-only
+-- to everyone else. Department is the school's full name for it, the way the
+-- app's school list writes it
+CREATE TABLE IF NOT EXISTS degree_requirements (
+  school      text NOT NULL,
+  entry_year  integer NOT NULL,
+  department  text NOT NULL CHECK (char_length(department) <= 50),
+  required    integer NOT NULL CHECK (required BETWEEN 0 AND 400),
+  general     integer NOT NULL CHECK (general BETWEEN 0 AND 400),
+  elective    integer NOT NULL CHECK (elective BETWEEN 0 AND 400),
+  total       integer NOT NULL CHECK (total BETWEEN 0 AND 400),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (school, entry_year, department)
+);
+
+ALTER TABLE degree_requirements ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "degree_requirements_read" ON degree_requirements;
+CREATE POLICY "degree_requirements_read" ON degree_requirements
   FOR SELECT TO anon, authenticated
   USING (true);

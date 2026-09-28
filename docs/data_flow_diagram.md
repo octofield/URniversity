@@ -472,7 +472,8 @@ flowchart TD
 | D25 | `haptics_enabled` | 裝置本機 SharedPreferences（觸覺回饋開關，每台裝置各自設定） |
 | D27 | `courses` | Supabase 資料表（課程，時段在同一列的 jsonb；Phase 6 的成績也在這裡） |
 | D29 | `course_catalog` | Supabase 資料表（各校課程目錄，時段已讀好；公開唯讀，由離線腳本寫入） |
-| D32 | `catalog_schools` | Supabase 資料表（可搜尋的學校與學期；公開唯讀，由離線腳本寫入） |
+| D32 | `catalog_schools` | Supabase 資料表（可搜尋的學校、學期與系名；公開唯讀，由離線腳本寫入） |
+| D33 | `degree_requirements` | Supabase 資料表（各系各入學年度的畢業學分：必修／通識／選修／總計；公開唯讀，由離線腳本寫入） |
 | D30 | `term_starts` | 裝置本機 SharedPreferences（各學期開學日；登入帳號另同步到 D8 `user_settings.term_starts`） |
 | D31 | `graduation_credits`、`degree_level` | 裝置本機 SharedPreferences（畢業學分與及格線；登入帳號另同步到 D8） |
 | D26 | `app_style` | 裝置本機 SharedPreferences（使用者選的風格；登入帳號另同步到 D8 `user_settings.app_style`） |
@@ -501,6 +502,7 @@ flowchart TD
     DC[("D27 courses")]
     DCat[("D29 course_catalog")]
     DSch[("D32 catalog_schools")]
+    DReq[("D33 degree_requirements")]
     DT[("D30 term_starts\n＋D8 user_settings.term_starts")]
     DG[("D31 ＋ D8 graduation_credits／degree_level")]
     DTrash[("D6 trash_items")]
@@ -508,11 +510,13 @@ flowchart TD
 
     Src --> Mods --> Script
     Script -- "service role upsert（含 sessions）\n完整時刪掉已停開的課" --> DCat
-    Script -- "寫入成功的學期" --> DSch
+    Script -- "寫入成功的學期、目錄裡的系名" --> DSch
+    Script -- "各系畢業學分（台大，最近 7 屆）" --> DReq
+    DReq -- "開啟依學系分類學分時，依入學年度查" --> PG
     DSch -- "每次開啟讀一次" --> PCat
     User -- "選學校、搜尋課名／老師／課號" --> PCat
     DCat -- "同校同學期 ilike，最多 40 筆" --> PCat
-    PCat -- "加入：複製 sessions" --> PC
+    PCat -- "加入：複製 sessions；開啟分類時依 kind／required_for 定 category" --> PC
     User -- "手動新增／編輯／填成績" --> PC
     PC <--> DC
     PC -- "刪除：整門課連時段" --> DTrash
@@ -527,6 +531,7 @@ flowchart TD
 ```
 
 - 課程目錄只有腳本寫、App 只讀；加入的課是**複製**進 D27，之後與目錄無關（`catalog_id` 只記來源）。
+- 「依學系分類學分」預設關閉；關閉時 App 不讀 D33、不寫 `category` 與 D8-B 的分類欄位（`categoriesTouched`），沒重跑 SQL 也不會同步失敗。
 - 各校的時間字串只在腳本裡讀（`common.periods_to_sessions` 加各校節次表），App 拿到的就是時段；新增一所學校＝一個 Python 模組＋`schools.json` 一筆，App 從 D32 自動多出那所學校的搜尋入口。
 - 一門課的時段在同一列，所以新增、修改、刪除、還原、訪客合併都是一次寫入。
 - GPA、及格學分、目標試算都是由 D27 即時算出，不另外存；只有學期回顧把當時的 GPA 存進 D23 的 `stats`。

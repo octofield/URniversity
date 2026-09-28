@@ -134,5 +134,37 @@ void main() {
       ]);
       expect(b, (startHour: 7, endHour: 22, days: 6));
     });
+
+    List<String> labels(List<ClassPeriod> rows) => [for (final r in rows) r.label];
+    CourseSession at(int start, int end) => CourseSession(weekday: 1, startMinute: start, endMinute: end);
+
+    test('a row per period, 08:00–18:00 by default, each school its own', () {
+      expect(labels(gridRows(kNtuPeriods, const [])), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+      expect(labels(gridRows(kNthuPeriods, const [])), ['1', '2', '3', '4', 'n', '5', '6', '7', '8', '9']);
+    });
+
+    test('grows to the periods a class uses, early or late', () {
+      expect(labels(gridRows(kNtuPeriods, [at(hm(7, 10), hm(8, 0)), at(hm(18, 25), hm(20, 10))])),
+          ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'A', 'B']);
+      expect(labels(gridRows(kNthuPeriods, [at(hm(20, 30), hm(21, 20))])).last, 'c');
+    });
+
+    test('hour rows without a table, or when a class lies beyond it', () {
+      final hours = gridRows(null, const []);
+      expect(hours.length, 10);
+      expect((hours.first.start, hours.last.end), (hm(8, 0), hm(18, 0)));
+      expect(gridRows(kNtuPeriods, [at(hm(22, 30), hm(23, 0))]).first.label, '');
+    });
+
+    test('a minute sits by its share of its row; a break takes no room', () {
+      final rows = gridRows(kNtuPeriods, const []);
+      expect(rowPosition(rows, hm(8, 10)), 0); // Period 1 starts
+      expect(rowPosition(rows, hm(10, 20)), 2); // Period 3 starts
+      expect(rowPosition(rows, hm(12, 10)), 4); // Period 4 ends
+      expect(rowPosition(rows, hm(10, 5)), 2, reason: 'the 10:00–10:20 break sits on the line');
+      expect(rowPosition(rows, hm(8, 35)), 0.5);
+      expect(rowPosition(rows, hm(6, 0)), 0);
+      expect(rowPosition(rows, hm(23, 0)), rows.length);
+    });
   });
 }

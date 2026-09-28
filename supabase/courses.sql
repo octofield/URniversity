@@ -26,13 +26,29 @@ CREATE TABLE IF NOT EXISTS courses (
                                        'pass', 'fail', 'withdrawn')),
   counts_in_gpa  boolean NOT NULL DEFAULT true,
   color          bigint NOT NULL,
-  catalog_id     text CHECK (char_length(catalog_id) <= 60),
+  -- "<school>_<semester>_<key>", course_catalog.id (≤ 80)
+  catalog_id     text CHECK (char_length(catalog_id) <= 80),
+  -- 2026-09-27: where the credits count toward graduation, when the user has
+  -- credits by category on; null is not yet filed
+  category       text CHECK (category IN ('required', 'elective', 'general', 'excluded')),
   sessions       jsonb NOT NULL DEFAULT '[]'
                  CHECK (jsonb_typeof(sessions) = 'array' AND jsonb_array_length(sessions) <= 20),
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS courses_user_idx ON courses (user_id, semester);
+
+-- 2026-09-27: catalog ids gained the school in front and can reach 80
+-- characters; a table made before then capped catalog_id at 60, which would
+-- reject adding such a course. Re-created under the inline CHECK's own name
+ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_catalog_id_check;
+ALTER TABLE courses ADD CONSTRAINT courses_catalog_id_check CHECK (char_length(catalog_id) <= 80);
+
+-- 2026-09-27: credits by category (D27 category), for a table made before
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS category text;
+ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_category_check;
+ALTER TABLE courses ADD CONSTRAINT courses_category_check
+  CHECK (category IN ('required', 'elective', 'general', 'excluded'));
 
 ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 
@@ -52,6 +68,20 @@ ALTER TABLE user_settings
 ALTER TABLE user_settings
   ADD COLUMN IF NOT EXISTS graduation_credits integer CHECK (graduation_credits BETWEEN 1 AND 400),
   ADD COLUMN IF NOT EXISTS degree_level text CHECK (degree_level IN ('bachelor', 'graduate'));
+
+-- 2026-09-27: credits by category (D8-B, D31). Off unless the user turns it
+-- on; the entry year and department pick the credits to graduate from
+-- degree_requirements, catalog_department is the department's name as the
+-- catalog writes it ("資工系"), and the three credits are the user's own when
+-- the school publishes none. Read and written on their own, like term_starts
+ALTER TABLE user_settings
+  ADD COLUMN IF NOT EXISTS credit_categories_enabled boolean,
+  ADD COLUMN IF NOT EXISTS entry_year integer CHECK (entry_year BETWEEN 50 AND 300),
+  ADD COLUMN IF NOT EXISTS requirement_department text CHECK (char_length(requirement_department) <= 50),
+  ADD COLUMN IF NOT EXISTS catalog_department text CHECK (char_length(catalog_department) <= 50),
+  ADD COLUMN IF NOT EXISTS credits_required integer CHECK (credits_required BETWEEN 0 AND 400),
+  ADD COLUMN IF NOT EXISTS credits_general integer CHECK (credits_general BETWEEN 0 AND 400),
+  ADD COLUMN IF NOT EXISTS credits_elective integer CHECK (credits_elective BETWEEN 0 AND 400);
 
 -- A deleted course goes to the trash like a task. If trash_items limits
 -- item_type with a CHECK, it has to allow 'course' too. This re-creates the

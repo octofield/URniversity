@@ -19,6 +19,10 @@ class CatalogCourse {
   // as is; the meetings themselves come ready in [sessions]
   final String? timeText;
   final List<CourseSession> sessions;
+  // The departments, as the school names them, it is compulsory for; and
+  // 'general' / 'excluded' when the school marks it so (credits by category)
+  final List<String> requiredFor;
+  final String? kind;
 
   const CatalogCourse({
     required this.id,
@@ -32,6 +36,8 @@ class CatalogCourse {
     this.required,
     this.timeText,
     this.sessions = const [],
+    this.requiredFor = const [],
+    this.kind,
   });
 
   factory CatalogCourse.fromJson(Map<String, dynamic> j) => CatalogCourse(
@@ -49,6 +55,8 @@ class CatalogCourse {
           for (final s in (j['sessions'] as List<dynamic>? ?? const []))
             CourseSession.fromJson(s as Map<String, dynamic>),
         ],
+        requiredFor: [for (final a in (j['required_for'] as List<dynamic>? ?? const [])) a as String],
+        kind: j['kind'] as String?,
       );
 }
 
@@ -62,14 +70,50 @@ class CatalogSchool {
   final String name;
   final String shortName;
   final List<String> semesters;
+  // Every department name the catalog files required courses under, for the
+  // user to pick their own from
+  final List<String> audiences;
 
-  const CatalogSchool({required this.code, required this.name, required this.shortName, this.semesters = const []});
+  const CatalogSchool({
+    required this.code,
+    required this.name,
+    required this.shortName,
+    this.semesters = const [],
+    this.audiences = const [],
+  });
 
   factory CatalogSchool.fromJson(Map<String, dynamic> j) => CatalogSchool(
         code: j['code'] as String,
         name: j['name'] as String,
         shortName: j['short_name'] as String,
         semesters: [for (final s in (j['semesters'] as List<dynamic>? ?? const [])) s as String],
+        audiences: [for (final a in (j['audiences'] as List<dynamic>? ?? const [])) a as String],
+      );
+}
+
+// One department's credits to graduate for one entry year (D33), as the
+// school publishes them
+class DegreeRequirement {
+  final String department;
+  final int required;
+  final int general;
+  final int elective;
+  final int total;
+
+  const DegreeRequirement({
+    required this.department,
+    required this.required,
+    required this.general,
+    required this.elective,
+    required this.total,
+  });
+
+  factory DegreeRequirement.fromJson(Map<String, dynamic> j) => DegreeRequirement(
+        department: j['department'] as String,
+        required: (j['required'] as num).toInt(),
+        general: (j['general'] as num).toInt(),
+        elective: (j['elective'] as num).toInt(),
+        total: (j['total'] as num).toInt(),
       );
 }
 
@@ -78,6 +122,10 @@ class CatalogSchool {
 abstract class CatalogSource {
   Future<List<CatalogSchool>> schools();
   Future<List<CatalogCourse>> search(String school, String semester, String query);
+  // Catalog rows by id, for filing courses added before credits by category
+  Future<List<CatalogCourse>> byIds(List<String> ids);
+  // Every department's requirements at a school for an entry year
+  Future<List<DegreeRequirement>> requirements(String school, int entryYear);
 }
 
 class SupabaseCatalogSource implements CatalogSource {
@@ -105,6 +153,24 @@ class SupabaseCatalogSource implements CatalogSource {
         .limit(limit);
     return [for (final r in rows as List<dynamic>) CatalogCourse.fromJson(r as Map<String, dynamic>)];
   }
+
+  @override
+  Future<List<CatalogCourse>> byIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final rows = await Supabase.instance.client.from('course_catalog').select().inFilter('id', ids);
+    return [for (final r in rows as List<dynamic>) CatalogCourse.fromJson(r as Map<String, dynamic>)];
+  }
+
+  @override
+  Future<List<DegreeRequirement>> requirements(String school, int entryYear) async {
+    final rows = await Supabase.instance.client
+        .from('degree_requirements')
+        .select()
+        .eq('school', school)
+        .eq('entry_year', entryYear)
+        .order('department');
+    return [for (final r in rows as List<dynamic>) DegreeRequirement.fromJson(r as Map<String, dynamic>)];
+  }
 }
 
 final catalogSourceProvider = Provider<CatalogSource>((ref) => SupabaseCatalogSource());
@@ -117,4 +183,9 @@ final catalogSchoolsProvider = FutureProvider<List<CatalogSchool>>(
 final catalogSearchProvider = FutureProvider.autoDispose
     .family<List<CatalogCourse>, ({String school, String semester, String query})>(
   (ref, args) => ref.watch(catalogSourceProvider).search(args.school, args.semester, args.query),
+);
+
+final degreeRequirementsProvider = FutureProvider.autoDispose
+    .family<List<DegreeRequirement>, ({String school, int entryYear})>(
+  (ref, args) => ref.watch(catalogSourceProvider).requirements(args.school, args.entryYear),
 );

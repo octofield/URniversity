@@ -21,6 +21,9 @@ class Course {
   // The catalog row it was added from, if any. Not a foreign key: the catalog
   // is reloaded every semester
   final String? catalogId;
+  // Where its credits count toward graduation, when credits by category are
+  // on (core/credit_categories.dart); null until filed
+  final String? category;
   final List<CourseSession> sessions;
   final DateTime createdAt;
 
@@ -36,6 +39,7 @@ class Course {
     this.countsInGpa = true,
     required this.color,
     this.catalogId,
+    this.category,
     this.sessions = const [],
     required this.createdAt,
   });
@@ -52,6 +56,7 @@ class Course {
         countsInGpa: j['counts_in_gpa'] as bool? ?? true,
         color: (j['color'] as num?)?.toInt() ?? 0xFF4A90C4,
         catalogId: j['catalog_id'] as String?,
+        category: j['category'] as String?,
         sessions: [
           for (final s in (j['sessions'] as List<dynamic>? ?? const []))
             CourseSession.fromJson((s as Map).cast<String, dynamic>()),
@@ -71,6 +76,10 @@ class Course {
         'counts_in_gpa': countsInGpa,
         'color': color,
         'catalog_id': catalogId,
+        // Only once filed: a database without the column (courses.sql not
+        // yet re-run) then still takes every course of someone not using
+        // credits by category
+        if (category != null) 'category': category,
         'sessions': [for (final s in sessions) s.toJson()],
         'created_at': createdAt.toIso8601String(),
       };
@@ -85,6 +94,7 @@ class Course {
     bool? countsInGpa,
     int? color,
     String? semester,
+    String? category,
     List<CourseSession>? sessions,
   }) =>
       Course(
@@ -99,6 +109,7 @@ class Course {
         countsInGpa: countsInGpa ?? this.countsInGpa,
         color: color ?? this.color,
         catalogId: catalogId,
+        category: category ?? this.category,
         sessions: sessions ?? this.sessions,
         createdAt: createdAt,
       );

@@ -29,7 +29,19 @@ python scripts/catalog/fetch_catalog.py --list                         # the sch
 python scripts/catalog/fetch_catalog.py --school=ntu --semesters=115-1
 python scripts/catalog/fetch_catalog.py --school=ntu,nthu              # each school's own defaults
 python scripts/catalog/fetch_catalog.py --school=all --dry-run         # fetch and parse, write nothing
+python scripts/catalog/fetch_catalog.py --school=ntu --skip-requirements
 ```
+
+A school that publishes its departments' credits to graduate has them fetched
+in the same run, into `degree_requirements` (D33). `--skip-requirements`
+leaves them as they are.
+
+For NTU, that is the registrar's query at `curri.aca.ntu.edu.tw`:
+- the latest 7 entry years, bachelor's departments only;
+- about 660 pages, 0.5 s apart.
+
+NTHU publishes only PDFs, so it has none. Its students enter the numbers
+themselves.
 
 `--school` is required, so a run never reaches a server nobody asked for.
 
@@ -94,6 +106,16 @@ Measured on 115-1 (2026-09-26):
 - **`time_text`** is kept as the school writes it, for display.
 - **`sessions`** are the meetings read from that text. They have the same shape
   as a course's own sessions, and are copied there when a course is added.
+- **`required_for`** lists the departments, as the school names them, that the
+  course is compulsory for. `catalog_schools.audiences` collects every such name.
+- **`kind`** is one of:
+  - `general`: general education, including the common Chinese and English.
+    NTU's general-education serials come from a separate NOL page, area by area.
+  - `excluded`: physical education, which does not count toward graduation.
+  - `null`: anything else.
+- The app uses `required_for` and `kind` to file an added course as required,
+  general, elective or not counted — only for users who switch credits by
+  category on.
 
 ## Tests
 

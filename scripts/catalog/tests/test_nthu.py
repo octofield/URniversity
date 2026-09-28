@@ -113,3 +113,22 @@ def test_rows_for_the_database():
     assert len(rows) == 7
     assert rows[0]['id'] == 'nthu_115-1_AES 450100'
     assert all(len(r['teacher'] or '') <= common.LIMITS['teacher'] for r in rows)
+
+
+# Credits by category (system_design.md §3-T)
+
+def test_required_for_names_the_department_without_its_year_and_class():
+    assert by_code('11510ANTH651000')['required_for'] == ['人類所']
+    assert by_code('11510AES 450100')['required_for'] == []
+    r = nthu.to_record(dict(data()[0], **{'必選修說明': '數學系115BA 必修\t數學系115BB 必修\t物理系112B  選修\t'}))
+    assert r['required_for'] == ['數學系']
+    assert r['audience'] == ['數學系', '物理系']
+
+
+def test_general_education_common_courses_and_physical_education():
+    base = data()[0]
+    assert nthu.kind_of(dict(base, **{'通識類別': '核心通識Core GE '})) == common.KIND_GENERAL
+    assert nthu.kind_of(dict(base, **{'科號': '11510CL  101000', '通識類別': ''})) == common.KIND_GENERAL
+    assert nthu.kind_of(dict(base, **{'科號': '11510LANG101000', '通識類別': ''})) == common.KIND_GENERAL
+    assert nthu.kind_of(dict(base, **{'科號': '11510PE  100100', '通識類別': ''})) == common.KIND_EXCLUDED
+    assert nthu.kind_of(base) is None

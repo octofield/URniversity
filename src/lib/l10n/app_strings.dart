@@ -509,6 +509,7 @@ abstract class AppStrings {
   String get catalogUnavailable;
   String get catalogTypeMore;
   String get catalogAdded;
+  String get catalogRemove;
   String get noCoursesYet;
   String get todayClasses;
   String get classNext;
@@ -523,6 +524,7 @@ abstract class AppStrings {
 
   // Grades and GPA (Phase 6)
   String get courseTitleRequired;
+  String courseCreditsTooMany(int max);
   String get courseGradeLabel;
   String get gradeNone;
   String get gradePass;
@@ -546,6 +548,24 @@ abstract class AppStrings {
   String get degreeBachelor;
   String get degreeGraduate;
   String get gradesOtherSchool;
+  String get creditCategories;
+  String get creditCategoriesBeta;
+  String get creditCategoriesHint;
+  String get categoryRequired;
+  String get categoryElective;
+  String get categoryGeneral;
+  String get categoryExcluded;
+  String get categoryUnfiled;
+  String get creditCategory;
+  String get creditsTotal;
+  String get entryYear;
+  String get requirementDepartment;
+  String get catalogDepartment;
+  String get catalogDepartmentHint;
+  String requirementsFrom(int year, String department);
+  String get requirementsManual;
+  String unfiledCourses(int count);
+  String get fileAutomatically;
   String get noGradesYet;
   String creditsCount(String credits);
 
@@ -560,6 +580,11 @@ abstract class AppStrings {
   // Developer mode: open a review
   String get devOpenReview;
   String get devOpenReviewHint;
+  String get syncLog;
+  String get syncLogHint;
+  String get syncLogEmpty;
+  String get syncLogCopy;
+  String get syncLogCopied;
 
   // Account actions
   String get logout;
