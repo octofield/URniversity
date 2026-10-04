@@ -12,6 +12,7 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/responsive_body.dart';
 import 'review_screen.dart';
+import '../widgets/app_page.dart';
 
 // Every review done, newest first. Each opens to the numbers as they stood and
 // what was written — the point of keeping them is reading them back a month on
@@ -23,7 +24,7 @@ class ReviewsScreen extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final reviews = ref.watch(reviewsProvider);
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(title: Text(s.reviews)),
       body: ResponsiveBody(
         child: reviews.isEmpty
@@ -35,7 +36,7 @@ class ReviewsScreen extends ConsumerWidget {
                 itemBuilder: (_, i) => _ReviewTile(review: reviews[i]),
               ),
       ),
-    );
+    ));
   }
 }
 

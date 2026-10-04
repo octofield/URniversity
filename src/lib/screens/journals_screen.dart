@@ -11,6 +11,7 @@ import '../widgets/confirm_dialog.dart';
 import 'journal_edit_screen.dart';
 import '../widgets/responsive_body.dart';
 import 'me_screen.dart' show JournalDetailScreen;
+import '../widgets/app_page.dart';
 
 
 class JournalsScreen extends ConsumerWidget {
@@ -34,10 +35,10 @@ class JournalsScreen extends ConsumerWidget {
       return d.difference(earliest).inDays + 1;
     }
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(title: Text(s.allJournals)),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
+        onPressed: () => Navigator.push(context, AppPageRoute(builder: (_) => const JournalEditScreen())),
         child: const Icon(Icons.edit_note),
       ),
       body: ResponsiveBody(
@@ -59,7 +60,7 @@ class JournalsScreen extends ConsumerWidget {
                 },
               ),
       ),
-    );
+    ));
   }
 }
 
@@ -86,7 +87,7 @@ class _JournalCard extends ConsumerWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => JournalDetailScreen(journal: journal))),
+        onTap: () => Navigator.push(context, AppPageRoute(builder: (_) => JournalDetailScreen(journal: journal))),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(

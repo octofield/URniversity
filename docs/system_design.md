@@ -89,7 +89,8 @@ flowchart TD
 - `_AuthGate` 包住每一條路由，只管四件事：重設密碼、登入狀態還沒確定時的啟動畫面、第一次登入設定暱稱、維護模式。
   維護模式只取代頁面，不取代登入頁（管理員要能登入）。
 - 主要頁面用 `openPage()`（`context.push`，網址跟著變，上一頁回到原處）；直接輸入網址開啟時底下沒有頁面，AppBar 左上改成回任務頁的按鈕（`homeButtonIfFirst`）。
-- 詳情頁、sheet、日記、回收桶等沒有自己的網址，照舊 `Navigator.push`。
+- 詳情頁、sheet、日記、回收桶等沒有自己的網址，照舊 `Navigator.push`，但頁面用 `AppPageRoute`（2026-10-04，讓手勢能帶動轉場，§3-Q）；
+  路由裡的 `/timetable`、`/grades`、`/settings`、`/admin` 用 `GesturePage`（同一種路由）。
 
 ### 1-B 畫面導覽架構
 
@@ -120,9 +121,9 @@ flowchart TD
 
     Today -.->|進度卡點擊| History["TaskHistoryScreen\n完成度歷史"]
     Semester -.->|頁首 icon| Graph["OverviewGraphScreen\n關聯圖"]
-    Today -.->|課表卡／今天的課 · /timetable| Timetable["TimetableScreen\n課表｜成績"]
-    Settings2["SettingsScreen · /settings"] -.->|管理員才有的「後台」| AdminS["AdminScreen · /admin"]
+    Today -.->|今天的課 · /timetable| Timetable["TimetableScreen\n課表｜成績"]
     Home -.->|側邊欄「課表」| Timetable
+    Home -.->|側邊欄「後台」（管理員才有）| AdminS["AdminScreen · /admin"]
     Future -.->|頁首 icon| Graph
     Semester -.-> SemDetail["SemesterGoalDetailScreen"]
     Future -.-> FutDetail["FutureGoalDetailScreen"]
@@ -208,8 +209,16 @@ API，等於把那份名單公開出去。
 
 先前截止前一天就變橘、一過期就變紅。
 
+**循環任務的時間**（2026-10-04）：循環任務的截止時間是「每一次的時間」，不是期限——
+- 任務列只有一行「⟳ 每週四 07:00」（`_repeatLine`）：不顯示日期、時鐘圖示與截止顏色，也沒有延後鈕。週檢視同樣格式。
+- sheet 選了循環後，「截止時間」欄改叫「時間」，只選時:分（`_showTimeOfDayPicker`，保留原本的日期）；「5 分鐘後」等相對建議不出現，最近用過的時間仍在。
+- 存檔時，**每週但沒選星期**的規則改用截止那天的星期幾，**每月但沒選日期**的改用那天的號數（`RecurrenceRule.anchoredTo`）：
+  設 10/08 07:00、每週 → 每週四 07:00。以前沒選時用的是「建立那天」，所以截止日與重複日會不一致。
+  **既有任務只要規則與時間都沒動，存檔時規則原封不動**（`_savedRecurrence`），舊任務不會被搬到別天。
+- 通知本來就把循環任務的截止時間當成每天的時:分（§3-K），不受影響。
+
 **延後一天**（2026-10-03）：一次性、還沒完成、已過期的任務，刪除鈕左邊多一個「延後一天」（`Icons.update`），
-截止時間改為**明天、原本的時:分**（`postponedToTomorrow`），並提示「已延後到 10/04 14:00」。重複任務沒有這個鈕（過期的那次由重複規則決定）。
+按下先問「延後到 10/05 14:00？」（`confirmAction`，2026-10-04），確認後截止時間改為**明天、原本的時:分**（`postponedToTomorrow`），並提示「已延後到 10/05 14:00」。重複任務沒有這個鈕（過期的那次由重複規則決定）。
 
 **目標頁的進度總覽卡**（2026-09-18 改版，設計稿 A 版）：大字百分比 + 「已完成 / 總數」+ 一條
 整體進度條，下方每個分類一個小膠囊（分類色圓點 + 該分類的完成數／總數）。取代原本「每個目標
@@ -374,6 +383,7 @@ API，等於把那份名單公開出去。
 | 日期顯示格式 | 單選清單（附即時預覽） | 4 種格式，見 data_dictionary.md |
 | 預設任務檢視 | 單選清單 | 全部／每日／每週 |
 | 學期制度 | 數字選擇 + 每學期起始月 | 每年 2/3/4 學期，起始月 1–12 |
+| 開學日與週次（2026-10-04） | 對話框列出上學期、本學期、下學期與自己設過的學期；點一列開課表同一個對話框（`widgets/term_dialog.dart` 的 `editTermStart`） | 每列顯示「9/7 起 · 16 週」，學校的加註「（學校預設）」，沒有的顯示「設定開學日」；寫入 D30，和課表是同一個值 |
 | 日記天數徽章開關 | `Switch` | 開／關 |
 | 開發者模式時間覆寫 | 日期選擇器 | 覆寫「現在時間」，僅供測試用（見 §4-J） |
 | 開發者模式開啟回顧 | 單選對話框（本週／上個月／本學期，附日期範圍） | 不論是否到期，直接開 `ReviewScreen`；完成會存成真的回顧（見 §3-P） |
@@ -403,7 +413,7 @@ API，等於把那份名單公開出去。
 ### 2-H 任務完成度歷史（TaskHistoryScreen）
 
 輸入：日／週／月檢視切換（`SegmentedButton`；2026-10-03 起也能左右滑動切換，水平 shared axis，切換鈕跟著）、
-點擊或滑鼠移到長條上選取該期間；往下拉關閉頁面（`PullToClose`，§3-Q）。
+點擊或滑鼠移到長條上選取該期間；往下拉關閉頁面（頁面模板 `AppPage`，§3-Q）。
 輸出（**2026-09-20 改版，設計稿 A**）：四張卡片，由上到下
 
 | 卡片 | 內容 | 來源 |
@@ -530,7 +540,7 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 **頁面順序與手勢**（2026-09-27）：兩個頁面排成一條線——…上學期成績 · 本學期課表 · 本學期成績 · 下學期課表…。
 左滑往後、右滑往前（`SwipeSwitcher`）：課表左滑到本學期成績、右滑到上學期成績；成績左滑到下學期課表、右滑到本學期課表。
 換頁用水平 shared axis（§3-Q）。內容已在頂端時繼續往下拉，或直接往下拖頁首，頁面以一半速度跟著手指；
-放開時決定關閉或彈回（`PullToClose`，規則與流程圖在 §3-Q）。
+放開時決定關閉或彈回（頁面模板 `AppPage`，規則與流程圖在 §3-Q）。左右滑是換頁，所以這兩頁沒有右滑返回。
 
 | 輸入 | 元件 | 格式／規則 |
 |---|---|---|
@@ -539,8 +549,8 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 | 學分類別（開啟依學系分類學分時） | chip | 必修／選修／通識／不計；從目錄加入時已自動填好（§3-T），可改 |
 | 成績（編輯時才有） | 等第 chip ＋「計入 GPA」開關 | A+…C-、F、X，或通過／不通過／停修；再點一次取消 |
 | 依學系分類學分（測試中） | 成績頁的開關，預設關 | 開啟時自動帶入入學年度（由年級推算）、學系（個人資料）、目錄裡的系名（依字元相似度猜）；三者都可用下拉選單改。學校沒公告這個學系的規定時，自己填必修／通識／選修三個數字 |
-| 開學日 | 對話框 | 日期＋上課週數（1–30，預設 16）；預設值是自己學校公告的開學日（D32 `term_starts`，2026-10-03），學校沒有資料時是學期起始月的第一個週一。按下儲存就成為自己的設定（D30） |
-| 課程任務（編輯時才有，2026-10-03） | 課程 sheet「這堂課的任務」 | 「新增任務」開一般任務 sheet，已連到這堂課、截止時間預設為下一次上課開始（`nextMeetingStart`，7 天內），可改成每週重複；下方列出這堂課的任務，點了編輯 |
+| 開學日 | 對話框（`editTermStart`，設定頁的「開學日與週次」用同一個） | 日期＋上課週數（1–30，預設 16）；預設值是自己學校公告的開學日（D32 `term_starts`，2026-10-03），學校沒有資料時是學期起始月的第一個週一。按下儲存就成為自己的設定（D30） |
+| 課程任務（編輯時才有，2026-10-03） | 課程 sheet「這堂課的任務」，**在上課時段之上**（2026-10-04） | 「新增任務」開一般任務 sheet，已連到這堂課、截止時間預設為下一次上課開始（`nextMeetingStart`，7 天內），可改成每週重複；下方用任務頁同一個 `TaskTile` 列出這堂課的任務（勾選、刪除線、時間、延後、刪除都一樣），點了編輯 |
 | 畢業學分、身分 | 成績頁第一次開啟時的內嵌卡片 | 1–400（預設 128）；學士班（C- 及格）／研究所（B- 及格） |
 | 目標累積 GPA | 數字欄 | 0–4.3，即時顯示剩下的課平均要多少 |
 
@@ -548,15 +558,15 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 課程方塊有三行以上空間時最後一行「3 學分」、任務頁「今天的課」（上課中加粗、下一堂標記、上完的變淡；沒課或不在上課週就不佔空間）、
 上課前提醒、小工具「課表」分頁；成績頁三格（本學期 GPA、累積 GPA 與百分制、已修／畢業學分）、GPA 趨勢線、試算結果、依學期分組的課程與等第。
 **匯出 PNG**（2026-10-03）：AppBar 的分享鈕把這學期的課表畫成圖（`RepaintBoundary.toImage`，pixelRatio 3）：
-上方學期與總學分、下方格線，不畫「現在」紅線。手機開分享選單（`share_plus`），網頁直接下載 `URniversity-<學期>.png`
+上方學期與總學分、下方格線，不畫「現在」紅線。2026-10-04 起圖的四周留 `lg` 外距，內容放在有細框線、圓角的白底卡片裡（內距 `md`），不再貼邊；畫面上不受影響。手機開分享選單（`share_plus`），網頁直接下載 `URniversity-<學期>.png`
 （`core/save_image/` 依平台條件 import）；失敗時提示「匯出失敗」。
 
 開啟依學系分類學分時，「已修學分」一格換成四條進度（必修、通識、選修、總計，各為「已修／門檻」）、門檻來源說明，以及「N 門課還沒分類 · 自動分類」。
 
 ### 2-O 後台（`/admin`，2026-09-28）
 
-只給 `admins` 表裡的帳號（D34）；設定頁也只有管理員看得到「後台」一列。寬螢幕左側分頁、手機上方分頁，右上「重新整理」。
-左滑到下一個分頁、右滑回上一個（`SwipeSwitcher`，水平 shared axis，與課表／成績相同），手機上方的分頁列跟著移動。內容避開 Android 導航列與 iPhone 的主畫面指示條（`SafeArea(top: false)`）。往下拉關閉（`PullToClose`，2026-10-03）。
+只給 `admins` 表裡的帳號（D34）；入口在側邊欄分隔線下、「課表」之下（手機的抽屜、桌面的 rail，2026-10-04 從設定頁移來），只有管理員看得到（`isAdminProvider`）。寬螢幕左側分頁、手機上方分頁，右上「重新整理」。
+左滑到下一個分頁、右滑回上一個（`SwipeSwitcher`，水平 shared axis，與課表／成績相同），手機上方的分頁列跟著移動。內容避開 Android 導航列與 iPhone 的主畫面指示條（`SafeArea(top: false)`）。往下拉關閉（頁面模板 `AppPage`，左右滑是換分頁所以沒有右滑返回，§3-Q）。
 
 | 分頁 | 輸入 | 輸出 |
 |---|---|---|
@@ -810,6 +820,40 @@ IconButton 的觸控範圍，也放得下 headlineSmall），三條線在左、�
 `load()` 失敗會把 `_userId` 設回 null，讓之後的 `load()` 能重試；但**`reload()`（回前景時
 處理通知背景寫入用）失敗時會把 `_userId` 還原**——那裡之後沒有別的 `load()` 會來，
 不還原的話該 session 後續**所有寫入都被靜默丟掉**（`upsert()` 開頭 `if (_userId == null) return;`）。
+
+**單列讀取也重試、`.maybeSingle()` 的錯誤代碼**（2026-10-04）：後台的錯誤報告裡，`user_settings` 的各種 load（設定、風格、畢業學分、學分分類、個人資料）
+反覆出現 `code=401 | {"code":"PGRST303",…,"message":"JWT issued at future"}`——從 2026-09-28 到 10-04，網頁與 Android 都有。兩個原因：
+- 這些讀取用 `.maybeSingle()`，而 postgrest-dart 在處理它的錯誤時於自己的 `try` 裡重新丟出，外層 `catch` 只留下 HTTP 狀態（`401`）與 PostgREST 的 JSON 原文，
+  真正的代碼 `PGRST303` 不見了，`isTransientSyncError` 就不會重試。現在由 `postgrestCode()` 從訊息裡讀回代碼。
+- 這些單列讀取本來就沒有經過 `runWithRetry`，失敗一次就回報。現在都包在 `readWithRetry()` 裡（與寫入同樣 5 次、約 6 秒）；
+  遠端設定與背景 isolate 的讀取有各自的退路，不在此列。
+
+**保持最新**（`providers/realtime_sync.dart` 的 `LiveSync`，2026-10-04）：先前清單只在登入時讀一次，另一台裝置的修改要重開 App 才看得到。
+
+- **推送**：登入（非訪客）後訂閱 Supabase Realtime 的 `postgres_changes`，七張清單表各一個（`user_id = 自己`）；
+  新增／修改帶整列 → `applyRemote(row)`，刪除只帶 id → `applyRemote(deletedId)`。要先跑 `supabase/realtime.sql` 把表加進 publication，
+  沒跑時不會有推送，下面的補抓仍然有效。斷線重連後補抓一次，彌補斷線期間漏掉的推送。登出或切成訪客時取消訂閱。
+- **補抓**：App 回到前景（網頁切回分頁也算，`AppLifecycleState.resumed`）時，七個清單 `refresh()`、回收桶 `refresh()`；距離上次不到 30 秒（`kResumeRefreshGap`）就略過。
+  設定類（`user_settings` 等）仍只在登入時讀。
+- **不蓋掉自己的修改**：`SyncedListNotifier` 記住還沒被伺服器確認的寫入（`_pending`：id → 送出的版本，刪除是 null）。
+  取回的資料與推送都以伺服器為底、再蓋上這些版本；推送的那一列若在 `_pending` 就忽略（自己寫入的回音也一樣）。
+  在取回途中才被確認的寫入另外記在 `_landed`，也蓋上去——取回的資料可能是那次寫入之前的快照。
+  失敗（用盡重試）的寫入留在 `_pending`，下次 `refresh()` 先重送。
+
+```mermaid
+flowchart TD
+    W(["本機寫入"]) --> P["_pending[id] = 這個版本"]
+    P --> S["送出（runWithRetry）"]
+    S -->|成功，且仍是最新版本| Rm["移出 _pending\n有取回在進行 → 記進 _landed"]
+    S -->|失敗| F["標記 failed，回報同步錯誤"]
+    R(["回到前景 / 重連"]) --> Re["failed 的先重送"]
+    Re --> Fe["取回整個清單（_fetching++）"]
+    Fe --> M["伺服器的列 + _landed + _pending 蓋上去"]
+    M --> C["沒有取回在進行 → 清空 _landed"]
+    Push(["Realtime 推送"]) --> Pend{"id 在 _pending？"}
+    Pend -->|是| Ign["忽略，保留本機版本"]
+    Pend -->|否| Ap["新增／取代／刪除該列"]
+```
 
 **佐證方式**：release 版 SnackBar 不顯示細節，但 `reportSyncError()` 會 `debugPrint('[sync] …')`，
 release 也會輸出到 logcat。出現時 `adb logcat -s flutter` 找 `[sync]` 那一行。
@@ -1236,30 +1280,49 @@ flowchart TD
 
 `AnimatedRows` 以 key 比對前後兩次的列：消失的列保留最後的 widget、`IgnorePointer`，
 一支 controller 跑完「停留＋收合」（收合是 `Interval` 後段）；新列展開；留著的列不動、state 保留。
-被移走的任務列之所以畫得出刪除線，是因為 `_TaskTile` 讀的是 provider 裡**當下**的那筆任務，
+被移走的任務列之所以畫得出刪除線，是因為 `TaskTile` 讀的是 provider 裡**當下**的那筆任務，
 不是建立時傳進來的舊物件。
 
 **減少動態**：系統開啟「移除動畫」（`MediaQuery.disableAnimations`）時，`motionScale()` 為 0：
 自訂 controller 與停留時間直接跳到結果，彩帶不放，關聯圖粒子停止。隱式動畫用 `scaled()`，
 回傳 1 微秒而不是 0——`AnimatedSize` 收到 0 會在自己的 layout 裡完成動畫、觸發框架斷言。
 
-**往下拉關閉**（`widgets/pull_to_close.dart`，課表／成績、完成度歷史、後台、同步紀錄，2026-10-03 改版）：
-內容已在頂端時繼續往下拉（Android 的 overscroll、iOS 的回彈都算），頁面跟著手指往下移；記住**最後一次移動的方向**。
+**頁面模板：下拉關閉與右滑返回**（`widgets/app_page.dart`，2026-10-04 取代 `PullToClose`）：
+每個疊在別頁上面打開的頁面（設定、通知設定、分類、回收桶、靈感、日記列表／詳情／編輯、回顧列表／回顧、關聯圖、完成度、課表／成績、後台、同步紀錄、目標／願景詳情）
+把自己的 `Scaffold` 包在 `AppPage` 裡，關閉的手勢都一樣：
+
+- **往下**：內容已在頂端時繼續往下拉（Android 的 overscroll、iOS 的回彈），或直接拖不會捲動的地方（AppBar、短頁面的空白）。
+- **往右**：從頁面任何地方往右滑＝返回（像 iOS、LINE）。頁內會橫向捲動的東西（關聯圖、長條圖、文字框）自己先接手勢。
+  有前後頁可切換的頁面（課表／成績、完成度的日／週／月、後台的分頁）左右滑是換頁，用 `AppPage(swipeBack: false)`。
+- **不能返回就沒有手勢**：`ModalRoute.popGestureEnabled` 為 false 時（底下沒有頁面、直接輸入網址開的頁面、還在進場）完全不動。
+- **跟著手指**：頁面沿著手指方向移動、縮到約 94%、圓角漸大（`_followFinger`）。
+  用 `AppPageRoute` 開的頁面由手指**直接控制路由本身的轉場**（`controller.value = 1 − 進度`）：
+  路由一離開「完成」狀態就不再不透明，所以**底下那頁真的露出來**，它自己被蓋住時的轉場也跟著倒回來。
+  拖曳期間主題的轉場收到 `kAlwaysCompleteAnimation`（保持完整顯示），手勢的位移畫在它外面，
+  所以切換前後頁面下方的 widget 樹不變、狀態不會重設；系統的返回手勢（Android predictive back、iOS 邊緣滑）照舊由主題處理。
+  卡片展開的詳情頁（`OpenContainer` 的路由）不是 `AppPageRoute`，改成頁面自己移動，放開關閉時一邊彈回一邊 pop，讓頁面縮回卡片。
 
 ```mermaid
 flowchart TD
-    Drag(["手指移動"]) --> Dir["記下方向：往下或往上\n往上就把位移減回去（最低 0）"]
+    Start(["手指開始拖"]) --> Gate{"popGestureEnabled？"}
+    Gate -->|否| None["什麼都不做"]
+    Gate -->|是| Route{"AppPageRoute？"}
+    Route -->|是| Drive["didStartUserGesture\n手指位移 → controller.value = 1 − 位移/寬或高\n底下那頁露出"]
+    Route -->|否| Self["頁面自己 translate＋縮放"]
+    Drive --> Dir["記下最後一次移動的方向\n往回就把位移減回去（最低 0）"]
+    Self --> Dir
     Dir --> Up(["放開"])
-    Up --> V{"下滑速度 > 700 px/s？"}
+    Up --> V{"往前速度 > 700 px/s？"}
     V -->|是| Close
-    V -->|否| T{"位移 ≥ 120 px、最後是往下\n而且速度 ≥ 0？"}
+    V -->|否| T{"位移 ≥ 120 px、最後是往前\n而且速度 ≥ 0？"}
     T -->|是| Close{"減少動態效果？"}
-    T -->|否| Back["彈回原位（move）"]
-    Close -->|是| Pop["直接 pop"]
-    Close -->|否| Leave["往下滑出畫面＋淡出（exit），結束後才 pop"]
+    T -->|否| Back["彈回（move）"]
+    Close -->|是| Pop["直接關閉"]
+    Close -->|否，AppPageRoute| Rev["pop：路由從手指放開的位置倒播到底"]
+    Close -->|否，自己移動| Shrink["彈回並 pop（縮回卡片）"]
 ```
 
-先前一拉超過門檻就退出，即使手已經移回去；退出時頁面直接消失。
+先前（2026-10-03）只有往下拉，頁面自己往下滑出並淡出，底下是空白；更早一拉超過門檻就退出，即使手已經移回去。
 
 **刻意不做**：清單第一次出現的錯開進場。資料已改成開 App 立刻出現（D24），再加進場延遲只會讓開啟變慢。
 
@@ -1379,6 +1442,20 @@ stateDiagram-v2
 **下一次上課**（`nextMeetingStart`）：從現在起 7 天內、這門課最早的一個時段開始時間；沒有時段為 null。課程任務的預設截止時間。
 
 **今天的課**（`meetingsOn` + `meetingStates`）：只取該學期、該星期的時段，依開始時間排序；以現在時刻分成「已上完／上課中／下一堂（只有一個）／稍後」。
+
+**樣式**（`providers/timetable_style_provider.dart` 的 `TimetableStyle`，2026-10-04）：課表 AppBar 的調色盤鈕選，記在本機（D39）並跟帳號同步（D8-B `timetable_style`）。
+五種畫的是同一份資料，課程顏色不變；設計稿在 Claude Design 的「URniversity 課表樣式」。
+
+| 樣式 | 格線 | 課程方塊 |
+|---|---|---|
+| `standard` 預設 | 淡色橫線＋直線，今天那欄淡底 | 課程色 18% 底＋左側 3px 色條，深色字 |
+| `solid` 色塊 | 沒有線，隔列一條淡色圓角帶 | 課程色加深 28% 實心、圓角 `md`；字是白或近黑，**取 WCAG 對比較高的那個**（`_onCourseColor`；Flutter 的 `estimateBrightnessForColor` 會在加深的黃色上放白字，約 2.9:1） |
+| `outline` 描邊 | 只有虛線橫線 | 白底（`surface`）、1.5px 課程色框、課名前一個色點 |
+| `paper` 紙本 | 墨色全格線，外框較粗，表頭與左欄是灰底 | 白底蓋住格內的線、文字置中，課名上方一小段課程色；左欄是大的節次＋小的時間 |
+| `agenda` 時間軸 | 不是格線（`widgets/timetable_agenda.dart`） | 上方一排星期鈕（每堂課一個色點，最多 3 個），下方那天的課沿時間線排列：開始／結束時間、色點、卡片（課名、教室 · 學分），上課中的那堂加框與「上課中」 |
+
+時間軸預設選今天（今天不在這週的欄位內時，選第一個有課的日子）；點空白新增課程只有格線樣式有，時間軸用「新增課程」鈕。
+匯出 PNG 用同一種樣式；時間軸匯出時**列出整週有課的每一天**（`allDays`），不是畫面上那一天。
 
 **格線**（2026-09-27 改為一列一節）：
 - 欄：週一到週五，有週六或週日的課才多出那一欄（`gridBounds().days`）；最後一欄畫右框線，整週是封閉的。
@@ -1816,7 +1893,8 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 4. 點格線上的課 → 編輯（含成績）或刪除（進回收桶，還原時時段一起回來）。
 5. 左右滑動在「課表 · 成績」之間與相鄰學期間移動；在頂端往下拉就關閉頁面（手移回去就不關）。
 6. 任務頁在當天有課時多一列「今天的課」；通知設定可開關上課前提醒；小工具多一個「課表」分頁。
-7. 課程任務：點課 → 「這堂課的任務」的「新增任務」→ 任務 sheet 已連到這堂課、截止是下一次上課 → 可設每週重複 → 新增。
+7. 課程任務：點課 → 「這堂課的任務」（在上課時段上方）的「新增任務」→ 任務 sheet 已連到這堂課、截止是下一次上課 → 可設每週重複（顯示成「每週三 10:20」）→ 新增；
+   課程 sheet 裡的任務列和任務頁一樣，可以直接勾選。
    任務頁那一列顯示課名；刪掉課程後任務還在，只是不再顯示課名。
 8. 匯出：右上分享鈕 → 手機開分享選單、網頁下載 PNG。
 
@@ -1833,7 +1911,7 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 ### UC21　管理員看統計（2026-09-28）
 
 1. 在 Supabase SQL 編輯器執行 `supabase/admin.sql`，把自己的 user id 加進 `admins`。
-2. 設定 › 後台（或直接開 `/admin`）。
+2. 側邊欄的「後台」（課表之下，只有管理員看得到；或直接開 `/admin`）。
 3. 總覽看使用者、活躍；使用量看各功能；設定與錯誤看分佈與最近的失敗；右上重新整理。
 
 ### UC22　發公告、關功能、維護
@@ -2077,7 +2155,9 @@ flowchart TD
 | `TrashScreen` | `trashProvider` | D6 `trash_items` |
 | Future 頁「更多分類」 / `CategorySettingsScreen` | `categoriesProvider` | D7 `user_categories` |
 | `MeScreen`（個人資料卡） | `profileProvider` | D8-A `user_settings` |
-| `SettingsScreen` | `settingsProvider` 家族 | D8-B `user_settings` |
+| `SettingsScreen` | `settingsProvider` 家族、`termsProvider`／`effectiveTermsProvider`（開學日與週次） | D8-B `user_settings`、D30 |
+| `TimetableScreen` 的樣式 | `timetableStyleProvider` | D39 `timetable_style`、D8-B `user_settings.timetable_style` |
+| `App`（整個 App） | `liveSyncProvider`（推送與回到前景的補抓，§3-I） | D1–D5、D23、D27 與 D6 的讀取 |
 | `SettingsScreen` 意見回饋對話框 | 無獨立 Provider，直接呼叫 Supabase | D9 `feedbacks` |
 | `OverviewGraphScreen` | `futureGoalsProvider` + `semesterGoalsProvider` + `tasksProvider`（唯讀彙整） | D1／D2／D3 |
 | `LoginScreen` / `RegisterScreen` | `authStateProvider` / `guestModeProvider` | D10 `auth.users` / D12 `is_guest_mode` |

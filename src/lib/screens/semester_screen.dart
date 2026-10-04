@@ -33,6 +33,7 @@ import 'overview_graph_screen.dart';
 import 'semester_goal_detail_screen.dart';
 import 'settings_screen.dart';
 import '../providers/remote_config_provider.dart';
+import '../widgets/app_page.dart';
 
 class _SemGroup {
   final SemesterGoal parent;
@@ -425,7 +426,7 @@ class _SemesterScreenState extends ConsumerState<SemesterScreen> {
               visualDensity: VisualDensity.compact,
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const OverviewGraphScreen()),
+                AppPageRoute(builder: (_) => const OverviewGraphScreen()),
               ),
             ),
             IconButton(
@@ -786,7 +787,7 @@ class _SemGoalCardTile extends ConsumerWidget {
         ? expand()
         : Navigator.push(
             context,
-            MaterialPageRoute(
+            AppPageRoute(
               builder: (_) => SemesterGoalDetailScreen(goalId: goal.id),
             ),
           );

@@ -23,7 +23,27 @@ Future<DateTime?> _showDateTimePicker(BuildContext context, DateTime initial) as
   return DateTime(date.year, date.month, date.day, time.hour, time.minute);
 }
 
+// A repeating task's time is a time of day: only the clock is picked, and the
+// date it had is kept (it anchors which weekday the rule falls on)
+Future<DateTime?> _showTimeOfDayPicker(BuildContext context, DateTime initial) async {
+  final time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.fromDateTime(initial),
+    builder: (ctx, child) =>
+        MediaQuery(data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true), child: child!),
+  );
+  if (time == null) return null;
+  return DateTime(initial.year, initial.month, initial.day, time.hour, time.minute);
+}
+
 // ─── Recurrence helpers ───────────────────────────────────────────────────────
+
+// How a repeating task reads wherever it is listed: "每週四 07:00". Its due
+// time is when each occurrence is, not a deadline, so no date and no colour
+String _repeatLine(RecurrenceRule rule, DateTime? time, AppStrings s, DateTime createdAt) {
+  final when = _recurrenceShort(rule, s, createdAt);
+  return time == null ? when : '$when ${formatClock(time)}';
+}
 
 String _recurrenceLabel(RecurrenceType type, AppStrings s) {
   switch (type) {
@@ -371,6 +391,7 @@ void showTaskSheet(
           final linkedCourse = linkedCourseId != null
               ? ref.read(coursesProvider).where((c) => c.id == linkedCourseId).firstOrNull
               : null;
+          final repeats = recurrence != null && !recurrence!.isNone;
 
           return SheetBody(
             child: Column(
@@ -416,34 +437,44 @@ void showTaskSheet(
                   maxLines: 3,
                 ),
                 const SizedBox(height: AppSpacing.sm),
+                // Repeating, the due time is the time of each occurrence
+                // (2026-10-04): only a clock is picked and shown
                 TourAnchor(id: 'task.due', child: _linkRow(
-                  icon: Icons.calendar_today_outlined,
-                  label: dueTime != null ? _formatDueTime(dueTime!) : s.dueTime,
+                  icon: repeats ? Icons.schedule : Icons.calendar_today_outlined,
+                  label: dueTime == null
+                      ? (repeats ? s.repeatAtTime : s.dueTime)
+                      : (repeats ? formatClock(dueTime!) : _formatDueTime(dueTime!)),
                   active: dueTime != null,
                   onTap: () async {
-                    final result = await _showDateTimePicker(sheetCtx, dueTime ?? DateTime.now());
+                    final result = repeats
+                        ? await _showTimeOfDayPicker(sheetCtx, dueTime ?? DateTime.now())
+                        : await _showDateTimePicker(sheetCtx, dueTime ?? DateTime.now());
                     if (result != null) setState(() => dueTime = result);
                   },
                   onClear: () => setState(() => dueTime = null),
                 )),
                 _suggestionChips(sheetCtx, [
                   // "In a few minutes" first: a task being written down now is
-                  // usually about to be done now. Remembered clock times follow
-                  for (final (label, gap) in [
-                    (s.minutesLater(5), const Duration(minutes: 5)),
-                    (s.minutesLater(30), const Duration(minutes: 30)),
-                    (s.hoursLater(1), const Duration(hours: 1)),
-                  ])
-                    (label, () => setState(() => dueTime = DateTime.now().add(gap))),
+                  // usually about to be done now. Remembered clock times follow.
+                  // A repeating task has no "now" to be minutes after
+                  if (!repeats)
+                    for (final (label, gap) in [
+                      (s.minutesLater(5), const Duration(minutes: 5)),
+                      (s.minutesLater(30), const Duration(minutes: 30)),
+                      (s.hoursLater(1), const Duration(hours: 1)),
+                    ])
+                      (label, () => setState(() => dueTime = DateTime.now().add(gap))),
                   for (final clock in recent.times.take(3))
-                    (clock, () => setState(() => dueTime = suggestedDueDate(clock, DateTime.now()))),
+                    (clock, () => setState(() => dueTime = repeats
+                        ? _atClock(dueTime ?? DateTime.now(), clock)
+                        : suggestedDueDate(clock, DateTime.now()))),
                 ]),
                 const SizedBox(height: 2),
                 TourAnchor(id: 'task.repeat', child: _linkRow(
                   icon: Icons.repeat,
                   label: (recurrence == null || recurrence!.isNone)
                       ? s.repeatNone
-                      : _recurrenceShort(recurrence!, s, labelCreatedAt),
+                      : _recurrenceShort(_savedRecurrence(existing, recurrence, dueTime)!, s, labelCreatedAt),
                   active: recurrence != null && !recurrence!.isNone,
                   onTap: () async {
                     final result = await _showRecurrencePicker(sheetCtx, s, recurrence);
@@ -502,7 +533,7 @@ void showTaskSheet(
                           titleController,
                           contentController,
                           dueTime,
-                          recurrence,
+                          _savedRecurrence(null, recurrence, dueTime),
                           linkedTargetId,
                           linkedCourseId,
                         );
@@ -522,7 +553,7 @@ void showTaskSheet(
                                   ? null
                                   : contentController.text.trim(),
                               dueTime: dueTime,
-                              recurrence: recurrence,
+                              recurrence: _savedRecurrence(existing, recurrence, dueTime),
                               linkedTargetId: linkedTargetId,
                               // Removed: written as "" so the column clears
                               linkedCourseId: linkedCourseId ?? (existing.linkedCourseId != null ? '' : null),
@@ -627,6 +658,23 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
       ),
     ),
   );
+}
+
+// [day] at the remembered [clock] ("07:00")
+DateTime _atClock(DateTime day, String clock) {
+  final parts = clock.split(':');
+  return DateTime(day.year, day.month, day.day, int.parse(parts[0]), int.parse(parts[1]));
+}
+
+// The rule as it will be saved: one with no days picked takes them from the
+// task's date. An existing task whose rule and time were left alone keeps its
+// rule exactly — a task from before this change is not moved to another day
+RecurrenceRule? _savedRecurrence(Task? existing, RecurrenceRule? recurrence, DateTime? dueTime) {
+  if (recurrence == null) return null;
+  if (existing != null && identical(recurrence, existing.recurrence) && dueTime == existing.dueTime) {
+    return recurrence;
+  }
+  return recurrence.anchoredTo(dueTime);
 }
 
 Color? _dueColor(DateTime dueTime) => switch (dueLevel(dueTime, DateTime.now())) {

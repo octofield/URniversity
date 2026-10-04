@@ -25,6 +25,7 @@ import '../providers/semester_goals_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/term_dialog.dart';
 import '../widgets/style_picker_sheet.dart';
 import '../widgets/tour_guide_sheet.dart';
 import 'category_settings_screen.dart';
@@ -33,8 +34,7 @@ import 'review_screen.dart';
 import 'trash_screen.dart';
 import 'sync_log_screen.dart';
 import '../widgets/credit_categories_section.dart' show CreditCategoriesSwitch;
-import 'admin_screen.dart';
-import '../providers/admin_provider.dart';
+import '../widgets/app_page.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -125,27 +125,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showSemesterSettingsDialog(context, ref, s, semSettings),
           ),
+          // The same first days of classes the timetable asks for (D30)
+          ListTile(
+            title: Text(s.termStartsSetting),
+            subtitle: Text(s.termStartsSettingHint),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showTermStartsDialog(context),
+          ),
           ListTile(
             title: Text(s.categorySettings),
             leading: const Icon(Icons.category_outlined),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const CategorySettingsScreen()),
+              AppPageRoute(builder: (_) => const CategorySettingsScreen()),
             ),
           ),
           notificationSettingsTile(context, s),
           // Also on the grades page; either place switches the same setting
           const CreditCategoriesSwitch(),
-          // Only for accounts in the admins table (supabase/admin.sql)
-          if (ref.watch(isAdminProvider).value ?? false)
-            ListTile(
-              leading: Icon(Icons.admin_panel_settings_outlined, color: AppColors.primary),
-              title: Text(s.adminTitle),
-              subtitle: Text(s.adminEntryHint),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => openPage(context, AppRoutes.admin, () => const AdminScreen()),
-            ),
           ListTile(
             title: Text(s.completionEffect),
             subtitle: Text(completionEffectLabel(completionEffect, s)),
@@ -181,7 +179,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TrashScreen()),
+              AppPageRoute(builder: (_) => const TrashScreen()),
             ),
           ),
           GestureDetector(
@@ -250,7 +248,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SyncLogScreen()),
+                AppPageRoute(builder: (_) => const SyncLogScreen()),
               ),
             ),
           ],
@@ -276,10 +274,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       );
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(title: Text(s.settings), leading: homeButtonIfFirst(context)),
       body: ResponsiveBody(child: list),
-    );
+    ));
   }
 }
 
@@ -330,7 +328,7 @@ void _showDevReviewDialog(BuildContext context, WidgetRef ref, AppStrings s) {
                 Navigator.pop(ctx);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => ReviewScreen(window: window)),
+                  AppPageRoute(builder: (_) => ReviewScreen(window: window)),
                 );
               },
             );

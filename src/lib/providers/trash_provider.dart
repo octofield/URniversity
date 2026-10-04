@@ -28,6 +28,16 @@ class TrashNotifier extends StateNotifier<List<TrashItem>> {
     }
   }
 
+  // A newer view of the trash, on coming back to the app (system_design.md
+  // §3-I). A failed fetch keeps what is shown, and the account
+  Future<void> refresh() async {
+    final userId = _userId;
+    if (userId == null) return;
+    _userId = null;
+    await load(userId);
+    _userId ??= userId;
+  }
+
   // Sign-out only: drops local state and forgets the user. Do NOT use this for
   // the Empty Trash button — it leaves the cloud rows in place and nulls
   // _userId, which silently disables every later write in the session

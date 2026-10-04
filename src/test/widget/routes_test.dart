@@ -84,6 +84,14 @@ void main() {
       await tester.tap(find.byType(BackButton)); // pageBack() looks for the English tooltip
       await tester.pumpAndSettle();
       expect(location(tester), AppRoutes.tasks);
+
+      // Swiped right instead (§3-Q): the router's page is finger-driven too
+      await tester.tap(find.byIcon(Icons.settings_outlined).first);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(SettingsScreen), const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsNothing);
+      expect(location(tester), AppRoutes.tasks);
     });
 
     testWidgets('a tab picked under an open page reaches the address once it closes', (tester) async {

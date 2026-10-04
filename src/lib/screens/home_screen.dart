@@ -26,6 +26,9 @@ import 'home_tour.dart';
 import 'timetable_screen.dart';
 import '../providers/remote_config_provider.dart';
 import '../widgets/announcement_banner.dart';
+import '../widgets/app_page.dart';
+import '../providers/admin_provider.dart' show isAdminProvider;
+import 'admin_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   // Which tab to show, from the address (/tasks, /targets …, CLAUDE.md §13)
@@ -185,6 +188,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     void openTimetable() => openPage(context, AppRoutes.timetable, () => const TimetableScreen());
     // Switched off from the admin backend (kRemoteFeatures): no way in
     final timetableOn = ref.watch(featureOnProvider('timetable'));
+    // Below the timetable, only for accounts in the admins table
+    // (supabase/admin.sql); moved here from Settings on 2026-10-04
+    void openAdmin() => openPage(context, AppRoutes.admin, () => const AdminScreen());
+    final isAdmin = ref.watch(isAdminProvider).valueOrNull ?? false;
 
     final addButton = switch (_index) {
       1 => _VividFab(
@@ -202,7 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           tooltip: s.addJournal,
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const JournalEditScreen()),
+            AppPageRoute(builder: (_) => const JournalEditScreen()),
           ),
           child: const Icon(Icons.edit_note, color: AppColors.textOnPrimary, size: 30)),
       _ => _VividFab(
@@ -327,25 +334,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Divider(color: AppColors.border),
                     ),
                   ),
-                  if (!timetableOn)
-                    const SizedBox.shrink()
-                  else if (extended)
-                    SizedBox(
+                  if (timetableOn)
+                    _RailEntry(
+                      icon: Icons.calendar_view_week_outlined,
+                      label: s.timetable,
+                      extended: extended,
                       width: railWidth - AppSpacing.sm * 2,
-                      child: ListTile(
-                        leading: const Icon(Icons.calendar_view_week_outlined),
-                        title: Text(s.timetable),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.lg),
-                        ),
-                        onTap: openTimetable,
-                      ),
-                    )
-                  else
-                    IconButton(
-                      icon: const Icon(Icons.calendar_view_week_outlined),
-                      tooltip: s.timetable,
-                      onPressed: openTimetable,
+                      onTap: openTimetable,
+                    ),
+                  if (isAdmin)
+                    _RailEntry(
+                      icon: Icons.admin_panel_settings_outlined,
+                      label: s.adminTitle,
+                      extended: extended,
+                      width: railWidth - AppSpacing.sm * 2,
+                      onTap: openAdmin,
                     ),
                 ],
               ),
@@ -414,6 +417,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onTap: () {
                     Navigator.pop(context);
                     openTimetable();
+                  },
+                ),
+              if (isAdmin)
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: Text(s.adminTitle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    openAdmin();
                   },
                 ),
             ],
@@ -603,3 +615,58 @@ class _FabPresence extends StatelessWidget {
         ),
       );
 }
+
+// A page below the rail's divider (the timetable, the backend). Laid out like
+// the destinations above, not as a ListTile: extended, the icon centred on
+// their icon column (half the rail's 80-pixel minWidth) and the label starting
+// where theirs do, in the rail's own icon size and label style; collapsed, an
+// icon with a tooltip
+class _RailEntry extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool extended;
+  final double width;
+  final VoidCallback onTap;
+
+  const _RailEntry({
+    required this.icon,
+    required this.label,
+    required this.extended,
+    required this.width,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rail = NavigationRailTheme.of(context);
+    if (!extended) {
+      return IconButton(
+        icon: Icon(icon),
+        iconSize: rail.unselectedIconTheme?.size,
+        tooltip: label,
+        onPressed: onTap,
+      );
+    }
+    return SizedBox(
+      width: width,
+      height: 56,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 80 - AppSpacing.sm * 2,
+              child: Icon(icon, size: rail.unselectedIconTheme?.size),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(label, style: rail.unselectedLabelTextStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

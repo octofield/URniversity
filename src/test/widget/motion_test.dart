@@ -67,6 +67,23 @@ void main() {
     expect(find.text('多益 800'), findsOneWidget, reason: 'back on its card');
   });
 
+  // Not an AppPageRoute: the page moves itself, then the pop shrinks it back
+  // into its card (§3-Q, 2026-10-04)
+  testWidgets('a detail page grown from its card swipes right to close', (tester) async {
+    final c = await pumpApp(tester);
+    c.read(semesterGoalsProvider.notifier).addGoal('多益 800', c.read(selectedSemesterProvider));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(zh.targets).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('多益 800'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(SemesterGoalDetailScreen), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    expect(find.byType(SemesterGoalDetailScreen), findsNothing);
+    expect(find.text('多益 800'), findsOneWidget, reason: 'back on its card');
+  });
+
   testWidgets('the add button gives under a press, touch included', (tester) async {
     await pumpApp(tester);
     final fab = find.byTooltip(zh.addTask);

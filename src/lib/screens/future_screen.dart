@@ -36,6 +36,7 @@ import 'future_goal_detail_screen.dart';
 import 'overview_graph_screen.dart';
 import 'settings_screen.dart';
 import '../providers/remote_config_provider.dart';
+import '../widgets/app_page.dart';
 
 class _FutGroup {
   final FutureGoal parent;
@@ -591,7 +592,7 @@ class _FutureScreenState extends ConsumerState<FutureScreen> {
               visualDensity: VisualDensity.compact,
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const OverviewGraphScreen()),
+                AppPageRoute(builder: (_) => const OverviewGraphScreen()),
               ),
             ),
             IconButton(
@@ -817,7 +818,7 @@ class _FutureGoalCardRow extends ConsumerWidget {
         ? expand()
         : Navigator.push(
             context,
-            MaterialPageRoute(
+            AppPageRoute(
                 builder: (_) => FutureGoalDetailScreen(goalId: goal.id)),
           );
 

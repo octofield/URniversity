@@ -11,6 +11,7 @@ import '../providers/courses_provider.dart';
 import '../providers/future_goals_provider.dart';
 import '../providers/trash_provider.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/app_page.dart';
 
 class TrashScreen extends ConsumerWidget {
   const TrashScreen({super.key});
@@ -20,7 +21,7 @@ class TrashScreen extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final items = ref.watch(trashProvider);
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(
         title: Text(s.trash),
         actions: [
@@ -49,7 +50,7 @@ class TrashScreen extends ConsumerWidget {
                 itemBuilder: (ctx, i) => _TrashTile(item: items[i]),
               ),
       ),
-    );
+    ));
   }
 
   void _confirmEmptyTrash(BuildContext context, WidgetRef ref, AppStrings s) {

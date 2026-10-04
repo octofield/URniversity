@@ -37,6 +37,7 @@ import 'providers/reviews_provider.dart';
 import 'screens/review_screen.dart';
 import 'providers/settings_provider.dart';
 import 'providers/sync_provider.dart';
+import 'providers/realtime_sync.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
@@ -47,6 +48,7 @@ import 'screens/splash_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/setup_profile_screen.dart';
 import 'screens/admin_screen.dart';
+import 'widgets/app_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -163,12 +165,15 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     // midnight timer only covers the case where it stayed open
     if (lifecycle == AppLifecycleState.resumed) {
       ref.read(effectiveNowProvider.notifier).refresh();
+      // And whatever other devices changed meanwhile (§3-I)
+      ref.read(liveSyncProvider).refreshAll(minGap: kResumeRefreshGap);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     ref.watch(syncProvider);
+    ref.watch(liveSyncProvider);
     // Signing in or out, or a stored session settling, moves the router
     ref.listen<AuthStatus>(authStatusProvider, (_, _) => _routerRefresh.value++);
     ref.listen<bool>(passwordRecoveryProvider, (_, _) => _routerRefresh.value++);
@@ -296,20 +301,20 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(path: AppRoutes.login, builder: (_, _) => _titled((s) => s.login, const LoginScreen())),
       GoRoute(
         path: AppRoutes.timetable,
-        builder: (_, _) => _titled((s) => s.timetable, const _AuthGate(child: TimetableScreen())),
+        pageBuilder: (_, state) => GesturePage(key: state.pageKey, child: _titled((s) => s.timetable, const _AuthGate(child: TimetableScreen()))),
       ),
       GoRoute(
         path: AppRoutes.grades,
-        builder: (_, _) => _titled((s) => s.grades, const _AuthGate(child: TimetableScreen(grades: true))),
+        pageBuilder: (_, state) => GesturePage(key: state.pageKey, child: _titled((s) => s.grades, const _AuthGate(child: TimetableScreen(grades: true)))),
       ),
       GoRoute(
         path: AppRoutes.settings,
-        builder: (_, _) => _titled((s) => s.settings, const _AuthGate(child: SettingsScreen())),
+        pageBuilder: (_, state) => GesturePage(key: state.pageKey, child: _titled((s) => s.settings, const _AuthGate(child: SettingsScreen()))),
       ),
       // Anyone can open the address; AdminScreen shows nothing to a non-admin
       GoRoute(
         path: AppRoutes.admin,
-        builder: (_, _) => _titled((s) => s.adminTitle, const _AuthGate(child: AdminScreen())),
+        pageBuilder: (_, state) => GesturePage(key: state.pageKey, child: _titled((s) => s.adminTitle, const _AuthGate(child: AdminScreen()))),
       ),
       // The four tabs are one page under one key, so moving between them keeps
       // HomeScreen — its tab state, scroll positions, dragged buttons — and
@@ -405,7 +410,7 @@ void _handlePendingOpen(WidgetRef ref) {
       if (exists) {
         open((ctx) => Navigator.push(
               ctx,
-              MaterialPageRoute(
+              AppPageRoute(
                 builder: (_) => SemesterGoalDetailScreen(goalId: pending.id),
               ),
             ));
@@ -417,7 +422,7 @@ void _handlePendingOpen(WidgetRef ref) {
       if (exists) {
         open((ctx) => Navigator.push(
               ctx,
-              MaterialPageRoute(
+              AppPageRoute(
                 builder: (_) => FutureGoalDetailScreen(goalId: pending.id),
               ),
             ));
@@ -453,7 +458,7 @@ void _handlePendingOpen(WidgetRef ref) {
       } else {
         open((ctx) => Navigator.push(
               ctx,
-              MaterialPageRoute(builder: (_) => ReviewScreen(window: window)),
+              AppPageRoute(builder: (_) => ReviewScreen(window: window)),
             ));
       }
 

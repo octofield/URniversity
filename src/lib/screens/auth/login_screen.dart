@@ -12,6 +12,7 @@ import '../../l10n/app_strings.dart';
 import '../../providers/settings_provider.dart';
 import 'auth_layout.dart';
 import 'register_screen.dart';
+import '../../widgets/app_page.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -209,7 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           action: s.register,
           onPressed: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+            AppPageRoute(builder: (_) => const RegisterScreen()),
           ),
         ),
       ],

@@ -18,6 +18,7 @@ import 'inspirations_provider.dart';
 import 'journal_provider.dart';
 import 'profile_provider.dart';
 import 'reviews_provider.dart';
+import 'timetable_style_provider.dart';
 import 'guest_provider.dart';
 import 'settings_provider.dart';
 import '../models/user_profile.dart';
@@ -56,6 +57,7 @@ final syncProvider = Provider<void>((ref) {
   // The choice, not the style in use: a random launch drawing a new style is
   // not a change of setting
   ref.listen(appStyleChoiceProvider, (prev, next) => _saveStyle(ref));
+  ref.listen(timetableStyleProvider, (prev, next) => _saveTimetableStyle(ref));
   ref.listen(termsProvider, (prev, next) => _saveTerms(ref));
   ref.listen(gradeSettingsProvider, (prev, next) {
     _saveGradeSettings(ref);
@@ -94,6 +96,7 @@ final syncProvider = Provider<void>((ref) {
         ref.read(profileProvider.notifier).load(uid);
         _loadSettings(ref, uid);
         _loadStyle(ref, uid);
+        _loadTimetableStyle(ref, uid);
         _loadTerms(ref, uid);
         _loadGradeSettings(ref, uid);
         _loadCreditCategories(ref, uid);
@@ -143,6 +146,7 @@ Future<void> _handleGuestLogin(Ref ref, String uid) async {
   unawaited(ref.read(profileProvider.notifier).load(uid));
   unawaited(_loadSettings(ref, uid));
   unawaited(_loadStyle(ref, uid));
+  unawaited(_loadTimetableStyle(ref, uid));
   unawaited(_loadTerms(ref, uid));
   unawaited(_loadGradeSettings(ref, uid));
   unawaited(_loadCreditCategories(ref, uid));
@@ -179,11 +183,11 @@ void _clearAll(Ref ref) {
 
 Future<void> _loadSettings(Ref ref, String uid) async {
   try {
-    final row = await Supabase.instance.client
+    final row = await readWithRetry(() => Supabase.instance.client
         .from('user_settings')
         .select('language, date_format, semester_count, semester_start_months, default_task_view, show_day_counter')
         .eq('user_id', uid)
-        .maybeSingle();
+        .maybeSingle());
     if (row == null) return;
 
     final langStr = row['language'] as String?;
@@ -252,11 +256,11 @@ Future<void> _saveSettings(Ref ref) async {
 
 Future<void> _loadStyle(Ref ref, String uid) async {
   try {
-    final row = await Supabase.instance.client
+    final row = await readWithRetry(() => Supabase.instance.client
         .from('user_settings')
         .select('app_style')
         .eq('user_id', uid)
-        .maybeSingle();
+        .maybeSingle());
     final name = row?['app_style'] as String?;
     // Nothing stored yet: keep what this device already shows, and the first
     // change writes it up
@@ -280,6 +284,43 @@ Future<void> _saveStyle(Ref ref) async {
     }));
   } catch (e) {
     reportSyncError(ref, e, where: 'user_settings app_style save');
+  }
+}
+
+// ── Timetable style ────────────────────────────────────────────────────────────
+//
+// On its own for the same reason as the app style: user_settings.timetable_style
+// is added by supabase/timetable_style.sql, and a query naming it fails until
+// that runs
+
+Future<void> _loadTimetableStyle(Ref ref, String uid) async {
+  try {
+    final row = await readWithRetry(() => Supabase.instance.client
+        .from('user_settings')
+        .select('timetable_style')
+        .eq('user_id', uid)
+        .maybeSingle());
+    final name = row?['timetable_style'] as String?;
+    // Nothing stored yet: keep this device's choice; the first change writes it
+    if (name == null) return;
+    final style = timetableStyleFromName(name);
+    if (style != ref.read(timetableStyleProvider)) await ref.read(timetableStyleProvider.notifier).set(style);
+  } catch (e) {
+    reportSyncError(ref, e, where: 'user_settings timetable_style load');
+  }
+}
+
+Future<void> _saveTimetableStyle(Ref ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return;
+  if (ref.read(guestModeProvider)) return;
+  try {
+    await runWithRetry(() => Supabase.instance.client.from('user_settings').upsert({
+      'user_id': uid,
+      'timetable_style': ref.read(timetableStyleProvider).name,
+    }));
+  } catch (e) {
+    reportSyncError(ref, e, where: 'user_settings timetable_style save');
   }
 }
 
@@ -319,11 +360,11 @@ Future<void> _saveTerms(Ref ref) async {
 
 Future<void> _loadGradeSettings(Ref ref, String uid) async {
   try {
-    final row = await Supabase.instance.client
+    final row = await readWithRetry(() => Supabase.instance.client
         .from('user_settings')
         .select('graduation_credits, degree_level')
         .eq('user_id', uid)
-        .maybeSingle();
+        .maybeSingle());
     final credits = row?['graduation_credits'] as int?;
     if (credits == null) return;
     // copyWith: credits by category arrive on their own and must survive this
@@ -365,11 +406,11 @@ const _creditCategoryColumns =
 
 Future<void> _loadCreditCategories(Ref ref, String uid) async {
   try {
-    final row = await Supabase.instance.client
+    final row = await readWithRetry(() => Supabase.instance.client
         .from('user_settings')
         .select(_creditCategoryColumns)
         .eq('user_id', uid)
-        .maybeSingle();
+        .maybeSingle());
     final enabled = row?['credit_categories_enabled'] as bool?;
     // Never switched on for this account: keep this device's choice
     if (enabled == null) return;

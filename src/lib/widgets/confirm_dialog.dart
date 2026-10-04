@@ -24,3 +24,25 @@ Future<bool> confirmDelete(BuildContext context, AppStrings s) async {
   );
   return confirmed ?? false;
 }
+
+/// Asks before an action that is not destructive but should not happen on a
+/// stray tap (e.g. postponing a task). Returns false when dismissed
+Future<bool> confirmAction(BuildContext context, {required String message, required String action}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}

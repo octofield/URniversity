@@ -14,11 +14,11 @@ import '../providers/auth_provider.dart';
 import '../providers/remote_config_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/synced_list_notifier.dart' show newRowId, reportSyncErrorFromWidget;
-import '../widgets/pull_to_close.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/style_picker_sheet.dart' show appStyleChoiceName;
 import '../core/theme/app_motion.dart';
 import '../widgets/swipe_switcher.dart';
+import '../widgets/app_page.dart';
 
 // The admin backend (/admin, system_design.md §2-O, UC21–UC22): numbers across
 // all accounts, the switches every app obeys, and the account list. Only for
@@ -128,7 +128,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> with SingleTickerProv
       _ => const Center(child: CircularProgressIndicator()),
     };
 
-    return Scaffold(
+    return AppPage(swipeBack: false, child: Scaffold(
       appBar: AppBar(
         title: Text(s.adminTitle),
         leading: homeButtonIfFirst(context),
@@ -156,8 +156,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen> with SingleTickerProv
       // Clear of Android's navigation bar and the iPhone's home indicator: the
       // lists set their own padding, which drops the automatic inset
       // Pulled down from the top of a section, the backend closes (§3-Q)
-      body: PullToClose(child: SafeArea(top: false, child: body)),
-    );
+      body: SafeArea(top: false, child: body),
+    ));
   }
 }
 

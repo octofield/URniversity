@@ -45,6 +45,7 @@
   | `courses.credits`（數值，不是文字） | 0–30 | `CHECK`（`courses.sql`）；App 端 `InputLimits.courseCredits`，超過顯示錯誤不存 |
   | `app_config.announcement->text`、`app_config.maintenance->message` | 200 | `CHECK`（`admin.sql`）；`InputLimits.announcement` / `.maintenanceMessage`，只有管理員會輸入 |
   | `user_settings.app_style` | 20 | `user_settings_app_style_len`（在 `supabase/app_style.sql`；值只由 App 從列舉寫入，沒有對應的 `InputLimits`） |
+  | `user_settings.timetable_style` | 20 | `user_settings_timetable_style_len`（在 `supabase/timetable_style.sql`；同上，值只來自列舉） |
   | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
 ## D1. `tasks`（任務）
@@ -58,7 +59,7 @@
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 在寫入時附加，不在 `Task.toJson()` 內 |
 | `title` | text | ✓ | — | 任務標題；≤ 100 字 |
 | `content` | text | ✗ | `null` | 備註內容；≤ 500 字 |
-| `due_time` | timestamptz | ✗ | `null` | 截止時間；非循環任務靠此欄位判斷「屬於哪一天」 |
+| `due_time` | timestamptz | ✗ | `null` | 截止時間；非循環任務靠此欄位判斷「屬於哪一天」。**循環任務只用它的時:分**——每一次的時間（2026-10-04 起畫面只顯示時:分，通知一直是如此）；日期只在存檔時用來補上沒選的星期／號數（`RecurrenceRule.anchoredTo`，存進 `recurrence_weekdays`／`recurrence_month_days`） |
 | `priority` | int | ✓ | `1` | **保留欄位，App 已不再讀寫**。原本是 1=低、2=中、3=高，2026-09-20 移除優先度功能後新增的任務一律寫預設值 `1`；欄位留著不動 |
 | `is_completed` | bool | ✓ | `false` | **僅供非循環任務使用**；循環任務的完成狀態改看 `completed_dates` |
 | `created_at` | timestamptz | ✓ | — | 建立時間；循環任務用來計算「哪些日期符合循環規則」的起算點 |
@@ -305,6 +306,7 @@
 | `requirement_department` | text | ✗ | `null` | 查 D33 用的學系全名，≤ 50；預設是 `department` |
 | `catalog_department` | text | ✗ | `null` | 目錄裡的系名（簡稱，例如「資工系」），≤ 50；比對 D29 `required_for` 判斷必修 |
 | `credits_required`、`credits_general`、`credits_elective` | int | ✗ | `null` | 學校沒公告時使用者自填的三個門檻，0–400 |
+| `timetable_style` | text | ✗ | `null`（＝`standard`） | 課表樣式：`standard` / `solid` / `outline` / `paper` / `agenda`，≤ 20 字；由 `supabase/timetable_style.sql` 新增（2026-10-04）。與 `app_style` 一樣**單獨讀寫**（`_loadTimetableStyle` / `_saveTimetableStyle`），沒跑 SQL 只有這一項同步失敗；不認得的值退回 `standard`。雲端沒有值時保留這台裝置的選擇 |
 | `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono`，或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
 
 **特別說明：**
@@ -806,6 +808,7 @@ RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
 
 - 決定課表的「第幾週」、上課提醒與小工具「課表」只在上課週內出現。
 - 每學期在課表頁問一次（「設定開學日」），預設建議是學期起始月的第一個週一，上課週數預設 16。
+- 2026-10-04：設定頁「開學日與週次」與課表的「設定開學日」寫同一把 key（`widgets/term_dialog.dart` 的 `editTermStart`）。
 - 2026-10-03：這把 key 只存**使用者自己設的**。沒設的學期用自己學校的開學日（D32 `term_starts`），
   兩者由 `effectiveTermsProvider` 合併（自己的優先），不寫回這把 key；在對話框按儲存才成為自己的設定。
 - 訪客與登入帳號都存這把 key；登入帳號另同步 D8-B `user_settings.term_starts`，登入時合併雲端的值。
@@ -933,6 +936,15 @@ RLS 只開 `SELECT TO anon, authenticated`。
 | `activity_day` | `sync_provider._recordActivity` | `"<user id> <YYYY-MM-DD>"`，今天已寫過 D36 就不再送 |
 
 三個都不是使用者資料，不上雲、不在訪客資料清單、登出不清。
+
+---
+
+## D39. 裝置本機儲存 — `timetable_style`
+
+媒介：SharedPreferences（`String`，列舉名稱）。讀寫處理程序：`timetableStyleProvider`（`EnumPrefNotifier`，`providers/timetable_style_provider.dart`）。
+
+- 課表的畫法（system_design.md §3-S），預設 `standard`；不認得的值退回 `standard`。
+- 訪客也存；登入帳號另同步 D8-B `user_settings.timetable_style`（登入時讀雲端，有值就套用；每次改選就寫上去）。
 
 ---
 

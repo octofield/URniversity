@@ -86,6 +86,14 @@ flowchart TD
 
     P3 -- "language / dateFormat / semester 設定變化 → upsert" --> SBTables
     SBTables -- "登入時 SELECT 設定欄位" --> P3
+
+    P4["P4 realtime_sync\nLiveSync"]
+    SBRealtime[("Supabase Realtime\npublication supabase_realtime")]
+    User -- "App 回到前景（最多每 30 秒）" --> P4
+    SBTables -- "七張清單表的變動" --> SBRealtime
+    SBRealtime -- "postgres_changes（user_id = 自己）" --> P4
+    P4 -- "applyRemote(列 / 刪除的 id)\n重連或回前景 → refresh()" --> D1
+    D1 -- "refresh：failed 的寫入重送 → SELECT → 蓋上 _pending / _landed" --> SBTables
 ```
 
 **關鍵流程說明：**
@@ -102,7 +110,12 @@ flowchart TD
    決定是否呼叫七個 `mergeToUser(uid)`（tasks / inspirations / journals / reviews / profile / semester_goals /
    future_goals，**不含** trash_items 與 user_categories，因為訪客模式本來就不保存這兩者），
    再呼叫 `guestModeProvider.notifier.disable()` 清除本機 guest_* key，最後重新以登入身分 `load(uid)`。
-4. **登出／回收桶清空／訪客模式清除**：呼叫各 Provider 的 `clear()`，清記憶體狀態與該清單的 `cache_*`，
+4. **保持最新**（2026-10-04，`providers/realtime_sync.dart`）：登入（非訪客）後 `LiveSync` 訂閱 Supabase Realtime，
+   七個 `SyncedListNotifier` 清單（tasks、semester_goals、future_goals、inspirations、journals、reviews、courses）的變動推送進來就
+   `applyRemote()`；App 回到前景（距離上次 30 秒以上）或 Realtime 重新連上時，七個清單與回收桶 `refresh()`。
+   本機還沒被伺服器確認的寫入（`_pending`）與取回途中才確認的寫入（`_landed`）會蓋在伺服器的資料上，不會被較舊的資料蓋掉；
+   失敗的寫入在下次 `refresh()` 重送。推送需要先跑 `supabase/realtime.sql`；設定類只在登入時讀。
+5. **登出／回收桶清空／訪客模式清除**：呼叫各 Provider 的 `clear()`，清記憶體狀態與該清單的 `cache_*`，
    `_clearAll` 再刪 `cache_owner`；不刪除雲端資料。
 
 ---
@@ -528,6 +541,8 @@ flowchart TD
     User -- "畢業學分、學士／研究所" --> PG <--> DG
     PC --> TT
     PE --> TT
+    User -- "課表樣式（AppBar 調色盤）" --> PStyle["timetable_style_provider"] <--> DStyle[("D39 timetable_style\n＋D8 user_settings.timetable_style")]
+    PStyle -- "standard／solid／outline／paper → TimetableGrid\nagenda → TimetableAgenda" --> User
     User -- "課程 sheet「新增任務」" --> PTask["tasks_provider\n（linked_course_id）"] <--> DTask[("D1 tasks")]
     TT -- "今天的課、衝堂、第幾週、GPA、試算" --> User
     PC -- "上課前提醒（上課週內，7 天內最多 20 則）" --> PN

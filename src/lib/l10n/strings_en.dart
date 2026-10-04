@@ -514,9 +514,25 @@ class StringsEn implements AppStrings {
   @override String get courseTasks => 'Tasks for this course';
   @override String termFromSchool(String week) => '$week (school default)';
   @override String get postponeOneDay => 'Postpone a day';
+  @override String get termStartsSetting => 'First days of classes';
+  @override String get termStartsSettingHint => 'Each term\'s first day and teaching weeks, shared with the timetable';
+  @override String termStartSummary(String day, int weeks) => 'From $day, $weeks weeks';
+  @override String weekdayFull(int weekday) {
+    const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return names[weekday - 1];
+  }
+  @override String agendaClassCount(int count) => count == 1 ? '1 class' : '$count classes';
+  @override String get agendaNoClasses => 'No classes';
+  @override String get timetableStyle => 'Timetable style';
+  @override String get timetableStyleStandard => 'Standard';
+  @override String get timetableStyleSolid => 'Solid';
+  @override String get timetableStyleOutline => 'Outline';
+  @override String get timetableStylePaper => 'Paper';
+  @override String get timetableStyleAgenda => 'Agenda';
+  @override String get repeatAtTime => 'Time';
+  @override String postponeConfirm(String when) => 'Postpone to $when?';
   @override String postponedTo(String when) => 'Moved to $when';
   @override String get adminTitle => 'Admin';
-  @override String get adminEntryHint => 'Numbers, switches and accounts';
   @override String get adminNoAccess => 'This account has no admin access';
   @override String get adminLoadFailed => 'Could not load: has admin.sql been run in Supabase?';
   @override String get adminRefresh => 'Refresh';

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:animations/animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/app_routes.dart';
@@ -7,6 +6,7 @@ import '../core/period_tables.dart';
 import '../core/review_stats.dart' show termAt;
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_motion.dart';
+import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/timetable.dart';
 import '../l10n/app_strings.dart';
@@ -20,13 +20,16 @@ import '../utils/semester_helpers.dart';
 import '../widgets/catalog_search_sheet.dart';
 import '../widgets/course_sheet.dart';
 import '../widgets/grades_view.dart';
-import '../widgets/pull_to_close.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/swipe_switcher.dart';
+import '../widgets/term_dialog.dart';
+import '../widgets/timetable_agenda.dart';
 import '../widgets/timetable_grid.dart';
+import '../providers/timetable_style_provider.dart';
 import '../providers/remote_config_provider.dart';
 import '../core/save_image/save_image.dart';
 import '../core/ui_symbols.dart';
+import '../widgets/app_page.dart';
 
 // The timetable and the grades (UC18, UC20). One screen with two views,
 // because a grade is entered on the course it belongs to
@@ -113,20 +116,6 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     }
   }
 
-  Future<void> _editTerm(AppStrings s) async {
-    // Starts from the school's date when the user has not set one: saving it
-    // makes it theirs
-    final terms = ref.read(effectiveTermsProvider);
-    final settings = ref.read(semesterSettingsProvider);
-    final current = terms[_semester];
-    final initial = current?.firstDay ?? suggestedFirstDay(semesterStart(_semester, settings));
-    final result = await showDialog<TermInfo>(
-      context: context,
-      builder: (_) => _TermDialog(initial: initial, weeks: current?.weeks ?? TermInfo.defaultWeeks, s: s),
-    );
-    if (result != null) await ref.read(termsProvider.notifier).set(_semester, result);
-  }
-
   // Straight into the user's own school's search, the other schools with a
   // catalog this semester one chip away (a cross-registered course is in the
   // other school's catalog). No school to search — none yet, or offline —
@@ -169,6 +158,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     final term = ref.watch(effectiveTermsProvider)[_semester];
     final fromSchool = term != null && ref.watch(termsProvider)[_semester] == null;
     final periods = periodsFor(ref.watch(profileProvider)?.school);
+    final style = ref.watch(timetableStyleProvider);
     final isCurrent = _semester == termAt(now, settings);
 
     final String? weekLabel;
@@ -229,7 +219,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
             ActionChip(
               avatar: Icon(term == null ? Icons.event_outlined : Icons.event_available_outlined, size: 18),
               label: Text(weekLabel == null ? s.setFirstDay : fromSchool ? s.termFromSchool(weekLabel) : weekLabel),
-              onPressed: () => _editTerm(s),
+              onPressed: () => editTermStart(context, ref, _semester),
             ),
             const Spacer(),
             Text(credits, style: theme.labelLarge?.copyWith(color: AppColors.textSecondary)),
@@ -245,35 +235,85 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
           key: _exportKey,
           child: ColoredBox(
             color: AppColors.background,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_exporting)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                    child: Text('${formatSemester(_semester, settings, s)}$kDotSeparator$credits', style: theme.titleMedium),
+            // The picture gets a margin and a frame: edge to edge it looked
+            // cut off once shared (2026-10-04). On screen nothing changes
+            child: Padding(
+              padding: EdgeInsets.all(_exporting ? AppSpacing.lg : 0),
+              child: DecoratedBox(
+                decoration: _exporting
+                    ? BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      )
+                    : const BoxDecoration(),
+                child: Padding(
+                  padding: EdgeInsets.all(_exporting ? AppSpacing.md : 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_exporting)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: Text('${formatSemester(_semester, settings, s)}$kDotSeparator$credits', style: theme.titleMedium),
+                        ),
+                      // The agenda is not a grid; exported, it lists the whole week
+                      if (style == TimetableStyle.agenda)
+                        TimetableAgenda(
+                          courses: courses,
+                          s: s,
+                          now: isCurrent && !_exporting ? today : null,
+                          allDays: _exporting,
+                          onTapCourse: (c) => showCourseSheet(context, semester: _semester, existing: c),
+                        )
+                      else
+                        TimetableGrid(
+                          courses: courses,
+                          periods: periods,
+                          s: s,
+                          style: style,
+                          now: isCurrent && !_exporting ? today : null,
+                          onTapCourse: (c) => showCourseSheet(context, semester: _semester, existing: c),
+                          onTapEmpty: (weekday, minute) =>
+                              showCourseSheet(context, semester: _semester, weekday: weekday, startMinute: minute),
+                        ),
+                    ],
                   ),
-                TimetableGrid(
-                  courses: courses,
-                  periods: periods,
-                  s: s,
-                  now: isCurrent && !_exporting ? today : null,
-                  onTapCourse: (c) => showCourseSheet(context, semester: _semester, existing: c),
-                  onTapEmpty: (weekday, minute) =>
-                      showCourseSheet(context, semester: _semester, weekday: weekday, startMinute: minute),
                 ),
-              ],
+              ),
             ),
           ),
         ),
       ],
     );
 
-    return Scaffold(
+    return AppPage(swipeBack: false, child: Scaffold(
       appBar: AppBar(
         title: Text(_grades ? s.grades : s.timetable),
         leading: homeButtonIfFirst(context),
         actions: [
+          // How the week is drawn (§3-S); the grades view has no week to draw
+          if (!_grades)
+            PopupMenuButton<TimetableStyle>(
+              icon: const Icon(Icons.palette_outlined),
+              tooltip: s.timetableStyle,
+              initialValue: style,
+              onSelected: (picked) => ref.read(timetableStyleProvider.notifier).set(picked),
+              itemBuilder: (_) => [
+                for (final option in TimetableStyle.values)
+                  CheckedPopupMenuItem(
+                    value: option,
+                    checked: option == style,
+                    child: Text(switch (option) {
+                      TimetableStyle.standard => s.timetableStyleStandard,
+                      TimetableStyle.solid => s.timetableStyleSolid,
+                      TimetableStyle.outline => s.timetableStyleOutline,
+                      TimetableStyle.paper => s.timetableStylePaper,
+                      TimetableStyle.agenda => s.timetableStyleAgenda,
+                    }),
+                  ),
+              ],
+            ),
           if (!_grades)
             IconButton(
               icon: const Icon(Icons.ios_share),
@@ -290,13 +330,12 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               label: Text(s.addCourse),
             ),
       // Pulled down from the top, either page closes
-      body: PullToClose(
-        child: ResponsiveBody(
+      body: ResponsiveBody(
           // The week needs more room than a list does
           maxWidth: 960,
           child: Column(
             children: [
-              PullToCloseHandle(child: header),
+              header,
               Expanded(
                 child: SwipeSwitcher(
                   onNext: _next,
@@ -323,77 +362,8 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
             ],
           ),
         ),
-      ),
-    );
+    ));
   }
 }
 
 // First day of classes and how many weeks of teaching
-class _TermDialog extends StatefulWidget {
-  final DateTime initial;
-  final int weeks;
-  final AppStrings s;
-
-  const _TermDialog({required this.initial, required this.weeks, required this.s});
-
-  @override
-  State<_TermDialog> createState() => _TermDialogState();
-}
-
-class _TermDialogState extends State<_TermDialog> {
-  late DateTime _day = widget.initial;
-  late final _weeks = TextEditingController(text: '${widget.weeks}');
-
-  @override
-  void dispose() {
-    _weeks.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = widget.s;
-    final loc = MaterialLocalizations.of(context);
-    return AlertDialog(
-      title: Text(s.firstDayTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(s.firstDayHint, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.event),
-            label: Text(loc.formatFullDate(_day)),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _day,
-                firstDate: DateTime(_day.year - 1),
-                lastDate: DateTime(_day.year + 1, 12, 31),
-              );
-              if (picked != null) setState(() => _day = picked);
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _weeks,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
-            decoration: InputDecoration(labelText: s.teachingWeeks),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(loc.cancelButtonLabel)),
-        FilledButton(
-          onPressed: () {
-            final weeks = (int.tryParse(_weeks.text) ?? TermInfo.defaultWeeks).clamp(1, 30);
-            Navigator.pop(context, TermInfo(_day, weeks));
-          },
-          child: Text(s.save),
-        ),
-      ],
-    );
-  }
-}

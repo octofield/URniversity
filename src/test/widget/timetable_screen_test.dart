@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urniversity/core/input_limits.dart';
 import 'package:urniversity/core/save_image/save_image.dart';
 import 'package:urniversity/core/period_tables.dart';
+import 'package:urniversity/core/theme/app_spacing.dart';
 import 'package:urniversity/core/timetable.dart' show nextMeetingStart;
 import 'package:urniversity/providers/tasks_provider.dart';
 import 'package:urniversity/core/review_stats.dart' show termAt;
@@ -24,8 +25,9 @@ import 'package:urniversity/screens/settings_screen.dart';
 import 'package:urniversity/screens/timetable_screen.dart';
 import 'package:urniversity/widgets/page_header.dart';
 import 'package:urniversity/screens/task_history_screen.dart';
-import 'package:urniversity/screens/today_screen.dart' show TodayScreen;
+import 'package:urniversity/screens/today_screen.dart' show TodayScreen, TaskTile;
 import 'package:urniversity/widgets/timetable_grid.dart';
+import 'package:urniversity/widgets/completion_effect.dart' show TaskCheckbox;
 import 'package:urniversity/widgets/swipe_switcher.dart';
 import 'package:urniversity/widgets/grades_view.dart';
 import 'package:urniversity/utils/semester_helpers.dart';
@@ -589,6 +591,35 @@ void main() {
     await opens(tester, find.descendant(of: find.byType(NavigationRail), matching: find.byTooltip(zh.timetable)));
   });
 
+  // The timetable entry lines up with the destinations above it: its icon on
+  // their icon column, its label where theirs start (reported 2026-10-04)
+  for (final width in [900.0, 1280.0]) {
+    testWidgets('at $width the rail\'s timetable entry lines up with the tabs', (tester) async {
+      await pumpApp(tester, width: width);
+      final rail = find.byType(NavigationRail);
+      Rect icon(IconData data) => tester.getRect(find.descendant(of: rail, matching: find.byIcon(data)));
+      final tasks = icon(Icons.today);
+      final timetable = icon(Icons.calendar_view_week_outlined);
+      expect(timetable.center.dx, moreOrLessEquals(tasks.center.dx, epsilon: 0.5));
+      if (width >= 1200) {
+        final tasksLabel = tester.getRect(find.descendant(of: rail, matching: find.text(zh.tasks)));
+        final timetableLabel = tester.getRect(find.descendant(of: rail, matching: find.text(zh.timetable)));
+        expect(timetableLabel.left, moreOrLessEquals(tasksLabel.left, epsilon: 0.5));
+      }
+    });
+  }
+
+  testWidgets('in the drawer the timetable entry lines up with the tabs', (tester) async {
+    await pumpApp(tester, width: 360);
+    tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+    await tester.pumpAndSettle();
+    final drawer = find.byType(Drawer);
+    Rect at(Finder f) => tester.getRect(find.descendant(of: drawer, matching: f));
+    expect(at(find.byIcon(Icons.calendar_view_week_outlined)).center.dx,
+        moreOrLessEquals(at(find.byIcon(Icons.today)).center.dx, epsilon: 0.5));
+    expect(at(find.text(zh.timetable)).left, moreOrLessEquals(at(find.text(zh.tasks)).left, epsilon: 0.5));
+  });
+
   // A row per period and a closed right edge: without the last day's right
   // border the week looked cut off at the side (reported 2026-09-27)
   for (final width in [360.0, 412.0, 1280.0]) {
@@ -635,7 +666,16 @@ void main() {
     String? name;
     final realSave = savePng;
     final realCapture = capturePng;
-    capturePng = (key) async => Uint8List.fromList([1, 2, 3]);
+    // At the moment of capture the week sits inside a margin and a frame,
+    // not against the picture's edge
+    double? inset;
+    capturePng = (key) async {
+      final picture = tester.getRect(find.byKey(key));
+      final grid = tester.getRect(find.byType(TimetableGrid));
+      inset = [grid.left - picture.left, picture.right - grid.right, picture.bottom - grid.bottom]
+          .reduce((a, b) => a < b ? a : b);
+      return Uint8List.fromList([1, 2, 3]);
+    };
     savePng = (png, fileName) async {
       saved = png;
       name = fileName;
@@ -648,6 +688,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved, [1, 2, 3]);
     expect(name, 'URniversity-${semesterNow(c)}.png');
+    expect(inset, greaterThanOrEqualTo(AppSpacing.lg + AppSpacing.md));
   });
 
   testWidgets('a course\'s own task: due at its next class, listed in the course', (tester) async {
@@ -671,8 +712,15 @@ void main() {
     final task = c.read(tasksProvider).single;
     expect(task.courseId, course.id);
     expect(task.dueTime, nextMeetingStart(course, task.createdAt));
-    // Back on the course: it lists the new task
-    expect(find.text('習題 3.1'), findsOneWidget);
+    // Back on the course: it lists the new task as the task page draws it,
+    // above the meeting times (2026-10-04)
+    final row = find.ancestor(of: find.text('習題 3.1'), matching: find.byType(TaskTile));
+    expect(row, findsOneWidget);
+    expect(tester.getRect(row).bottom, lessThan(tester.getRect(find.text(zh.courseMeetings)).top));
+    // Ticked from here, it is done
+    await tester.tap(find.descendant(of: row, matching: find.byType(TaskCheckbox)));
+    await tester.pumpAndSettle();
+    expect(c.read(tasksProvider).single.isCompleted, isTrue);
   });
 
   testWidgets('a task row names its course', (tester) async {

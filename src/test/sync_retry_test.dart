@@ -47,9 +47,40 @@ void main() {
       }
     });
 
+    // What a .maybeSingle() query throws: postgrest-dart keeps only the HTTP
+    // status and puts PostgREST's JSON in the message. Every "JWT issued at
+    // future" of the user_settings loads looked like this (2026-09-28 to
+    // 10-04) and was never retried
+    test('the code inside a .maybeSingle() 401 is read back', () {
+      PostgrestException wrapped(String code) => PostgrestException(
+            message: '{"code":"$code","details":null,"hint":null,"message":"JWT issued at future"}',
+            code: '401',
+            details: 'Unauthorized',
+          );
+      expect(postgrestCode(wrapped('PGRST303')), 'PGRST303');
+      expect(isTransientSyncError(wrapped('PGRST303')), isTrue);
+      expect(isTransientSyncError(wrapped('PGRST301')), isTrue);
+      expect(isTransientSyncError(wrapped('42501')), isFalse, reason: 'RLS stays a one-off');
+      expect(isTransientSyncError(const PostgrestException(message: 'Unauthorized', code: '401')), isFalse,
+          reason: 'no code inside: not guessed at');
+    });
+
     test('an exception with no code is not retried', () {
       expect(isTransientSyncError(const PostgrestException(message: 'x')), isFalse);
     });
+  });
+
+  test('a single-row read retries like a write and returns the row', () async {
+    var calls = 0;
+    final row = await readWithRetry(() async {
+      calls++;
+      if (calls < 2) {
+        throw const PostgrestException(message: '{"code":"PGRST303","message":"JWT issued at future"}', code: '401');
+      }
+      return {'language': 'zh_tw'};
+    });
+    expect(calls, 2);
+    expect(row, {'language': 'zh_tw'});
   });
 
   group('runWithRetry', () {

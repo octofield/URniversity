@@ -37,6 +37,21 @@ class RecurrenceRule {
   // Guards the modulo in _recurringAppliesTo. The assert above only fires in
   // debug, and a 0 persisted before validation existed still round-trips
   int get safeInterval => interval >= 1 ? interval : 1;
+
+  // The days a rule with none picked falls on, taken from [day] — the date a
+  // task was given — rather than left to the creation-date fallback: "due
+  // 10/08 7:00, weekly" means every Thursday (2026-10-04). A rule with days
+  // picked, another type, or no day to go by stays as it is
+  RecurrenceRule anchoredTo(DateTime? day) {
+    if (day == null) return this;
+    return switch (type) {
+      RecurrenceType.weekly when weekdays.isEmpty =>
+        RecurrenceRule(type: type, interval: interval, weekdays: [day.weekday], monthDays: monthDays),
+      RecurrenceType.monthly when monthDays.isEmpty =>
+        RecurrenceRule(type: type, interval: interval, weekdays: weekdays, monthDays: [day.day]),
+      _ => this,
+    };
+  }
 }
 
 String _dateKey(DateTime date) =>

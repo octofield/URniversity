@@ -9,6 +9,7 @@ import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../l10n/app_strings.dart';
 import '../models/course.dart';
+import '../models/task.dart';
 import '../providers/courses_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
@@ -22,7 +23,7 @@ import 'sheet_fields.dart';
 import 'credit_categories_section.dart' show categoryName;
 import '../core/timetable.dart' show nextMeetingStart;
 import '../providers/tasks_provider.dart';
-import '../screens/today_screen.dart' show showTaskSheet;
+import '../screens/today_screen.dart' show showTaskSheet, TaskTile;
 
 String formatMinute(int minute) =>
     '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
@@ -191,6 +192,9 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
     final theme = Theme.of(context).textTheme;
     final isEdit = widget.existing != null;
 
+    final courseTasks = isEdit
+        ? ref.watch(tasksProvider).where((t) => t.courseId == widget.existing!.id).toList()
+        : const <Task>[];
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -240,6 +244,41 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
         if (_showErrors && _creditsValue > InputLimits.courseCredits)
           Text(s.courseCreditsTooMany(InputLimits.courseCredits),
               style: theme.bodySmall?.copyWith(color: AppColors.error)),
+        // Homework and the like for this course (UC18), above the meeting
+        // times (2026-10-04): each is an ordinary task linked to the course,
+        // due by default when it next meets, and drawn exactly as on the task
+        // page — tick, strike-through, due time, postpone, delete
+        if (isEdit) ...[
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(child: Text(s.courseTasks, style: theme.titleSmall)),
+              TextButton.icon(
+                onPressed: () => showTaskSheet(
+                  context,
+                  ref,
+                  courseId: widget.existing!.id,
+                  due: nextMeetingStart(widget.existing!, DateTime.now()),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(s.addTask),
+              ),
+            ],
+          ),
+          if (courseTasks.isNotEmpty)
+            Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (var i = 0; i < courseTasks.length; i++) ...[
+                    if (i > 0) const Divider(height: 1),
+                    TaskTile(task: courseTasks[i]),
+                  ],
+                ],
+              ),
+            ),
+        ],
         const SizedBox(height: AppSpacing.md),
         Text(s.courseMeetings, style: theme.titleSmall),
         const SizedBox(height: AppSpacing.xs),
@@ -312,38 +351,6 @@ class _CourseFormState extends ConsumerState<_CourseForm> {
                 ),
             ],
           ),
-        ],
-        // Homework and the like for this course (UC18): each task is an
-        // ordinary task linked to the course, due by default when it next meets
-        if (isEdit) ...[
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(child: Text(s.courseTasks, style: theme.titleSmall)),
-              TextButton.icon(
-                onPressed: () => showTaskSheet(
-                  context,
-                  ref,
-                  courseId: widget.existing!.id,
-                  due: nextMeetingStart(widget.existing!, DateTime.now()),
-                ),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(s.addTask),
-              ),
-            ],
-          ),
-          for (final task in ref.watch(tasksProvider).where((t) => t.courseId == widget.existing!.id))
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 20,
-                color: task.isCompleted ? AppColors.success : AppColors.textTertiary,
-              ),
-              title: Text(task.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-              onTap: () => showTaskSheet(context, ref, existing: task),
-            ),
         ],
         // Grades only mean something once the course exists (Phase 6)
         if (isEdit) ...[

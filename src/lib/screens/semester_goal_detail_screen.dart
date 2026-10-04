@@ -25,6 +25,7 @@ import '../widgets/sheet_fields.dart';
 import '../widgets/semester_list_dialog.dart';
 import '../widgets/coach_mark.dart';
 import 'future_goal_detail_screen.dart';
+import '../widgets/app_page.dart';
 
 class SemesterGoalDetailScreen extends ConsumerWidget {
   final String goalId;
@@ -267,14 +268,14 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
               ),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => FutureGoalDetailScreen(goalId: linkedGoal.id)),
+                AppPageRoute(builder: (_) => FutureGoalDetailScreen(goalId: linkedGoal.id)),
               ),
             ),
         ],
       ],
     );
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(
         title: Text(goal.title, overflow: TextOverflow.ellipsis),
         actions: [
@@ -286,7 +287,7 @@ class SemesterGoalDetailScreen extends ConsumerWidget {
         ],
       ),
       body: ResponsiveBody(child: content),
-    );
+    ));
   }
 }
 
@@ -340,7 +341,7 @@ class _SemMilestoneTile extends ConsumerWidget {
           child: InkWell(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => SemesterGoalDetailScreen(goalId: milestone.id)),
+              AppPageRoute(builder: (_) => SemesterGoalDetailScreen(goalId: milestone.id)),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),

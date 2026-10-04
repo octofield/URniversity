@@ -12,6 +12,7 @@ import '../providers/settings_provider.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/sheet_fields.dart' show nearLimitCounter;
 import '../widgets/coach_mark.dart';
+import '../widgets/app_page.dart';
 
 class JournalEditScreen extends ConsumerStatefulWidget {
   // null = add mode, non-null = edit mode
@@ -80,7 +81,7 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
     final profile = ref.watch(profileProvider);
     final identity = ref.watch(displayIdentityProvider);
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: ResponsiveBody(
@@ -231,6 +232,6 @@ class _JournalEditScreenState extends ConsumerState<JournalEditScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

@@ -9,6 +9,7 @@ import '../providers/settings_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../screens/review_screen.dart';
 import '../providers/remote_config_provider.dart';
+import 'app_page.dart';
 
 // The card on the task page while a review is due (§3-P). It goes away by
 // itself once that review is done or its window closes — no dismiss button to
@@ -57,7 +58,7 @@ class ReviewPromptCard extends ConsumerWidget {
             FilledButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => ReviewScreen(window: window)),
+                AppPageRoute(builder: (_) => ReviewScreen(window: window)),
               ),
               child: Text(s.reviewStart),
             ),

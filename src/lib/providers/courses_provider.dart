@@ -171,11 +171,11 @@ final termsProvider = StateNotifierProvider<TermsNotifier, Map<String, TermInfo>
 // Loads the account's term starts; a missing column (supabase/courses.sql not
 // run yet) is reported, not fatal
 Future<Map<String, TermInfo>> fetchCloudTerms(String uid) async {
-  final row = await Supabase.instance.client
+  final row = await readWithRetry(() => Supabase.instance.client
       .from('user_settings')
       .select('term_starts')
       .eq('user_id', uid)
-      .maybeSingle();
+      .maybeSingle());
   return decodeTerms(row?['term_starts']);
 }
 

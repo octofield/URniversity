@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/models/task.dart';
@@ -23,11 +24,22 @@ void main() {
 
     // Only the one-off, overdue task offers it
     expect(find.byTooltip(zh.postponeOneDay), findsOneWidget);
+    final overdue = DateTime(now.year, now.month, now.day - 3, 14, 30);
+    Task report() => c.read(tasksProvider).firstWhere((t) => t.title == '交報告');
+
+    // Asked first: cancelling leaves it where it was (2026-10-04)
     await tester.tap(find.byTooltip(zh.postponeOneDay));
     await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, MaterialLocalizations.of(tester.element(find.byType(AlertDialog))).cancelButtonLabel));
+    await tester.pumpAndSettle();
+    expect(report().dueTime, overdue);
 
-    final report = c.read(tasksProvider).firstWhere((t) => t.title == '交報告');
-    expect(report.dueTime, DateTime(now.year, now.month, now.day + 1, 14, 30));
+    await tester.tap(find.byTooltip(zh.postponeOneDay));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, zh.postponeOneDay));
+    await tester.pumpAndSettle();
+    expect(report().dueTime, DateTime(now.year, now.month, now.day + 1, 14, 30));
     expect(find.byTooltip(zh.postponeOneDay), findsNothing, reason: 'no longer overdue');
   });
 }

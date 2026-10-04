@@ -115,6 +115,9 @@ dozens of near-duplicates into these; re-implementing them undoes that work.
 | Need | Use | Where |
 |---|---|---|
 | Delete confirmation dialog | `confirmDelete(context, s)` | `widgets/confirm_dialog.dart` |
+| Confirming a non-destructive action | `confirmAction(context, message:, action:)` | `widgets/confirm_dialog.dart` |
+| A page opened on top of another (pull down / swipe right to close) | wrap its `Scaffold` in `AppPage`; push it with `AppPageRoute` | `widgets/app_page.dart` |
+| A semester's first day of classes | `editTermStart(context, ref, semester)` | `widgets/term_dialog.dart` |
 | Open a bottom sheet | `showAppSheet()` wrapping a `SheetBody` | `widgets/sheet_body.dart` |
 | Cap a single-column screen on desktop | `ResponsiveBody` | `widgets/responsive_body.dart` |
 | Drag-reorder drop zones and ordering | `dropZoneFor()`, `orderBetween()` | `widgets/drag_reorder.dart` |
@@ -212,6 +215,9 @@ explains where something came from and where it went, and never makes the user w
   not a sequence); ordinary pages use the platform transition from the theme (predictive
   back on Android, Cupertino on Apple, fade-forwards elsewhere); a card opening its own
   detail grows into it (`ExpandingCard`); steps of a flow use shared axis; sheets rise.
+- **Every page opened on top of another is an `AppPage`** pushed with `AppPageRoute`: pulled down or
+  swiped right, the finger drives the route's own transition so the page below shows through
+  (`system_design.md` §3-Q). A page whose sideways swipe changes its own view passes `swipeBack: false`.
 - **Respect "reduce motion".** Custom controllers and holds are multiplied by
   `motionScale(context)`; implicit animations take `scaled(context, …)`, which returns one
   microsecond rather than zero (`AnimatedSize` asserts on a zero duration).
@@ -258,7 +264,7 @@ holds the paths.
 | `/timetable` | `TimetableScreen` |
 | `/grades` | `TimetableScreen(grades: true)` |
 | `/settings` | `SettingsScreen` |
-| `/admin` | `AdminScreen` — admins only (the `admins` table, `supabase/admin.sql`) |
+| `/admin` | `AdminScreen` — admins only (the `admins` table, `supabase/admin.sql`); the way in is the side menu, shown to admins only |
 | `/login` | `LoginScreen`; `?from=` is where to go once signed in |
 
 - **Signed out, the router sends every address to `/login?from=<address>`**, and signing in (or
@@ -272,8 +278,9 @@ holds the paths.
   open on top, only the index changes and the address catches up when the page closes — `go()` would
   otherwise close that page.
 - **A main page is opened with `openPage()`** (`context.push`, which also sets the address), never a
-  bare `Navigator.push`. Detail pages, sheets, journals and the trash have no address of their own and
-  keep using `Navigator.push`.
+  bare `Navigator.push`. Its `GoRoute` uses `pageBuilder:` with a `GesturePage`, so the page can be
+  swiped closed. Detail pages, sheets, journals and the trash have no address of their own and
+  keep using `Navigator.push` — with an `AppPageRoute`, not a `MaterialPageRoute`.
 - **A page reached by typing its address has nothing to go back to**: give its `AppBar` the
   `leading: homeButtonIfFirst(context)`.
 - **A new main page** gets a constant in `AppRoutes`, a `GoRoute` in `main.dart`'s `_buildRouter()`

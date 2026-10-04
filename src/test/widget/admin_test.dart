@@ -153,6 +153,42 @@ void main() {
     });
   });
 
+  // The way in sits in the side menu, under the timetable, for admins only
+  // (moved from Settings, 2026-10-04)
+  group('the entry', () {
+    ProviderContainer as(bool admin) => testContainer(overrides: [
+          adminSourceProvider.overrideWithValue(_FakeAdmin(admin: admin)),
+          isAdminProvider.overrideWith((ref) async => admin),
+        ]);
+
+    testWidgets('an admin finds it in the drawer, and it opens', (tester) async {
+      await pumpApp(tester, width: 360, container: as(true));
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(Drawer), matching: find.text(zh.adminTitle)));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminScreen), findsOneWidget);
+    });
+
+    testWidgets('on a wide screen it is in the rail, labelled or as an icon', (tester) async {
+      await pumpApp(tester, width: 1280, container: as(true));
+      expect(find.descendant(of: find.byType(NavigationRail), matching: find.text(zh.adminTitle)), findsOneWidget);
+      setViewWidth(tester, 900);
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byType(NavigationRail), matching: find.byTooltip(zh.adminTitle)), findsOneWidget);
+    });
+
+    testWidgets('anyone else sees no trace of it, and Settings no longer has it', (tester) async {
+      await pumpApp(tester, width: 360, container: as(false));
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+      await tester.pumpAndSettle();
+      expect(find.text(zh.adminTitle), findsNothing);
+
+      await pumpScreen(tester, const SettingsScreen(), container: as(true));
+      expect(find.text(zh.adminTitle), findsNothing);
+    });
+  });
+
   group('the backend', () {
     Future<ProviderContainer> openAdmin(WidgetTester tester, _FakeAdmin fake, {double width = 400}) =>
         pumpScreen(tester, const AdminScreen(),

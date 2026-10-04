@@ -4,6 +4,7 @@ import '../providers/categories_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/category_manager.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/app_page.dart';
 
 class CategorySettingsScreen extends ConsumerWidget {
   const CategorySettingsScreen({super.key});
@@ -13,7 +14,7 @@ class CategorySettingsScreen extends ConsumerWidget {
     final s = ref.watch(stringsProvider);
     final cats = ref.watch(categoriesProvider);
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(title: Text(s.categorySettings)),
       body: ResponsiveBody(
         child: Column(
@@ -36,6 +37,6 @@ class CategorySettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }

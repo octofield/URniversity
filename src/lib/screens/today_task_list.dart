@@ -46,7 +46,7 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
     final sortMode = ref.watch(taskSortModeProvider);
     // While rearranging, the handle takes the delete button's place and is
     // the thing that drags, at once and without a long press
-    final tile = _TaskTile(
+    final tile = TaskTile(
       task: task,
       handle: sortMode && canDrag
           ? DragHandle<String>(
@@ -178,12 +178,12 @@ class _DraggableTaskListState extends ConsumerState<_DraggableTaskList> {
   }
 }
 
-class _TaskTile extends ConsumerWidget {
+class TaskTile extends ConsumerWidget {
   final Task task;
   // Set while rearranging: shown instead of the delete button, and the row
   // stops opening the task so a stray tap does not leave sort mode behind
   final Widget? handle;
-  const _TaskTile({required this.task, this.handle});
+  const TaskTile({super.key, required this.task, this.handle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -251,7 +251,26 @@ class _TaskTile extends ConsumerWidget {
               children: [
                 if (task.content != null)
                   Text(task.content!, style: Theme.of(context).textTheme.bodySmall),
-                if (task.dueTime != null)
+                // Repeating: "⟳ 每週四 07:00", the time of each occurrence, with
+                // no date and no due colour (2026-10-04)
+                if (task.recurrence != null && !task.recurrence!.isNone)
+                  Row(
+                    children: [
+                      Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          _repeatLine(task.recurrence!, task.dueTime, s, task.createdAt),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  )
+                else if (task.dueTime != null)
                   Row(
                     children: [
                       Icon(Icons.access_time, size: 12, color: _dueColor(task.dueTime!)),
@@ -264,38 +283,6 @@ class _TaskTile extends ConsumerWidget {
                           style: Theme.of(
                             context,
                           ).textTheme.bodySmall?.copyWith(color: _dueColor(task.dueTime!)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (task.recurrence != null && !task.recurrence!.isNone) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                        const SizedBox(width: 2),
-                        Flexible(
-                          child: Text(
-                            _recurrenceShort(task.recurrence!, s, task.createdAt),
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
-                  )
-                else if (task.recurrence != null && !task.recurrence!.isNone)
-                  Row(
-                    children: [
-                      Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                      const SizedBox(width: 2),
-                      Flexible(
-                        child: Text(
-                          _recurrenceShort(task.recurrence!, s, task.createdAt),
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -344,12 +331,15 @@ class _TaskTile extends ConsumerWidget {
               tooltip: s.postponeOneDay,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              onPressed: () {
+              onPressed: () async {
                 final due = postponedToTomorrow(task.dueTime!, DateTime.now());
+                final label = _formatDueTime(due);
+                if (!await confirmAction(context, message: s.postponeConfirm(label), action: s.postponeOneDay)) return;
+                if (!context.mounted) return;
                 ref.read(tasksProvider.notifier).update(task.copyWith(dueTime: due));
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text(s.postponedTo(_formatDueTime(due)))));
+                  ..showSnackBar(SnackBar(content: Text(s.postponedTo(label))));
               },
             ),
           IconButton(

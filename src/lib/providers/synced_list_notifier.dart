@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'dart:math';
-import 'package:flutter/foundation.dart' show debugPrint, defaultTargetPlatform, kIsWeb, visibleForTesting;
+import 'package:flutter/foundation.dart' show debugPrint, defaultTargetPlatform, kIsWeb, protected, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' show ClientException;
@@ -115,12 +115,29 @@ String describeSyncError(Object error) {
 // hits this, and it succeeds once the connection is back
 bool isTransientSyncError(Object error) {
   if (error is PostgrestException) {
-    return const {'PGRST301', 'PGRST303'}.contains(error.code);
+    return const {'PGRST301', 'PGRST303'}.contains(postgrestCode(error));
   }
   return error is SocketException ||
       error is TimeoutException ||
       error is ClientException ||
       error is AuthRetryableFetchException;
+}
+
+// The code PostgREST gave. A .maybeSingle() query loses it: postgrest-dart
+// rethrows inside its own try, and the catch there keeps only the HTTP status
+// (code=401) with PostgREST's JSON as the message — which is why the "JWT
+// issued at future" of every user_settings load (reported 2026-09-28 to
+// 10-04) was never retried. Read back from the message when that happens
+String? postgrestCode(PostgrestException error) {
+  final code = error.code;
+  if (code != null && !RegExp(r'^\d+$').hasMatch(code)) return code;
+  try {
+    final body = jsonDecode(error.message);
+    if (body is Map && body['code'] is String) return body['code'] as String;
+  } catch (_) {
+    // Parse fallback: a plain-text message has no code inside
+  }
+  return code;
 }
 
 // Runs a write, retrying transient failures with doubling, jittered delays.
@@ -145,6 +162,14 @@ Future<void> runWithRetry(
       await Future<void>.delayed(Duration(milliseconds: backoff));
     }
   }
+}
+
+// A read with the same retries as a write: the first query after waking meets
+// an expired or not-yet-valid token as often as a write does
+Future<T> readWithRetry<T>(Future<T> Function() read, {int maxAttempts = 5}) async {
+  late T result;
+  await runWithRetry(() async => result = await read(), maxAttempts: maxAttempts);
+  return result;
 }
 
 // Row ids are generated on the client. A bare millisecond timestamp collides
@@ -198,6 +223,122 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
   // Runs after either load path, for subclasses that backfill rows
   Future<void> afterLoad() async {}
 
+  // The three trips to the server, apart so a test can stand in for it
+  @protected
+  Future<List<Map<String, dynamic>>> fetchRows(String userId) async {
+    final rows = await db.from(table).select().eq('user_id', userId).order(orderColumn, ascending: orderAscending);
+    return [for (final r in rows as List<dynamic>) r as Map<String, dynamic>];
+  }
+
+  @protected
+  Future<void> sendUpsert(Map<String, dynamic> row) async => await db.from(table).upsert(row);
+
+  @protected
+  Future<void> sendDelete(String id) async => await db.from(table).delete().eq('id', id);
+
+  // Rows written here that the server has not confirmed (2026-10-04): the
+  // version sent, null for a delete. A refetch or a pushed change lays these
+  // over what the server says, so a write still on its way — or one that
+  // failed, offline — is never undone by a newer view of the account
+  final Map<String, _PendingWrite<T>> _pending = {};
+  int _writes = 0;
+  // Writes confirmed while a fetch was out: the rows it returns may predate
+  // them, so they are laid over it as well. Emptied once no fetch is out
+  final Map<String, _PendingWrite<T>> _landed = {};
+  int _fetching = 0;
+
+  void _send(String id, T? item, String op) {
+    final userId = _userId;
+    if (userId == null) return;
+    final write = _PendingWrite<T>(item, ++_writes);
+    _pending[id] = write;
+    final send = item == null ? () => sendDelete(id) : () => sendUpsert({...toJson(item), 'user_id': userId});
+    unawaited(runWithRetry(send).then((_) {
+      if (!identical(_pending[id], write)) return;
+      _pending.remove(id);
+      if (_fetching > 0) _landed[id] = write;
+    }).catchError((Object e) {
+      write.failed = true;
+      reportSyncError(e, op);
+    }));
+  }
+
+  // The server's rows with this device's own writes on top: unconfirmed ones,
+  // and ones confirmed after the rows were asked for
+  List<T> _withPending(List<T> server) {
+    final mine = {..._landed, ..._pending};
+    final out = [
+      for (final row in server)
+        if (!mine.containsKey(idOf(row))) row else if (mine[idOf(row)]!.item case final T local) local,
+    ];
+    final present = {for (final row in out) idOf(row)};
+    for (final MapEntry(:key, :value) in mine.entries) {
+      if (value.item case final T local when !present.contains(key)) out.add(local);
+    }
+    return out;
+  }
+
+  // The account's rows, counted as out so writes landing meanwhile are kept
+  Future<List<T>> _fetch(String userId) async {
+    _fetching++;
+    try {
+      return [for (final r in await fetchRows(userId)) fromJson(r)];
+    } finally {
+      _fetching--;
+    }
+  }
+
+  void _settled() {
+    if (_fetching == 0) _landed.clear();
+  }
+
+  // What other devices wrote since: asked for on coming back to the app
+  // (system_design.md §3-I). Writes that failed here are sent again first
+  Future<void> refresh() async {
+    final userId = _userId;
+    if (userId == null || isGuest) return;
+    for (final MapEntry(:key, :value) in {..._pending}.entries) {
+      if (value.failed) _send(key, value.item, value.item == null ? 'delete' : 'upsert');
+    }
+    try {
+      late List<T> server;
+      await runWithRetry(() async => server = await _fetch(userId));
+      // Signed out, or into another account, while asking
+      if (_userId != userId) return;
+      state = _withPending(server);
+      _settled();
+      await afterLoad();
+    } catch (e) {
+      reportSyncError(e, 'refresh');
+    }
+  }
+
+  // A change another device made, pushed by Supabase Realtime: a whole row
+  // for an insert or update, only the id for a delete. A row with a write of
+  // this device's still unconfirmed keeps that version
+  void applyRemote({Map<String, dynamic>? row, String? deletedId}) {
+    if (_userId == null || isGuest) return;
+    if (row != null) {
+      final T item;
+      try {
+        item = fromJson(row);
+      } catch (e) {
+        // Parse fallback: a row from a newer build's schema is left for the
+        // next refetch rather than breaking the list
+        debugPrint('[sync] $table push unreadable - $e');
+        return;
+      }
+      final id = idOf(item);
+      if (_pending.containsKey(id)) return;
+      final i = state.indexWhere((r) => idOf(r) == id);
+      state = i < 0 ? [...state, item] : ([...state]..[i] = item);
+    } else if (deletedId != null && !_pending.containsKey(deletedId)) {
+      if (state.any((r) => idOf(r) == deletedId)) {
+        state = state.where((r) => idOf(r) != deletedId).toList();
+      }
+    }
+  }
+
   // Named with the table and what was being done, for the sync log
   void reportSyncError(Object error, [String op = '']) => _report(
         ref.read(syncLogProvider.notifier),
@@ -214,14 +355,8 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       // Retried harder than a single write: a failed load nulls _userId below,
       // which silently disables every write for the rest of the session
       await runWithRetry(() async {
-        final rows = await db
-            .from(table)
-            .select()
-            .eq('user_id', userId)
-            .order(orderColumn, ascending: orderAscending);
-        state = (rows as List<dynamic>)
-            .map((r) => fromJson(r as Map<String, dynamic>))
-            .toList();
+        state = _withPending(await _fetch(userId));
+        _settled();
       }, maxAttempts: 6);
       await afterLoad();
     } catch (e) {
@@ -303,6 +438,8 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
 
   void clear() {
     _userId = null;
+    _pending.clear();
+    _landed.clear();
     state = [];
     SharedPreferences.getInstance().then((p) => p.remove(cacheKey));
   }
@@ -354,12 +491,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       persistLocally();
       return;
     }
-    if (_userId == null) return;
-    final row = {...toJson(item), 'user_id': _userId};
-    unawaited(
-      runWithRetry(() => db.from(table).upsert(row))
-          .catchError((Object e) => reportSyncError(e, 'upsert')),
-    );
+    _send(idOf(item), item, 'upsert');
   }
 
   void deleteRow(String id) {
@@ -367,11 +499,7 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       persistLocally();
       return;
     }
-    if (_userId == null) return;
-    unawaited(
-      runWithRetry(() => db.from(table).delete().eq('id', id))
-          .catchError((Object e) => reportSyncError(e, 'delete')),
-    );
+    _send(id, null, 'delete');
   }
 
   // A trashed row keeps whatever ids it held when it was deleted, and those
@@ -385,4 +513,11 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
     state = [...state, clean];
     upsert(clean);
   }
+}
+
+class _PendingWrite<T> {
+  final T? item;
+  final int version;
+  bool failed = false;
+  _PendingWrite(this.item, this.version);
 }

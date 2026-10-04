@@ -39,6 +39,7 @@ import '../widgets/coach_mark.dart';
 import '../providers/reviews_provider.dart';
 import 'review_screen.dart' show reviewTitle, reviewRange;
 import 'reviews_screen.dart';
+import '../widgets/app_page.dart';
 
 class MeScreen extends ConsumerWidget {
   const MeScreen({super.key});
@@ -513,7 +514,7 @@ class _InspirationSection extends ConsumerWidget {
                 icon: Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationsScreen())),
+                onPressed: () => Navigator.push(context, AppPageRoute(builder: (_) => const InspirationsScreen())),
               )),
               IconButton(
                 icon: Icon(Icons.add, color: AppColors.primary),
@@ -693,7 +694,7 @@ class _ReviewSection extends ConsumerWidget {
     final fmt = ref.watch(settingsProvider);
     final latest = ref.watch(reviewsProvider).firstOrNull;
     final theme = Theme.of(context);
-    void openAll() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewsScreen()));
+    void openAll() => Navigator.push(context, AppPageRoute(builder: (_) => const ReviewsScreen()));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -799,13 +800,13 @@ class _JournalSection extends ConsumerWidget {
                 icon: Icon(Icons.open_in_new, size: 18, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalsScreen())),
+                onPressed: () => Navigator.push(context, AppPageRoute(builder: (_) => const JournalsScreen())),
               )),
               TourAnchor(id: 'me.journal.add', child: IconButton(
                 icon: Icon(Icons.add, color: AppColors.primary),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JournalEditScreen())),
+                onPressed: () => Navigator.push(context, AppPageRoute(builder: (_) => const JournalEditScreen())),
               )),
             ],
           ),
@@ -826,7 +827,7 @@ class _JournalSection extends ConsumerWidget {
               message: s.noJournal,
               actionLabel: s.writeJournal,
               onAction: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const JournalEditScreen())),
+                  AppPageRoute(builder: (_) => const JournalEditScreen())),
               compact: true,
             ),
           )
@@ -908,7 +909,7 @@ class _JournalTile extends ConsumerWidget {
     return InkWell(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => JournalDetailScreen(journal: journal)),
+        AppPageRoute(builder: (_) => JournalDetailScreen(journal: journal)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -1014,7 +1015,7 @@ class JournalDetailScreen extends ConsumerWidget {
     final dateStr =
         '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -1023,7 +1024,7 @@ class JournalDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => JournalEditScreen(existingJournal: live))),
+            onPressed: () => Navigator.push(context, AppPageRoute(builder: (_) => JournalEditScreen(existingJournal: live))),
           ),
         ],
       ),
@@ -1111,7 +1112,7 @@ class JournalDetailScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 

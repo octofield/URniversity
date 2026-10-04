@@ -21,11 +21,11 @@ class ProfileNotifier extends StateNotifier<UserProfile?> {
   Future<void> load(String userId) async {
     _userId = userId;
     try {
-      final row = await _db
+      final row = await readWithRetry(() => _db
           .from('user_settings')
           .select('username, school, department, grade, grade_set_year, avatar_index')
           .eq('user_id', userId)
-          .maybeSingle();
+          .maybeSingle());
       // null state = not loaded; const UserProfile() = loaded but no DB row (new user)
       state = row != null ? UserProfile.fromRow(row) : const UserProfile();
     } catch (e) {

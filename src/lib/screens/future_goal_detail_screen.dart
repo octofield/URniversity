@@ -18,6 +18,7 @@ import '../widgets/responsive_body.dart';
 import '../widgets/coach_mark.dart';
 import 'future_screen.dart';
 import 'semester_goal_detail_screen.dart';
+import '../widgets/app_page.dart';
 
 class FutureGoalDetailScreen extends ConsumerWidget {
   final String goalId;
@@ -207,7 +208,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
               ),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                AppPageRoute(
                   builder: (_) =>
                       SemesterGoalDetailScreen(goalId: target.id),
                 ),
@@ -223,7 +224,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
         ],
       );
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(
         title: Text(goal.title, overflow: TextOverflow.ellipsis),
         actions: [
@@ -235,7 +236,7 @@ class FutureGoalDetailScreen extends ConsumerWidget {
         ],
       ),
       body: ResponsiveBody(child: content),
-    );
+    ));
   }
 }
 
@@ -315,7 +316,7 @@ class _GoalTreeTile extends ConsumerWidget {
               child: InkWell(
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  AppPageRoute(
                     builder: (_) =>
                         FutureGoalDetailScreen(goalId: goal.id),
                   ),

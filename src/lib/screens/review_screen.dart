@@ -21,6 +21,7 @@ import '../providers/tasks_provider.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/review_heatmap.dart';
 import '../widgets/sheet_fields.dart';
+import '../widgets/app_page.dart';
 
 String reviewTitle(ReviewPeriod period, AppStrings s) => switch (period) {
       ReviewPeriod.week => s.reviewWeekTitle,
@@ -149,7 +150,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final fmt = ref.watch(settingsProvider);
     final steps = [s.reviewStepNumbers, s.reviewStepReflect, s.reviewStepPlan];
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +262,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 

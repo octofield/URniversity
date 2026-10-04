@@ -50,6 +50,7 @@ import '../widgets/today_classes_strip.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import '../providers/courses_provider.dart';
+import '../widgets/app_page.dart';
 
 // Split with `part` rather than separate libraries: every helper here is
 // library-private and used across all three files, so real imports would mean
@@ -627,7 +628,7 @@ class _WeekTaskTile extends ConsumerWidget {
         Colors.transparent;
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
     final meta = isRecurring
-        ? _recurrenceShort(task.recurrence!, s, task.createdAt)
+        ? _repeatLine(task.recurrence!, task.dueTime, s, task.createdAt)
         : (task.dueTime != null ? _formatDueTime(task.dueTime!) : null);
     final metaStyle = Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary);
 
@@ -730,7 +731,7 @@ class _SummaryRing extends ConsumerWidget {
         radius: 24,
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+          AppPageRoute(builder: (_) => const TaskHistoryScreen()),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
@@ -799,7 +800,7 @@ class _SummaryCard extends ConsumerWidget {
           child: InkWell(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+              AppPageRoute(builder: (_) => const TaskHistoryScreen()),
             ),
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -1225,7 +1226,7 @@ class _CompletedTasksSectionState extends ConsumerState<_CompletedTasksSection> 
                       enterDelayFor: (_) => AppMotion.hold,
                       children: [
                         for (final t in completed)
-                          KeyedSubtree(key: ValueKey(t.id), child: _TaskTile(task: t)),
+                          KeyedSubtree(key: ValueKey(t.id), child: TaskTile(task: t)),
                       ],
                     ),
                   ),

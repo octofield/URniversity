@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/app_page.dart';
 
 // Web addresses (CLAUDE.md §13, system_design.md §1). The four tabs share one
 // HomeScreen and the address picks the tab; the main pages have their own.
@@ -26,7 +27,7 @@ void openPage(BuildContext context, String path, Widget Function() page) {
   if (GoRouter.maybeOf(context) != null) {
     context.push(path);
   } else {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page()));
+    Navigator.push(context, AppPageRoute(builder: (_) => page()));
   }
 }
 

@@ -8,6 +8,7 @@ import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/notification_service.dart';
 import '../widgets/responsive_body.dart';
+import '../widgets/app_page.dart';
 
 class NotificationSettingsScreen extends ConsumerWidget {
   const NotificationSettingsScreen({super.key});
@@ -32,7 +33,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
       }
     }
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(title: Text(s.notifications)),
       body: ResponsiveBody(
         child: ListView(
@@ -182,7 +183,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -289,6 +290,6 @@ ListTile notificationSettingsTile(BuildContext context, AppStrings s) => ListTil
       trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()),
+        AppPageRoute(builder: (_) => const NotificationSettingsScreen()),
       ),
     );

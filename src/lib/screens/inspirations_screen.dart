@@ -13,6 +13,7 @@ import '../widgets/sheet_body.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/sheet_fields.dart' show nearLimitCounter;
 import '../widgets/coach_mark.dart';
+import '../widgets/app_page.dart';
 
 class InspirationsScreen extends ConsumerStatefulWidget {
   const InspirationsScreen({super.key});
@@ -32,7 +33,7 @@ class _InspirationsScreenState extends ConsumerState<InspirationsScreen> {
     final done = all.where((i) => i.isCompleted && !i.isArchived).toList();
     final archived = all.where((i) => i.isArchived).toList();
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       appBar: AppBar(title: Text(s.allInspirations)),
       body: ResponsiveBody(
         child: ListView(
@@ -111,7 +112,7 @@ class _InspirationsScreenState extends ConsumerState<InspirationsScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 

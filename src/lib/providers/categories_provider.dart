@@ -25,11 +25,11 @@ class CategoriesNotifier extends StateNotifier<List<CategoryEntry>> {
     if (_userId == userId) return;
     _userId = userId;
     try {
-      final row = await _db
+      final row = await readWithRetry(() => _db
           .from('user_categories')
           .select('ordered_list, styles')
           .eq('user_id', userId)
-          .maybeSingle();
+          .maybeSingle());
       if (row != null) {
         final ids = (row['ordered_list'] as List<dynamic>).cast<String>();
         final styles = (row['styles'] as Map<String, dynamic>?) ?? {};

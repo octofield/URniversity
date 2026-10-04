@@ -24,6 +24,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/hover_lift.dart';
 import 'future_goal_detail_screen.dart';
 import 'semester_goal_detail_screen.dart';
+import '../widgets/app_page.dart';
 
 // Node box sizes and layout spacing
 const _futureNodeW = 190.0;
@@ -139,7 +140,7 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
       ],
     ];
 
-    return Scaffold(
+    return AppPage(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -304,7 +305,7 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
             ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -595,7 +596,7 @@ class _SummaryCard extends ConsumerWidget {
                 child: FilledButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    AppPageRoute(
                       builder: (_) => isVision
                           ? FutureGoalDetailScreen(goalId: nodeId)
                           : SemesterGoalDetailScreen(goalId: nodeId),
