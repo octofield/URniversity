@@ -23,6 +23,33 @@ git-ignored). See README.md.
 import sys
 
 import common
+
+
+def term_starts(module, code, semesters):
+    """Each semester's first day of classes: read from the school's own
+    calendar where the module can, else the maintainer's date in schools.json.
+    -> ({semester: {first_day, weeks}}, [(semester, date or None, 'calendar' |
+    'schools.json' | 'none')])"""
+    defaults = common.term_defaults(code)
+    weeks = common.load_schools()[code].get('term_weeks', 16)
+    found = {}
+    if hasattr(module, 'fetch_term_starts'):
+        for year in sorted({int(s.split('-')[0]) for s in semesters}):
+            try:
+                found.update(module.fetch_term_starts(year))
+            except Exception as e:  # noqa: BLE001 - the fallback below covers it
+                print('  %s calendar %d unreadable: %s' % (code, year, e))
+    out, report = {}, []
+    for s in semesters:
+        if s in found:
+            out[s] = {'first_day': found[s].isoformat(), 'weeks': weeks}
+            report.append((s, out[s]['first_day'], 'calendar'))
+        elif s in defaults:
+            out[s] = defaults[s]
+            report.append((s, out[s]['first_day'], 'schools.json'))
+        else:
+            report.append((s, None, 'none'))
+    return out, report
 from schools import REGISTRY
 
 
@@ -72,6 +99,7 @@ def main(argv):
     failed_any = False
     report = []
     requirement_report = []
+    terms_report = []
     for code in codes:
         module = REGISTRY[code]
         try:
@@ -113,8 +141,10 @@ def main(argv):
             written.append(semester)
             audiences |= {a for r in rows for a in r['required_for']}
             print('  %s written: %d courses' % (semester, len(rows)))
+        starts, start_report = term_starts(module, code, wanted)
+        terms_report.extend((code,) + r for r in start_report)
         if written:
-            common.record_school(env, code, written, audiences)
+            common.record_school(env, code, written, audiences, starts)
 
         if skip_requirements or not hasattr(module, 'fetch_requirements'):
             continue
@@ -134,6 +164,8 @@ def main(argv):
         flag = '' if complete else '   ⚠ incomplete'
         print('  %-6s%-11s%-11d%-11d%-11d%d%s%s' % (code, semester, source, parsed, courses, unread, flag,
                                                    ('   ' + note) if note else ''))
+    for code, semester, first_day, source in terms_report:
+        print('  %-6s%-11sclasses start %s (%s)' % (code, semester, first_day or '?', source))
     for code, count, missing in requirement_report:
         print('  %-6scredits to graduate: %d department-years%s' % (
             code, count, ('   %d unreadable, e.g. %s' % (len(missing), missing[:3])) if missing else ''))

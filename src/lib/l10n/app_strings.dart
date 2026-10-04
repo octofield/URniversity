@@ -519,8 +519,6 @@ abstract class AppStrings {
   String get classReminder;
   String get classReminderDesc;
   String minutesBefore(int minutes);
-  String get tourTimetableTitle;
-  String get tourTimetableBody;
 
   // Grades and GPA (Phase 6)
   String get courseTitleRequired;
@@ -548,6 +546,13 @@ abstract class AppStrings {
   String get degreeBachelor;
   String get degreeGraduate;
   String get gradesOtherSchool;
+  String semesterCredits(String credits);
+  String get exportTimetable;
+  String get exportFailed;
+  String get courseTasks;
+  String termFromSchool(String week);
+  String get postponeOneDay;
+  String postponedTo(String when);
   String get adminTitle;
   String get adminEntryHint;
   String get adminNoAccess;

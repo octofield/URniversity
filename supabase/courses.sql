@@ -83,6 +83,12 @@ ALTER TABLE user_settings
   ADD COLUMN IF NOT EXISTS credits_general integer CHECK (credits_general BETWEEN 0 AND 400),
   ADD COLUMN IF NOT EXISTS credits_elective integer CHECK (credits_elective BETWEEN 0 AND 400);
 
+-- 2026-10-03: a task can belong to a course (homework). Not a foreign key: a
+-- course deleted to the trash leaves its tasks, which simply stop naming it.
+-- The app writes the key only once a task has had a course, so until this runs
+-- every other task still saves
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS linked_course_id text;
+
 -- A deleted course goes to the trash like a task. If trash_items limits
 -- item_type with a CHECK, it has to allow 'course' too. This re-creates the
 -- constraint under the name Postgres gives an inline CHECK; if yours has a

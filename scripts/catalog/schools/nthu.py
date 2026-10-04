@@ -14,11 +14,14 @@ Weekdays are M T W R F S U; periods 1–4, n, 5–9, a–d (schools.json).
 import html
 import json
 import re
+import urllib.parse
 
 import common
 
 CODE = 'nthu'
 URL = 'https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/JH/OPENDATA/open_course_data.json'
+# The academic calendars, one PDF a year, linked from this page
+CALENDAR_PAGE = 'https://dgaa.site.nthu.edu.tw/p/412-1209-2942.php?Lang=zh-tw'
 
 PERIODS = common.load_periods(CODE)
 _WEEKDAYS = {'M': 1, 'T': 2, 'W': 3, 'R': 4, 'F': 5, 'S': 6, 'U': 7}
@@ -131,3 +134,40 @@ def fetch(semester):
     note = '%d cancelled or untitled, left out' % cancelled if cancelled else ''
     # The file is one document: parsed whole, it is complete
     return common.Fetched(records, len(here) - cancelled, len(records) > 0, note)
+
+
+# First day of classes -------------------------------------------------------
+
+# "… 7 一 (1)全校各級學生上課開始、註冊日 …": the day, its weekday, then the
+# event; the summer school's own start does not count
+_CLASSES_START = re.compile(r'(\d{1,2})\s+([一二三四五六日])\s+\(1\)全校各級學生上課開始')
+
+
+def class_starts_from_text(text, roc_year):
+    """{semester: date} from the calendar's text. The PDF loses which month a
+    line sits under, so the month is the one in the term's window where that
+    day falls on the printed weekday (common.class_start)."""
+    out = {}
+    for semester, m in zip(('%d-1' % roc_year, '%d-2' % roc_year), _CLASSES_START.finditer(text)):
+        d = common.class_start(semester, int(m.group(1)), common.WEEKDAY_CHARS[m.group(2)])
+        if d:
+            out[semester] = d
+    return out
+
+
+def fetch_term_starts(roc_year):
+    """The academic year's first days of classes, from the PDF whose link
+    reads "<year> 學年度行事曆"."""
+    import io as _io
+    from bs4 import BeautifulSoup
+    from pypdf import PdfReader
+    page = BeautifulSoup(common.fetch_text(CALENDAR_PAGE), 'html.parser')
+    wanted = re.compile(r'%d\s*學年度行事曆' % roc_year)
+    link = next((a['href'] for a in page.find_all('a', href=True)
+                 if wanted.search(a.get_text()) and a['href'].lower().endswith('.pdf')), None)
+    if link is None:
+        return {}
+    url = urllib.parse.urljoin(CALENDAR_PAGE, link)
+    reader = PdfReader(_io.BytesIO(common.fetch_bytes(url)))
+    return class_starts_from_text('\n'.join(p.extract_text() or '' for p in reader.pages), roc_year)
+

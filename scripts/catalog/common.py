@@ -93,6 +93,35 @@ def periods_to_sessions(weekday, labels, periods, location=None):
     return out
 
 
+# Python's weekday() for the weekday characters calendars print
+WEEKDAY_CHARS = {'一': 0, '二': 1, '三': 2, '四': 3, '五': 4, '六': 5, '日': 6}
+
+
+def class_start(semester, day, weekday=None):
+    """The date a semester's classes start on, from a calendar that gives the
+    day of the month (and perhaps the weekday) but not always the month: the
+    earliest month in the term's usual window (Aug–Oct, Jan–Mar) where that
+    day exists and falls on that weekday. None if none does."""
+    roc, half = semester.split('-')
+    year = int(roc) + 1911 + (1 if half == '2' else 0)
+    for month in ((8, 9, 10) if half == '1' else (1, 2, 3)):
+        try:
+            d = datetime.date(year, month, day)
+        except ValueError:
+            continue
+        if weekday is None or d.weekday() == weekday:
+            return d
+    return None
+
+
+def term_defaults(code):
+    """The maintainer's first days of classes in schools.json, for when a
+    school's calendar cannot be read: {semester: {first_day, weeks}}."""
+    info = load_schools()[code]
+    weeks = info.get('term_weeks', 16)
+    return {s: {'first_day': d, 'weeks': weeks} for s, d in info.get('term_starts', {}).items()}
+
+
 def is_semester(code):
     """The app's own semester code: "115-1", "115-2"."""
     parts = code.split('-')
@@ -192,14 +221,15 @@ def write_semester(env, school, semester, rows, stamp, prune=True):
     }), prefer='return=minimal')
 
 
-def record_school(env, code, semesters, audiences=()):
+def record_school(env, code, semesters, audiences=(), term_starts=None):
     """catalog_schools: the app's list of schools it can search, for which
-    semesters, and every department name the catalog files required courses
-    under (the list a student picks their own from). What was written before
-    is kept."""
+    semesters, every department name the catalog files required courses under
+    (the list a student picks their own from), and each semester's first day
+    of classes ({semester: {first_day, weeks}}), the app's default. What was
+    written before is kept."""
     info = load_schools()[code]
     existing = _rest(env, 'GET', 'catalog_schools?' + urllib.parse.urlencode({
-        'code': 'eq.' + code, 'select': 'semesters,audiences',
+        'code': 'eq.' + code, 'select': 'semesters,audiences,term_starts',
     })) or []
     old = existing[0] if existing else {}
     _rest(env, 'POST', 'catalog_schools', [{
@@ -208,6 +238,7 @@ def record_school(env, code, semesters, audiences=()):
         'short_name': info['short_name'],
         'semesters': sorted(set(old.get('semesters') or []) | set(semesters)),
         'audiences': sorted(set(old.get('audiences') or []) | set(audiences)),
+        'term_starts': {**(old.get('term_starts') or {}), **(term_starts or {})},
         'updated_at': now_stamp(),
     }], prefer='resolution=merge-duplicates,return=minimal')
 

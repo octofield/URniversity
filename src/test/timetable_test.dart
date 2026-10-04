@@ -167,4 +167,29 @@ void main() {
       expect(rowPosition(rows, hm(23, 0)), rows.length);
     });
   });
+
+  group('the next class', () {
+    int hm(int h, int m) => h * 60 + m;
+    final calc = Course(
+      id: 'c', semester: '115-1', title: '微積分', color: 0, createdAt: DateTime(2026),
+      sessions: [
+        CourseSession(weekday: DateTime.monday, startMinute: hm(10, 20), endMinute: hm(12, 10)),
+        CourseSession(weekday: DateTime.thursday, startMinute: hm(8, 10), endMinute: hm(9, 0)),
+      ],
+    );
+
+    test('is the soonest meeting still ahead', () {
+      // Wednesday 2026-10-07 noon: Thursday morning comes first
+      expect(nextMeetingStart(calc, DateTime(2026, 10, 7, 12)), DateTime(2026, 10, 8, 8, 10));
+      // Monday 10:30, the class already began: Thursday
+      expect(nextMeetingStart(calc, DateTime(2026, 10, 5, 10, 30)), DateTime(2026, 10, 8, 8, 10));
+      // Thursday 9:00: next Monday
+      expect(nextMeetingStart(calc, DateTime(2026, 10, 8, 9)), DateTime(2026, 10, 12, 10, 20));
+    });
+
+    test('none without meetings', () {
+      expect(nextMeetingStart(calc.copyWith(sessions: const []), DateTime(2026, 10, 7)), isNull);
+    });
+  });
 }
+

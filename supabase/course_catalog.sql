@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS catalog_schools (
 -- Every department name the catalog files required courses under, for a
 -- student to pick their own from (D32)
 ALTER TABLE catalog_schools ADD COLUMN IF NOT EXISTS audiences text[] NOT NULL DEFAULT '{}';
+-- Each semester's first day of classes, {"115-1": {"first_day": "2026-09-07",
+-- "weeks": 16}}: read from the school's calendar by the script, or the
+-- maintainer's date in schools.json. The app's default for a semester the
+-- user has not set themselves (2026-10-03)
+ALTER TABLE catalog_schools ADD COLUMN IF NOT EXISTS term_starts jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 ALTER TABLE catalog_schools ENABLE ROW LEVEL SECURITY;
 

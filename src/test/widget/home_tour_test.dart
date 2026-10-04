@@ -53,7 +53,7 @@ void main() {
       await pumpApp(tester);
 
       expect(find.text(zh.tourTaskAddTitle), findsOneWidget);
-      expect(find.text('1 / 6'), findsOneWidget);
+      expect(find.text('1 / 5'), findsOneWidget);
       expect(holeOn(tester, find.byTooltip(zh.addTask)), isTrue);
     });
 
@@ -93,7 +93,7 @@ void main() {
       expect(scope.read(tasksProvider).single.title, '交微積分作業');
       expect(find.text(zh.tourSaved), findsOneWidget);
       expect(find.text(zh.tourSummaryTitle), findsOneWidget);
-      expect(find.text('2 / 6'), findsOneWidget);
+      expect(find.text('2 / 5'), findsOneWidget);
     });
 
     testWidgets('closing the sheet without saving goes back to the button', (tester) async {
@@ -168,9 +168,6 @@ void main() {
       expect(find.text(zh.tourHistoryBody), findsOneWidget);
       expect(holeOn(tester, find.text(zh.historyDaily)), isTrue);
       await tapAndSettle(tester, find.text(zh.tourGoBack));
-      // Then the timetable card beside it, then the view switch
-      expect(find.text(zh.tourTimetableTitle), findsOneWidget);
-      await gotIt(tester);
       expect(find.text(zh.tourViewBody), findsOneWidget);
     });
 
@@ -179,7 +176,6 @@ void main() {
 
       await tapAndSettle(tester, find.text(zh.tourSkipStep));
       await tapAndSettle(tester, find.text(zh.tourSkipStep));
-      await gotIt(tester);
       expect(find.text(zh.tourViewBody), findsOneWidget);
       expect(holeOn(tester, find.text(zh.weeklyTasks)), isTrue);
 
@@ -334,12 +330,7 @@ void main() {
       tester.view.physicalSize = const Size(900, 700);
       await tester.pumpAndSettle();
       // Skip through to "next: targets", which points at the rail
-      // The timetable stop is information only: "got it" rather than skip
-      for (var i = 0; i < 2; i++) {
-        await tapAndSettle(tester, find.text(zh.tourSkipStep));
-      }
-      await gotIt(tester);
-      for (var i = 0; i < 2; i++) {
+      for (var i = 0; i < 4; i++) {
         await tapAndSettle(tester, find.text(zh.tourSkipStep));
       }
       expect(find.text(zh.tourNextTargetTitle), findsOneWidget);

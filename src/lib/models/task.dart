@@ -63,6 +63,14 @@ class Task {
   final int sortOrder;
   // Dates on which a recurring task was completed ("yyyy-MM-dd")
   final List<String> completedDates;
+  // The course this task belongs to (2026-10-03, homework for a class). An
+  // empty string is a link that was removed: it has to be written to clear
+  // the column, while a task that never had one leaves the key out — so a
+  // database without the column (courses.sql not re-run) still takes it.
+  // Read it through [courseId]
+  final String? linkedCourseId;
+
+  String? get courseId => linkedCourseId == null || linkedCourseId!.isEmpty ? null : linkedCourseId;
 
   const Task({
     required this.id,
@@ -78,6 +86,7 @@ class Task {
     this.parentTaskId,
     this.sortOrder = 0,
     this.completedDates = const [],
+    this.linkedCourseId,
   });
 
   bool isCompletedOn(DateTime date) {
@@ -141,6 +150,7 @@ class Task {
       parentTaskId: j['parent_task_id'] as String?,
       sortOrder: j['sort_order'] as int? ?? 0,
       completedDates: completedDates,
+      linkedCourseId: j['linked_course_id'] as String?,
     );
   }
 
@@ -166,6 +176,7 @@ class Task {
     'parent_task_id': parentTaskId,
     'sort_order': sortOrder,
     'completed_dates': completedDates.isNotEmpty ? jsonEncode(completedDates) : null,
+    if (linkedCourseId != null) 'linked_course_id': linkedCourseId,
   };
 
   Task copyWith({
@@ -180,6 +191,7 @@ class Task {
     Object? parentTaskId = _absent,
     int? sortOrder,
     List<String>? completedDates,
+    Object? linkedCourseId = _absent,
   }) {
     return Task(
       id: id,
@@ -195,6 +207,7 @@ class Task {
       parentTaskId: parentTaskId is _Absent ? this.parentTaskId : parentTaskId as String?,
       sortOrder: sortOrder ?? this.sortOrder,
       completedDates: completedDates ?? this.completedDates,
+      linkedCourseId: linkedCourseId is _Absent ? this.linkedCourseId : linkedCourseId as String?,
     );
   }
 }

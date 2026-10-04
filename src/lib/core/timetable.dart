@@ -128,3 +128,21 @@ double rowPosition(List<ClassPeriod> rows, int minute) {
   }
   return rows.length.toDouble();
 }
+
+// When the course next meets after [now], within a week; null if it has no
+// meetings. A homework task added from the course is due then by default
+DateTime? nextMeetingStart(Course course, DateTime now) {
+  DateTime? best;
+  for (final s in course.sessions) {
+    for (var d = 0; d <= 7; d++) {
+      final day = DateTime(now.year, now.month, now.day + d);
+      if (day.weekday != s.weekday) continue;
+      final start = day.add(Duration(minutes: s.startMinute));
+      if (!start.isAfter(now)) continue;
+      if (best == null || start.isBefore(best)) best = start;
+      break;
+    }
+  }
+  return best;
+}
+

@@ -27,7 +27,7 @@ class TodayClassesStrip extends ConsumerWidget {
     final nowDay = ref.watch(effectiveNowProvider);
     final settings = ref.watch(semesterSettingsProvider);
     final semester = termAt(day, settings);
-    final term = ref.watch(termsProvider)[semester];
+    final term = ref.watch(effectiveTermsProvider)[semester];
     if (term != null && !inTerm(day, term.firstDay, term.weeks)) return const SizedBox.shrink();
 
     final meetings = meetingsOn(day, semester, ref.watch(coursesProvider));

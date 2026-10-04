@@ -14,6 +14,7 @@ abstract final class AppRoutes {
   static const grades = '/grades';
   static const settings = '/settings';
   static const admin = '/admin';
+  static const login = '/login';
 
   // In tab order: index 0 is the tasks tab
   static const tabs = [tasks, targets, visions, me];

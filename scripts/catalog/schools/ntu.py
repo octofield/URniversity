@@ -15,6 +15,8 @@ the hard way on NOL:
      many times over
 dptname=0 with a startrec offset covers everything in about 110 requests.
 """
+import datetime
+import io
 import json
 import re
 import time
@@ -37,6 +39,8 @@ GEN_ED_AREAS = ('a', '1', '2', '3', '4', '5', '6', '7', '8', 'b')
 # page per department (curri.aca.ntu.edu.tw, the registrar's own query)
 REQUIREMENTS_API = 'https://curri.aca.ntu.edu.tw/NTUVoxCourse/index.php/api/'
 REQUIREMENTS_PAGE = 'https://curri.aca.ntu.edu.tw/NTUVoxCourse/uquery/search-result'
+# The academic calendars, one Excel sheet a year, linked from this page
+CALENDAR_PAGE = 'https://www.aca.ntu.edu.tw/w/aca/calendar'
 # Entry years kept: this year's intake and six before it, which covers
 # students taking longer than four years
 ENTRY_YEARS = 7
@@ -278,3 +282,41 @@ def fetch_requirements():
                          'general': general, 'elective': elective, 'total': total})
         print('    %s: %d departments' % (year, len(depts)))
     return rows, failed
+
+
+# First day of classes -------------------------------------------------------
+
+def class_starts_from_rows(rows):
+    """{semester: date} from the calendar sheet's rows: column A carries the
+    year ("115年") and B the month ("9月") on a month's first row only, so both
+    are carried down; column K has the events, among them "7日 115學年度第一學期
+    上課開始"."""
+    out = {}
+    year = month = None
+    for row in rows:
+        a, b, k = (row + (None,) * 11)[0], (row + (None,) * 11)[1], (row + (None,) * 11)[10]
+        if isinstance(a, str) and re.match(r'^\d{3}年$', a.strip()):
+            year = int(a.strip()[:-1])
+        if isinstance(b, str) and re.match(r'^\d{1,2}月$', b.strip()):
+            month = int(b.strip()[:-1])
+        m = re.search(r'(\d{1,2})日\s*(\d{3})學年度第([一二])學期上課開始', k if isinstance(k, str) else '')
+        if m and year and month:
+            semester = '%s-%s' % (m.group(2), '1' if m.group(3) == '一' else '2')
+            out[semester] = datetime.date(year + 1911, month, int(m.group(1)))
+    return out
+
+
+def fetch_term_starts(roc_year):
+    """The academic year's first days of classes, from the sheet whose link
+    reads "國立臺灣大學<year>學年度行事曆"."""
+    import openpyxl
+    page = BeautifulSoup(common.fetch_text(CALENDAR_PAGE), 'html.parser')
+    link = next((a['href'] for a in page.find_all('a', href=True)
+                 if '%d學年度行事曆' % roc_year in a.get_text() and a['href'].lower().endswith(('.xlsx', '.xls'))), None)
+    if link is None:
+        return {}
+    parts = urllib.parse.urlsplit(urllib.parse.urljoin(CALENDAR_PAGE, link))
+    url = urllib.parse.urlunsplit(parts._replace(path=urllib.parse.quote(parts.path)))
+    sheet = openpyxl.load_workbook(io.BytesIO(common.fetch_bytes(url)), data_only=True).worksheets[0]
+    return class_starts_from_rows([tuple(c.value for c in row) for row in sheet.iter_rows()])
+

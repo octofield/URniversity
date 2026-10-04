@@ -64,7 +64,12 @@ class TimetableGrid extends StatelessWidget {
               top: y(m.startMinute) + 1,
               width: dayWidth - 3,
               height: y(m.endMinute) - y(m.startMinute) - 2,
-              child: _Block(course: c, session: m, onTap: () => onTapCourse(c)),
+              child: _Block(
+                course: c,
+                session: m,
+                credits: c.credits > 0 ? s.creditsCount(formatCredits(c.credits)) : null,
+                onTap: () => onTapCourse(c),
+              ),
             ),
       ];
 
@@ -165,12 +170,17 @@ class TimetableGrid extends StatelessWidget {
   }
 }
 
+// A course's credits as a person writes them: 3, 2.5
+String formatCredits(double c) => c == c.roundToDouble() ? c.toInt().toString() : c.toString();
+
 class _Block extends StatelessWidget {
   final Course course;
   final CourseSession session;
+  // "3 學分", or null for a course with none
+  final String? credits;
   final VoidCallback onTap;
 
-  const _Block({required this.course, required this.session, required this.onTap});
+  const _Block({required this.course, required this.session, this.credits, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -188,13 +198,16 @@ class _Block extends StatelessWidget {
           child: LayoutBuilder(builder: (context, c) {
             // As many lines as the block has room for; the title always first
             final lines = (c.maxHeight / 14).floor().clamp(1, 6);
+            // The credits only once the title and room have a line each
+            final showCredits = credits != null && lines > 2;
+            final below = (lines > 1 && session.location != null ? 1 : 0) + (showCredits ? 1 : 0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Flexible(
                   child: Text(
                     course.title,
-                    maxLines: lines > 1 ? lines - 1 : 1,
+                    maxLines: lines - below > 0 ? lines - below : 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
@@ -205,6 +218,13 @@ class _Block extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.labelSmall?.copyWith(color: AppColors.textSecondary),
+                  ),
+                if (showCredits)
+                  Text(
+                    credits!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
                   ),
               ],
             );

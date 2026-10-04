@@ -55,8 +55,10 @@ void main() {
   RemoteConfig off(String feature) => RemoteConfig(flags: {feature: false});
 
   group('feature switches', () {
-    testWidgets('all on by default: the timetable card is there', (tester) async {
+    testWidgets('all on by default: the timetable is in the side menu', (tester) async {
       await pumpApp(tester);
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+      await tester.pumpAndSettle();
       expect(find.text(zh.timetable), findsWidgets);
     });
 
@@ -216,6 +218,29 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, zh.save));
       await tester.pumpAndSettle();
       expect(c.read(featureOnProvider('timetable')), isFalse);
+    });
+
+    testWidgets('pulled down, the backend closes like any page (§3-Q)', (tester) async {
+      await pumpScreen(
+        tester,
+        Builder(builder: (context) => Scaffold(
+          body: Center(
+            child: TextButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminScreen())),
+              child: const Text('open'),
+            ),
+          ),
+        )),
+        container: testContainer(overrides: [
+          adminSourceProvider.overrideWithValue(_FakeAdmin()),
+          isAdminProvider.overrideWith((ref) async => true),
+        ]),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.drag(find.text(zh.adminDau), const Offset(0, 400));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminScreen), findsNothing);
     });
 
     testWidgets('an account is disabled only after confirming', (tester) async {

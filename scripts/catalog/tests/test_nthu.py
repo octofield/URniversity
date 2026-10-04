@@ -132,3 +132,15 @@ def test_general_education_common_courses_and_physical_education():
     assert nthu.kind_of(dict(base, **{'科號': '11510LANG101000', '通識類別': ''})) == common.KIND_GENERAL
     assert nthu.kind_of(dict(base, **{'科號': '11510PE  100100', '通識類別': ''})) == common.KIND_EXCLUDED
     assert nthu.kind_of(base) is None
+
+
+# First day of classes (2026-10-03)
+
+def test_the_calendar_text_gives_both_terms_first_days():
+    import datetime
+    text = io.open(os.path.join(os.path.dirname(FIXTURE), 'calendar_115.txt'), encoding='utf-8').read()
+    # The summer school's own "上課開始" is not a term's
+    assert nthu.class_starts_from_text(text, 115) == {
+        '115-1': datetime.date(2026, 9, 7),
+        '115-2': datetime.date(2027, 2, 15),
+    }

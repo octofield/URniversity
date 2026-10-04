@@ -25,6 +25,8 @@ import '../widgets/responsive_body.dart';
 import '../widgets/swipe_switcher.dart';
 import '../widgets/timetable_grid.dart';
 import '../providers/remote_config_provider.dart';
+import '../core/save_image/save_image.dart';
+import '../core/ui_symbols.dart';
 
 // The timetable and the grades (UC18, UC20). One screen with two views,
 // because a grade is entered on the course it belongs to
@@ -43,6 +45,26 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   late String _semester = termAt(ref.read(effectiveNowProvider), ref.read(semesterSettingsProvider));
   // Which way the last change went, so the pages slide the matching way
   bool _forward = true;
+  // The week as a picture: drawn once more without the now line and with the
+  // semester's name on top, captured, then back to normal
+  final _exportKey = GlobalKey();
+  bool _exporting = false;
+
+  Future<void> _export(AppStrings s) async {
+    setState(() => _exporting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final png = await capturePng(_exportKey);
+      if (png == null) return;
+      await savePng(png, 'URniversity-$_semester.png');
+    } catch (e) {
+      // Nothing of the user's is lost: say so, and let them try again
+      messenger.showSnackBar(SnackBar(content: Text(s.exportFailed)));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
 
   List<String> get _semesters {
     // Regular terms only (no breaks), newest last, and always the one showing
@@ -92,7 +114,9 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   }
 
   Future<void> _editTerm(AppStrings s) async {
-    final terms = ref.read(termsProvider);
+    // Starts from the school's date when the user has not set one: saving it
+    // makes it theirs
+    final terms = ref.read(effectiveTermsProvider);
     final settings = ref.read(semesterSettingsProvider);
     final current = terms[_semester];
     final initial = current?.firstDay ?? suggestedFirstDay(semesterStart(_semester, settings));
@@ -142,7 +166,8 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
     final clock = DateTime.now();
     final today = DateTime(now.year, now.month, now.day, clock.hour, clock.minute);
     final courses = ref.watch(coursesProvider).where((c) => c.semester == _semester).toList();
-    final term = ref.watch(termsProvider)[_semester];
+    final term = ref.watch(effectiveTermsProvider)[_semester];
+    final fromSchool = term != null && ref.watch(termsProvider)[_semester] == null;
     final periods = periodsFor(ref.watch(profileProvider)?.school);
     final isCurrent = _semester == termAt(now, settings);
 
@@ -195,16 +220,20 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
       ),
     );
 
+    final credits = s.semesterCredits(formatCredits(courses.fold<double>(0, (sum, c) => sum + c.credits)));
     final week = ListView(
       padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, 0, AppSpacing.pageHorizontal, 96),
       children: [
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: ActionChip(
-            avatar: Icon(term == null ? Icons.event_outlined : Icons.event_available_outlined, size: 18),
-            label: Text(weekLabel ?? s.setFirstDay),
-            onPressed: () => _editTerm(s),
-          ),
+        Row(
+          children: [
+            ActionChip(
+              avatar: Icon(term == null ? Icons.event_outlined : Icons.event_available_outlined, size: 18),
+              label: Text(weekLabel == null ? s.setFirstDay : fromSchool ? s.termFromSchool(weekLabel) : weekLabel),
+              onPressed: () => _editTerm(s),
+            ),
+            const Spacer(),
+            Text(credits, style: theme.labelLarge?.copyWith(color: AppColors.textSecondary)),
+          ],
         ),
         const SizedBox(height: AppSpacing.sm),
         if (courses.isEmpty)
@@ -212,20 +241,47 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Text(s.noCoursesYet, style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
           ),
-        TimetableGrid(
-          courses: courses,
-          periods: periods,
-          s: s,
-          now: isCurrent ? today : null,
-          onTapCourse: (c) => showCourseSheet(context, semester: _semester, existing: c),
-          onTapEmpty: (weekday, minute) =>
-              showCourseSheet(context, semester: _semester, weekday: weekday, startMinute: minute),
+        RepaintBoundary(
+          key: _exportKey,
+          child: ColoredBox(
+            color: AppColors.background,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_exporting)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: Text('${formatSemester(_semester, settings, s)}$kDotSeparator$credits', style: theme.titleMedium),
+                  ),
+                TimetableGrid(
+                  courses: courses,
+                  periods: periods,
+                  s: s,
+                  now: isCurrent && !_exporting ? today : null,
+                  onTapCourse: (c) => showCourseSheet(context, semester: _semester, existing: c),
+                  onTapEmpty: (weekday, minute) =>
+                      showCourseSheet(context, semester: _semester, weekday: weekday, startMinute: minute),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(_grades ? s.grades : s.timetable), leading: homeButtonIfFirst(context)),
+      appBar: AppBar(
+        title: Text(_grades ? s.grades : s.timetable),
+        leading: homeButtonIfFirst(context),
+        actions: [
+          if (!_grades)
+            IconButton(
+              icon: const Icon(Icons.ios_share),
+              tooltip: s.exportTimetable,
+              onPressed: _exporting ? null : () => _export(s),
+            ),
+        ],
+      ),
       floatingActionButton: _grades
           ? null
           : FloatingActionButton.extended(

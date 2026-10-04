@@ -59,6 +59,10 @@ dependencies:
   go_router: ^18.0.1
   flutter_web_plugins:
     sdk: flutter
+  # The timetable as a PNG (2026-10-03): the share sheet on a phone, a
+  # download link on the web
+  share_plus: ^13.3.1
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

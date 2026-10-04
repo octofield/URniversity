@@ -5,6 +5,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../providers/settings_provider.dart';
 import '../providers/synced_list_notifier.dart';
+import '../widgets/pull_to_close.dart';
 import '../widgets/responsive_body.dart';
 
 // Developer mode: the last failed syncs, newest first, with where each one
@@ -41,7 +42,7 @@ class SyncLogScreen extends ConsumerWidget {
         ],
       ),
       // Clear of the phone's navigation bar: the list sets its own padding
-      body: SafeArea(top: false, child: ResponsiveBody(
+      body: PullToClose(child: SafeArea(top: false, child: ResponsiveBody(
         child: log.isEmpty
             ? Center(
                 child: Text(s.syncLogEmpty, style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
@@ -65,7 +66,7 @@ class SyncLogScreen extends ConsumerWidget {
                   );
                 },
               ),
-      )),
+      ))),
     );
   }
 }

@@ -1,7 +1,9 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/history_stats.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/ui_symbols.dart';
@@ -18,6 +20,8 @@ import '../providers/tasks_provider.dart';
 import '../utils/category_helpers.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/coach_mark.dart';
+import '../widgets/pull_to_close.dart';
+import '../widgets/swipe_switcher.dart';
 import 'reviews_screen.dart';
 
 // One point on the history chart. rate is null when no task applied that
@@ -46,6 +50,19 @@ class TaskHistoryScreen extends ConsumerStatefulWidget {
 class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
   int _range = 0; // 0 = daily, 1 = weekly, 2 = monthly
   int? _selected;
+  // Which way the last change went, so the views slide the matching way
+  bool _forward = true;
+
+  // Day, week and month in a line: a swipe to the left moves on, to the right
+  // back, like the switch above
+  void _setRange(int range) {
+    if (range < 0 || range > 2 || range == _range) return;
+    setState(() {
+      _forward = range > _range;
+      _range = range;
+      _selected = null;
+    });
+  }
 
   List<_Period> _buildPeriods(DateTime today) {
     final tasks = ref.watch(tasksProvider);
@@ -174,8 +191,27 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
           ),
         ],
       ),
-      body: ResponsiveBody(
+      // Pulled down from the top it closes; sideways it changes view (§3-Q)
+      body: PullToClose(
+        child: ResponsiveBody(
+        child: SwipeSwitcher(
+        onNext: _range < 2 ? () => _setRange(_range + 1) : null,
+        onPrevious: _range > 0 ? () => _setRange(_range - 1) : null,
+        child: PageTransitionSwitcher(
+        duration: scaled(context, AppMotion.page),
+        reverse: !_forward,
+        transitionBuilder: (child, primary, secondary) => SharedAxisTransition(
+          animation: primary,
+          secondaryAnimation: secondary,
+          transitionType: SharedAxisTransitionType.horizontal,
+          fillColor: Colors.transparent,
+          child: child,
+        ),
         child: SingleChildScrollView(
+          key: ValueKey(_range),
+          // Scrollable even when it all fits, or a pull down past the top
+          // would have no scroll to report and could not close the page
+          physics: const AlwaysScrollableScrollPhysics(),
           // The last card sat under the Android navigation bar without this
           padding: EdgeInsets.fromLTRB(
             AppSpacing.pageHorizontal,
@@ -193,10 +229,7 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                   ButtonSegment(value: 2, label: Text(s.historyMonthly)),
                 ],
                 selected: {_range},
-                onSelectionChanged: (v) => setState(() {
-                  _range = v.first;
-                  _selected = null;
-                }),
+                onSelectionChanged: (v) => _setRange(v.first),
               )),
               const SizedBox(height: AppSpacing.md),
               _SummaryHead(
@@ -264,6 +297,9 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
               ),
             ],
           ),
+        ),
+        ),
+        ),
         ),
       ),
     );

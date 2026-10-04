@@ -50,6 +50,7 @@ class TasksNotifier extends SyncedListNotifier<Task> {
     DateTime? dueTime,
     RecurrenceRule? recurrence,
     String? linkedTargetId,
+    String? linkedCourseId,
   }) {
     // Newest first: one step before the smallest there is, so a new task lands
     // on top without moving anything the user has dragged
@@ -63,6 +64,7 @@ class TasksNotifier extends SyncedListNotifier<Task> {
       createdAt: DateTime.now(),
       recurrence: recurrence,
       linkedTargetId: linkedTargetId,
+      linkedCourseId: linkedCourseId,
       sortOrder: minOrder - 1000,
     );
     state = [...state, task];

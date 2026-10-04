@@ -32,7 +32,7 @@ final homeWidgetSyncProvider = Provider<void>((ref) {
     s: ref.watch(stringsProvider),
     now: DateTime.now(),
     courses: ref.watch(coursesProvider),
-    terms: ref.watch(termsProvider),
+    terms: ref.watch(effectiveTermsProvider),
   );
 
   unawaited(HomeWidgetService.instance.push(

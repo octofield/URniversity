@@ -79,7 +79,7 @@ final notificationScheduleProvider = Provider<List<ScheduledNotification>>((ref)
     now: DateTime.now(),
     reviews: ref.watch(reviewsProvider),
     courses: ref.watch(coursesProvider),
-    terms: ref.watch(termsProvider),
+    terms: ref.watch(effectiveTermsProvider),
   );
 });
 

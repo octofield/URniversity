@@ -49,24 +49,45 @@ flowchart TD
 | `/timetable`、`/grades` | `TimetableScreen`（`grades: true`） |
 | `/settings` | `SettingsScreen` |
 | `/admin` | `AdminScreen`（非管理員只看到「沒有後台權限」） |
+| `/login` | `LoginScreen`（2026-10-03；`?from=` 記著登入後要回去的網址） |
 | 其他 | 轉到 `/tasks`（包含 Android 交給路由的登入 deep link） |
+
+**分頁標題**（2026-10-03）：每條路由外包一個 `Title`，瀏覽器分頁顯示「任務 · URniversity」「課表 · URniversity」「登入 · URniversity」等；
+四個分頁共用一條路由，標題依網址決定的分頁換。
+
+**登入狀態**（`providers/auth_status_provider.dart` 的 `AuthStatus`）：
+- `signedIn`：有有效的登入，或是訪客（而且沒有按「登入」）；
+- `signedOut`：沒有登入，或訪客按了「登入」；
+- `unknown`：裝置上存著的登入已過期、正在換新——最多等 4 秒（`kAuthSettleWait`），離線時換不到新的，就照存著的登入進去。
+  以前把這段時間當作已登入，所以開 App 會先閃過任務頁才跳到登入頁（2026-10-03 回報）；現在這段時間只顯示啟動畫面。
 
 ```mermaid
 flowchart TD
-    URL["網址"] --> R{"路徑"}
+    URL["網址（登入狀態或重設密碼一變就重算）"] --> R{"路徑"}
     R -->|/ 或未知| T["/tasks"]
-    R -->|/tasks /targets /visions /me| G1["_AuthGate → HomeScreen(tab)\n同一個頁面 key，換分頁不重建"]
-    R -->|/timetable /grades /settings /admin| G2["_AuthGate → 該頁面"]
-    G1 --> M{"維護模式且不是管理員？"}
-    G2 --> M
+    R -->|已知| Rec{"正在重設密碼？"}
+    Rec -->|是| RecP["/login 轉 /tasks，其他不轉\n（_AuthGate 顯示重設密碼頁）"]
+    Rec -->|否| L{"是 /login？"}
+    L -->|是| In{"signedIn？"}
+    In -->|是| From["轉到 from（站內網址）或 /tasks"]
+    In -->|否| LP["LoginScreen"]
+    L -->|否| Out{"signedOut？"}
+    Out -->|是| ToLogin["轉到 /login?from=原網址"]
+    Out -->|否| Gate["_AuthGate"]
+    Gate --> U{"unknown？"}
+    U -->|是| Splash["SplashScreen（不閃過任何頁面）"]
+    U -->|否| M{"維護模式且不是管理員？"}
     M -->|是| MS["MaintenanceScreen"]
-    M -->|否| P["頁面"]
+    M -->|否| P["頁面：/tasks /targets /visions /me → HomeScreen(tab)\n（同一個頁面 key，換分頁不重建）；其他 → 該頁面"]
     Tap["點分頁"] --> Cur{"分頁上方有開著的頁面？"}
     Cur -->|否| Go["context.go(新分頁網址)\n瀏覽器上一頁／下一頁可用"]
     Cur -->|是| Idx["只換分頁；頁面關閉後網址才更新\n（go 會關掉上面的頁面）"]
 ```
 
-- `_AuthGate` 包住每一條路由：未登入時在原網址顯示登入頁，登入後停在要去的頁面。維護模式只取代頁面，不取代登入頁（管理員要能登入）。
+- 登入頁有自己的網址（2026-10-03）：未登入時路由把任何網址轉到 `/login?from=<原網址>`，登入（或以訪客進入）後回到 `from`；
+  `from` 只接受 `/` 開頭、不是 `/login` 的站內網址，其他一律回 `/tasks`。
+- `_AuthGate` 包住每一條路由，只管四件事：重設密碼、登入狀態還沒確定時的啟動畫面、第一次登入設定暱稱、維護模式。
+  維護模式只取代頁面，不取代登入頁（管理員要能登入）。
 - 主要頁面用 `openPage()`（`context.push`，網址跟著變，上一頁回到原處）；直接輸入網址開啟時底下沒有頁面，AppBar 左上改成回任務頁的按鈕（`homeButtonIfFirst`）。
 - 詳情頁、sheet、日記、回收桶等沒有自己的網址，照舊 `Navigator.push`。
 
@@ -170,9 +191,25 @@ API，等於把那份名單公開出去。
 | 循環規則 | `ChoiceChip` + 數字輸入（僅「每 N 天」時出現）+ 星期複選 `FilterChip`（僅「每週」時出現） | 不循環/每日/每週/每月/每 N 天 | ✗ |
 | 循環星期 | 7 個 `FilterChip`（一～日，可複選） | ISO 星期 1–7；不選＝沿用「與建立日同星期幾」 | ✗ |
 | 連結學期目標 | 依學期分組的清單選擇對話框（見 §3-C） | 學期目標 id | ✗ |
+| 課程（2026-10-03） | 從課程 sheet 的「新增任務」開啟時才出現，可按 ✕ 移除 | 課程 id（D1 `linked_course_id`） | ✗ |
 
-輸出：任務卡片（含截止時間倒數上色、循環圖示、連結目標的箭頭文字），依
-§3-A 規則分組排序後呈現；環形進度卡顯示「已完成 / 總數」與百分比，**整張卡片都可以點**進完成度歷史（2026-09-20：先前只有 72px 的圓環可點）。
+輸出：任務卡片（含截止時間倒數上色、循環圖示、連結目標的箭頭文字、連結課程的課名），依
+§3-A 規則分組排序後呈現。完成度：
+- **手機**（2026-10-03）：頁首右側一個 36px 的小圓環（百分比在中間，全部完成時綠色），點它進完成度歷史；先前清單上方的整張卡擋住任務。
+- **桌面**：右欄的環形進度卡，顯示「已完成 / 總數」與百分比，**整張卡片都可以點**（2026-09-20：先前只有 72px 的圓環可點）。
+
+**截止時間的顏色**（`core/due_level.dart` 的 `dueLevel`，2026-10-03）：
+
+| 時間 | 顏色 |
+|---|---|
+| 截止前超過 3 小時 | 一般 |
+| 截止前 3 小時內，或過期 24 小時內 | 橘色（`warning`） |
+| 過期超過 24 小時 | 紅色（`late`） |
+
+先前截止前一天就變橘、一過期就變紅。
+
+**延後一天**（2026-10-03）：一次性、還沒完成、已過期的任務，刪除鈕左邊多一個「延後一天」（`Icons.update`），
+截止時間改為**明天、原本的時:分**（`postponedToTomorrow`），並提示「已延後到 10/04 14:00」。重複任務沒有這個鈕（過期的那次由重複規則決定）。
 
 **目標頁的進度總覽卡**（2026-09-18 改版，設計稿 A 版）：大字百分比 + 「已完成 / 總數」+ 一條
 整體進度條，下方每個分類一個小膠囊（分類色圓點 + 該分類的完成數／總數）。取代原本「每個目標
@@ -365,7 +402,8 @@ API，等於把那份名單公開出去。
 
 ### 2-H 任務完成度歷史（TaskHistoryScreen）
 
-輸入：日／週／月檢視切換（`SegmentedButton`）、點擊或滑鼠移到長條上選取該期間。
+輸入：日／週／月檢視切換（`SegmentedButton`；2026-10-03 起也能左右滑動切換，水平 shared axis，切換鈕跟著）、
+點擊或滑鼠移到長條上選取該期間；往下拉關閉頁面（`PullToClose`，§3-Q）。
 輸出（**2026-09-20 改版，設計稿 A**）：四張卡片，由上到下
 
 | 卡片 | 內容 | 來源 |
@@ -486,13 +524,13 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 
 ### 2-N 課表與成績（Phase 5／6）
 
-**入口**：任務頁的「課表」卡（手機在完成度卡右邊、同高的方塊；桌面在右欄完成度卡下方的一列）、
-任務頁「今天的課」、側邊欄分隔線下的「課表」（§1）、小工具「課表」分頁的課。週檢視沒有這張卡。`TimetableScreen` 上方可切換學期（‹ ›）與「課表｜成績」。
+**入口**：側邊欄分隔線下的「課表」（§1）、任務頁「今天的課」（有課的日子才出現）、小工具「課表」分頁的課。
+任務頁的「課表」卡已於 2026-10-03 移除。`TimetableScreen` 上方可切換學期（‹ ›）與「課表｜成績」。
 
 **頁面順序與手勢**（2026-09-27）：兩個頁面排成一條線——…上學期成績 · 本學期課表 · 本學期成績 · 下學期課表…。
 左滑往後、右滑往前（`SwipeSwitcher`）：課表左滑到本學期成績、右滑到上學期成績；成績左滑到下學期課表、右滑到本學期課表。
 換頁用水平 shared axis（§3-Q）。內容已在頂端時繼續往下拉，或直接往下拖頁首，頁面以一半速度跟著手指；
-超過 120 px 或下滑速度 > 700 px/s 就關閉，否則彈回（`PullToClose`，彈回時間 `AppMotion.move`，減少動態效果時縮為 0）。
+放開時決定關閉或彈回（`PullToClose`，規則與流程圖在 §3-Q）。
 
 | 輸入 | 元件 | 格式／規則 |
 |---|---|---|
@@ -501,18 +539,24 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 | 學分類別（開啟依學系分類學分時） | chip | 必修／選修／通識／不計；從目錄加入時已自動填好（§3-T），可改 |
 | 成績（編輯時才有） | 等第 chip ＋「計入 GPA」開關 | A+…C-、F、X，或通過／不通過／停修；再點一次取消 |
 | 依學系分類學分（測試中） | 成績頁的開關，預設關 | 開啟時自動帶入入學年度（由年級推算）、學系（個人資料）、目錄裡的系名（依字元相似度猜）；三者都可用下拉選單改。學校沒公告這個學系的規定時，自己填必修／通識／選修三個數字 |
-| 開學日 | 對話框 | 日期＋上課週數（1–30，預設 16）；建議值是學期起始月的第一個週一 |
+| 開學日 | 對話框 | 日期＋上課週數（1–30，預設 16）；預設值是自己學校公告的開學日（D32 `term_starts`，2026-10-03），學校沒有資料時是學期起始月的第一個週一。按下儲存就成為自己的設定（D30） |
+| 課程任務（編輯時才有，2026-10-03） | 課程 sheet「這堂課的任務」 | 「新增任務」開一般任務 sheet，已連到這堂課、截止時間預設為下一次上課開始（`nextMeetingStart`，7 天內），可改成每週重複；下方列出這堂課的任務，點了編輯 |
 | 畢業學分、身分 | 成績頁第一次開啟時的內嵌卡片 | 1–400（預設 128）；學士班（C- 及格）／研究所（B- 及格） |
 | 目標累積 GPA | 數字欄 | 0–4.3，即時顯示剩下的課平均要多少 |
 
-**輸出**：週課表格線（§3-S）、頁首「第 N 週」、任務頁「今天的課」（上課中加粗、下一堂標記、上完的變淡；沒課或不在上課週就不佔空間）、
+**輸出**：週課表格線（§3-S）、頁首「第 N 週」（開學日來自學校時加註「（學校預設）」）與「本學期 N 學分」、
+課程方塊有三行以上空間時最後一行「3 學分」、任務頁「今天的課」（上課中加粗、下一堂標記、上完的變淡；沒課或不在上課週就不佔空間）、
 上課前提醒、小工具「課表」分頁；成績頁三格（本學期 GPA、累積 GPA 與百分制、已修／畢業學分）、GPA 趨勢線、試算結果、依學期分組的課程與等第。
+**匯出 PNG**（2026-10-03）：AppBar 的分享鈕把這學期的課表畫成圖（`RepaintBoundary.toImage`，pixelRatio 3）：
+上方學期與總學分、下方格線，不畫「現在」紅線。手機開分享選單（`share_plus`），網頁直接下載 `URniversity-<學期>.png`
+（`core/save_image/` 依平台條件 import）；失敗時提示「匯出失敗」。
+
 開啟依學系分類學分時，「已修學分」一格換成四條進度（必修、通識、選修、總計，各為「已修／門檻」）、門檻來源說明，以及「N 門課還沒分類 · 自動分類」。
 
 ### 2-O 後台（`/admin`，2026-09-28）
 
 只給 `admins` 表裡的帳號（D34）；設定頁也只有管理員看得到「後台」一列。寬螢幕左側分頁、手機上方分頁，右上「重新整理」。
-左滑到下一個分頁、右滑回上一個（`SwipeSwitcher`，水平 shared axis，與課表／成績相同），手機上方的分頁列跟著移動。內容避開 Android 導航列與 iPhone 的主畫面指示條（`SafeArea(top: false)`）。
+左滑到下一個分頁、右滑回上一個（`SwipeSwitcher`，水平 shared axis，與課表／成績相同），手機上方的分頁列跟著移動。內容避開 Android 導航列與 iPhone 的主畫面指示條（`SafeArea(top: false)`）。往下拉關閉（`PullToClose`，2026-10-03）。
 
 | 分頁 | 輸入 | 輸出 |
 |---|---|---|
@@ -1199,6 +1243,24 @@ flowchart TD
 自訂 controller 與停留時間直接跳到結果，彩帶不放，關聯圖粒子停止。隱式動畫用 `scaled()`，
 回傳 1 微秒而不是 0——`AnimatedSize` 收到 0 會在自己的 layout 裡完成動畫、觸發框架斷言。
 
+**往下拉關閉**（`widgets/pull_to_close.dart`，課表／成績、完成度歷史、後台、同步紀錄，2026-10-03 改版）：
+內容已在頂端時繼續往下拉（Android 的 overscroll、iOS 的回彈都算），頁面跟著手指往下移；記住**最後一次移動的方向**。
+
+```mermaid
+flowchart TD
+    Drag(["手指移動"]) --> Dir["記下方向：往下或往上\n往上就把位移減回去（最低 0）"]
+    Dir --> Up(["放開"])
+    Up --> V{"下滑速度 > 700 px/s？"}
+    V -->|是| Close
+    V -->|否| T{"位移 ≥ 120 px、最後是往下\n而且速度 ≥ 0？"}
+    T -->|是| Close{"減少動態效果？"}
+    T -->|否| Back["彈回原位（move）"]
+    Close -->|是| Pop["直接 pop"]
+    Close -->|否| Leave["往下滑出畫面＋淡出（exit），結束後才 pop"]
+```
+
+先前一拉超過門檻就退出，即使手已經移回去；退出時頁面直接消失。
+
 **刻意不做**：清單第一次出現的錯開進場。資料已改成開 App 立刻出現（D24），再加進場延遲只會讓開啟變慢。
 
 ### 3-R 風格系統（`core/theme/app_styles.dart`）
@@ -1307,6 +1369,14 @@ stateDiagram-v2
 **衝堂**（`clashingCourses`）：同一天、時間區間重疊（`a.start < b.end && b.start < a.end`）；剛好接續（下課 = 上課）不算。
 
 **第幾週**（`weekOfTerm`）：以開學日所在那週的週一為第 1 週起點；在那之前為 0。`inTerm` = 第 1 到第 N 週之間，且不早於開學日當天。
+
+**用哪一個開學日**（`effectiveTermsProvider`，2026-10-03）：自己設的（D30）優先；沒設的學期用自己學校的（D32 `term_starts`，
+個人資料的學校名稱＝目錄的學校名稱）；學校目錄讀不到時就只有自己設的。課表頁、今天的課、上課提醒、小工具都讀它。
+學校的開學日由腳本讀各校行事曆：台大是 Excel（A 欄年、B 欄月往下延續，K 欄「7日 115學年度第一學期上課開始」），
+清大是 PDF（「7 一 (1)全校各級學生上課開始」——PDF 文字失去月份，取學期窗口〔8–10 月／1–3 月〕中那天是該星期幾的第一個月）；
+讀不到時用維護者在 `schools.json` 填的 `term_starts`，兩者都沒有就不寫。
+
+**下一次上課**（`nextMeetingStart`）：從現在起 7 天內、這門課最早的一個時段開始時間；沒有時段為 null。課程任務的預設截止時間。
 
 **今天的課**（`meetingsOn` + `meetingStates`）：只取該學期、該星期的時段，依開始時間排序；以現在時刻分成「已上完／上課中／下一堂（只有一個）／稍後」。
 
@@ -1619,8 +1689,8 @@ flowchart TD
    再點一次同一個節點或按 ✕ 收起摘要卡。
 
 ### UC9　查看任務完成度歷史
-1. 今日頁點**摘要卡**（整張都可以點，不只中間的環形進度）→ 進入 `TaskHistoryScreen`。
-2. 預設顯示「每日」（近 30 天）長條圖；切換「每週」（近 12 週）／「每月」（近 6 個月）。
+1. 今日頁點完成度（手機：頁首右側的小圓環；桌面：右欄的摘要卡，整張都可以點）→ 進入 `TaskHistoryScreen`。
+2. 預設顯示「每日」（近 30 天）長條圖；切換（或左右滑動）「每週」（近 12 週）／「每月」（近 6 個月）。往下拉關閉。
 3. 點擊或滑鼠移到長條上 → 下方顯示該期間「N / M 完成（P%）」；無資料的期間點擊顯示「無資料」。
 4. 圖表上方是摘要卡（平均、較上一期、連續達成、完成數、最強的星期幾），
    下方是各分類完成率與拖最久的任務（見 §2-H）。
@@ -1737,14 +1807,18 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 
 ### UC18　課表（Phase 5）
 
-1. 任務頁的「課表」卡（或側邊欄的「課表」）→ 課表頁，預設是今天所在的學期；‹ › 換學期。
-2. 第一次：點「設定開學日」→ 確認日期與週數 → 頁首顯示「第 N 週」，上課提醒與小工具開始依上課週運作。
+1. 側邊欄的「課表」→ 課表頁，預設是今天所在的學期；‹ › 換學期。
+2. 開學日：學校有公告的，頁首直接顯示「第 N 週（學校預設）」；沒有的點「設定開學日」→ 確認日期與週數。
+   有了開學日，上課提醒與小工具才依上課週運作；自己改過的開學日優先於學校的。
 3. 加課：「新增課程」→ 直接進入自己學校的搜尋（上方 chip 可換學校）：
    - 輸入課名／老師／課號／流水號 → 點結果 → 課與所有時段一次建立；和已有的課衝堂會先標示；加錯了在同一列按「移除」；
    - 搜尋頁底部「手動新增」：填課名、時段（有節次表的學校選節次）→ 新增。點格線空白處也能新增，星期與節次已帶入。
 4. 點格線上的課 → 編輯（含成績）或刪除（進回收桶，還原時時段一起回來）。
-5. 左右滑動在「課表 · 成績」之間與相鄰學期間移動；在頂端往下拉就關閉頁面。
+5. 左右滑動在「課表 · 成績」之間與相鄰學期間移動；在頂端往下拉就關閉頁面（手移回去就不關）。
 6. 任務頁在當天有課時多一列「今天的課」；通知設定可開關上課前提醒；小工具多一個「課表」分頁。
+7. 課程任務：點課 → 「這堂課的任務」的「新增任務」→ 任務 sheet 已連到這堂課、截止是下一次上課 → 可設每週重複 → 新增。
+   任務頁那一列顯示課名；刪掉課程後任務還在，只是不再顯示課名。
+8. 匯出：右上分享鈕 → 手機開分享選單、網頁下載 PNG。
 
 ### UC20　成績與 GPA（Phase 6）
 
@@ -1805,11 +1879,11 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
       每格一句說明與「知道了」；
    3. 光圈落在「新增」上，使用者按下去才前進，下一張卡顯示「✓ 完成」；
       若關掉 sheet 沒存，回到＋並說「沒存到也沒關係」；
-   4. 完成度卡：點它打開完成度頁，光圈標出日／週／月切換，按「回去」；
-   5. 課表卡（只標示）：課表與成績從這裡進，側邊欄也有；
-   6. 檢視切換：點一下切換看看——放在完成度卡與課表卡之後，因為週檢視兩張卡都沒有；
-   7. 靈感：點雲朵鈕、寫標題、按新增；
-   8. 「下一站：目標」——光圈落在導覽列的「目標」，點下去就進入下一章。
+   4. 完成度（手機是頁首的小圓環、桌面是右欄的卡）：點它打開完成度頁，光圈標出日／週／月切換，按「回去」；
+   5. 檢視切換：點一下切換看看——放在完成度之後，因為週檢視沒有完成度卡；
+   6. 靈感：點雲朵鈕、寫標題、按新增；
+   7. 「下一站：目標」——光圈落在導覽列的「目標」，點下去就進入下一章。
+   （2026-10-03 移除「課表卡」那一站：任務頁不再有課表卡，入口只在側邊欄。）
 3. **學期目標章**：✨ 範本（只標示）→ 新增目標（名稱、分類、學期、連到願景〔有願景時〕、新增）
    → 點剛建好的目標卡進詳情頁 → 點「新增里程碑」→ 寫下第一個小步驟並新增 → 標出里程碑清單、
    按「回去」→ 學期切換 →「下一站：願景」。沒建目標就自動跳過里程碑那一段。
@@ -1827,25 +1901,30 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 
 ## 5. 程式流程圖
 
-### 5-A App 啟動與登入守門（`main.dart` `_AuthGate`）
+### 5-A App 啟動與登入守門（`authStatusProvider` → 路由 → `_AuthGate`，2026-10-03 改版）
 
 ```mermaid
 flowchart TD
     Start(["App 啟動"]) --> Preload["preloadGuestMode()\n讀取 is_guest_mode"]
-    Preload --> Gate{"guestModeProvider\n= true?"}
-    Gate -->|是| Pending{"pendingGuestLoginProvider\n= true?"}
-    Pending -->|是| Login1["顯示 LoginScreen"]
-    Pending -->|否| Home1["顯示 HomeScreen"]
-    Gate -->|否| Auth{"authStateProvider\n是否有 session?"}
-    Auth -->|載入中且有舊 session| Home2["顯示 HomeScreen\n(避免閃爍)"]
-    Auth -->|載入中且無舊 session| Login2["顯示 LoginScreen"]
-    Auth -->|錯誤| Login3["顯示 LoginScreen"]
-    Auth -->|無 session| Login4["顯示 LoginScreen"]
-    Auth -->|有 session| ProfileCheck{"profile\n是否已載入?"}
-    ProfileCheck -->|尚未(null)| Home3["顯示 HomeScreen\n(避免閃爍，稍後自動刷新)"]
-    ProfileCheck -->|已載入| ProviderCheck{"provider = google\n或已有暱稱?"}
-    ProviderCheck -->|否| Setup["顯示 SetupProfileScreen"]
-    ProviderCheck -->|是| Home4["顯示 HomeScreen"]
+    Preload --> Gate{"訪客模式?"}
+    Gate -->|是| Pending{"按了「登入」?\n(pendingGuestLoginProvider)"}
+    Pending -->|是| Out["signedOut"]
+    Pending -->|否| In["signedIn"]
+    Gate -->|否| Sess{"裝置上有 session?"}
+    Sess -->|無| Out
+    Sess -->|有，未過期| In
+    Sess -->|有，已過期| Wait{"換新成功，或已等 4 秒?"}
+    Wait -->|還沒| Unknown["unknown"]
+    Wait -->|是| In
+    Out --> R1["路由：轉到 /login?from=原網址 → LoginScreen"]
+    Unknown --> Splash["_AuthGate：SplashScreen"]
+    In --> Rec{"正在重設密碼?"}
+    Rec -->|是| Reset["ResetPasswordScreen"]
+    Rec -->|否| ProfileCheck{"非訪客，且 provider 不是 google\n也還沒有暱稱?"}
+    ProfileCheck -->|是| Setup["SetupProfileScreen"]
+    ProfileCheck -->|否| Maint{"維護模式且不是管理員?"}
+    Maint -->|是| MS["MaintenanceScreen"]
+    Maint -->|否| Page["網址指定的頁面"]
 ```
 
 登入帳號的清單先畫快取、再等查詢（`SyncedListNotifier.load`，資料見 data_dictionary.md D24）。
@@ -2005,5 +2084,5 @@ flowchart TD
 | 個人資料學校／系所選擇器 | `universitiesProvider` | 靜態常數，非持久化資料儲存 |
 | 目標頁／願景頁「目標範本」sheet | `futureGoalsProvider` + `semesterGoalsProvider` + `tasksProvider`（只寫，見 §3-N） | D3 `future_goals`／D2 `semester_goals`／D1 `tasks`；範本本身是靜態常數 |
 | `ReviewScreen`／`ReviewsScreen`／任務頁回顧卡與本週專注 | `reviewsProvider`、`dueReviewProvider`、`activeFocusProvider`（讀 `tasksProvider`／`semesterGoalsProvider`／`journalProvider`） | D23 `reviews`；延後任務寫 D1 |
-| `TimetableScreen`（課表／成績）／`TodayClassesStrip`／課程 sheet／搜尋 sheet | `coursesProvider`、`termsProvider`、`gradeSettingsProvider`、`catalogSearchProvider` | D27 `courses`、D30 `term_starts`、D31、D29 `course_catalog`（唯讀）；刪除寫 D6 |
+| `TimetableScreen`（課表／成績）／`TodayClassesStrip`／課程 sheet／搜尋 sheet | `coursesProvider`、`termsProvider`、`effectiveTermsProvider`、`gradeSettingsProvider`、`catalogSearchProvider`、`catalogSchoolsProvider`、`tasksProvider`（課程任務） | D27 `courses`、D30 `term_starts`、D31、D29 `course_catalog`、D32 `catalog_schools`（唯讀）、D1 `tasks.linked_course_id`；刪除寫 D6 |
 | 新手導覽章節（`HomeScreen` 上的 overlay，見 §3-O）／設定頁「新手指南」 | `onboardingProvider`、`tourReplayProvider` | D22 `onboarding_done` |

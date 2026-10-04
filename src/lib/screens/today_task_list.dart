@@ -209,11 +209,17 @@ class _TaskTile extends ConsumerWidget {
     final targetColor = taskLinkColor(cats, linkedTarget,
         targetVision: visionOf(linkedTarget, ref.watch(futureGoalsProvider)));
 
+    // The course it is homework for; gone with the course, the task stays
+    final course = task.courseId == null
+        ? null
+        : ref.watch(coursesProvider).where((c) => c.id == task.courseId).firstOrNull;
+
     final hasSubtitle =
         task.content != null ||
         task.dueTime != null ||
         (task.recurrence != null && !task.recurrence!.isNone) ||
-        linkedTarget != null;
+        linkedTarget != null ||
+        course != null;
 
     final tile = ListTile(
       contentPadding: const EdgeInsets.symmetric(
@@ -305,12 +311,47 @@ class _TaskTile extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                if (course != null)
+                  Row(
+                    children: [
+                      Icon(Icons.menu_book_outlined, size: 12, color: Color(course.color)),
+                      const SizedBox(width: AppSpacing.xs),
+                      Flexible(
+                        child: Text(
+                          course.title,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             )
           : null,
       trailing: handle ?? Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Left of delete: the gentler thing to do with a task that slipped
+          if (canPostpone(
+            due: task.dueTime,
+            repeats: task.recurrence != null && !task.recurrence!.isNone,
+            done: isCompleted,
+            now: DateTime.now(),
+          ))
+            IconButton(
+              icon: const Icon(Icons.update, size: 20),
+              tooltip: s.postponeOneDay,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              onPressed: () {
+                final due = postponedToTomorrow(task.dueTime!, DateTime.now());
+                ref.read(tasksProvider.notifier).update(task.copyWith(dueTime: due));
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(s.postponedTo(_formatDueTime(due)))));
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 20),
             visualDensity: VisualDensity.compact,

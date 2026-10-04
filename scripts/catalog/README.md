@@ -15,7 +15,9 @@ Run it **by hand, once a semester**, when a school opens course selection.
 ## First time
 
 1. Run `supabase/course_catalog.sql` in the Supabase SQL Editor.
-2. `pip install -r scripts/catalog/requirements.txt`
+2. `pip install -r scripts/catalog/requirements.txt` (BeautifulSoup; `pypdf`
+   and `openpyxl` read the academic calendars). Run it again after pulling:
+   the last two were added on 2026-10-03.
 3. Copy `.env.example` to `.env` in this folder, and fill in the project URL
    and the **service role** key (Supabase → Project Settings → API).
    - The key bypasses RLS: keep it on this machine only. `.env` is git-ignored.
@@ -42,6 +44,22 @@ For NTU, that is the registrar's query at `curri.aca.ntu.edu.tw`:
 
 NTHU publishes only PDFs, so it has none. Its students enter the numbers
 themselves.
+
+Each written semester also gets **its first day of classes**, stored in
+`catalog_schools.term_starts` (D32). The app uses it as the default for a
+student of that school who hasn't set their own.
+- First the school's own academic calendar, if the module has
+  `fetch_term_starts(roc_year)`:
+  - NTU: the registrar's Excel sheet "<year>學年度行事曆".
+  - NTHU: the registrar's PDF. Its text loses the month, so the month is the
+    one in the term's window where that day falls on the printed weekday.
+- If the calendar can't be read: the maintainer's date in `schools.json`
+  (`term_starts`, with `term_weeks`). **Fill these in for each new academic
+  year**, from the calendar, so there is always a fallback.
+- Neither: that semester gets no default, and students set it themselves.
+
+The report says which it was, one line a semester:
+`ntu   115-1      classes start 2026-09-07 (calendar)`.
 
 `--school` is required, so a run never reaches a server nobody asked for.
 
@@ -88,6 +106,9 @@ Measured on 115-1 (2026-09-26):
    `fetch(semester)`. The contract is at the top of `schools/__init__.py`.
    - Read times with `common.periods_to_sessions`, so the app needs nothing new.
    - Register the module in `REGISTRY`.
+   - Optional: `fetch_term_starts(roc_year)` → `{semester: date}` from the
+     school's calendar. Either way, put the dates in `schools.json`'s
+     `term_starts` as the fallback.
 4. **Tests:** save a few real records or pages under `fixtures/<code>/` and
    write `tests/test_<code>.py`.
 5. **Run it:** `--school=<code> --dry-run`, check the table, then run without

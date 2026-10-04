@@ -489,7 +489,8 @@ flowchart TD
     User(["使用者：課表頁 / 任務頁「今天的課」/ 成績頁"])
     Script["scripts/catalog/fetch_catalog.py\n--school=… --semesters=…\n（每學期手動跑一次）"]
     Mods["schools/ntu.py、schools/nthu.py…\n各校抓取＋以 schools.json 節次表讀時間"]
-    Src[("各校公開來源\nNOL 查詢頁、清大開放資料…")]
+    Src[("各校公開來源\nNOL 查詢頁、清大開放資料、\n行事曆（台大 Excel、清大 PDF）")]
+    SJ[("schools.json term_starts\n（維護者填的備用開學日）")]
 
     PC["courses_provider\nCoursesNotifier"]
     PT["courses_provider\nTermsNotifier"]
@@ -510,10 +511,13 @@ flowchart TD
 
     Src --> Mods --> Script
     Script -- "service role upsert（含 sessions）\n完整時刪掉已停開的課" --> DCat
-    Script -- "寫入成功的學期、目錄裡的系名" --> DSch
+    SJ -- "行事曆讀不到時" --> Script
+    Script -- "寫入成功的學期、目錄裡的系名、各學期開學日" --> DSch
     Script -- "各系畢業學分（台大，最近 7 屆）" --> DReq
     DReq -- "開啟依學系分類學分時，依入學年度查" --> PG
     DSch -- "每次開啟讀一次" --> PCat
+    PCat -- "自己學校的開學日" --> PE["effectiveTermsProvider\n自己設的優先，沒設用學校的"]
+    PT --> PE
     User -- "選學校、搜尋課名／老師／課號" --> PCat
     DCat -- "同校同學期 ilike，最多 40 筆" --> PCat
     PCat -- "加入：複製 sessions；開啟分類時依 kind／required_for 定 category" --> PC
@@ -523,10 +527,12 @@ flowchart TD
     User -- "設定開學日" --> PT <--> DT
     User -- "畢業學分、學士／研究所" --> PG <--> DG
     PC --> TT
-    PT --> TT
+    PE --> TT
+    User -- "課程 sheet「新增任務」" --> PTask["tasks_provider\n（linked_course_id）"] <--> DTask[("D1 tasks")]
     TT -- "今天的課、衝堂、第幾週、GPA、試算" --> User
     PC -- "上課前提醒（上課週內，7 天內最多 20 則）" --> PN
-    PT --> PN
+    PE --> PN
+    PE --> PW
     PC -- "小工具「課表」分頁" --> PW --> DW
 ```
 
@@ -534,6 +540,8 @@ flowchart TD
 - 「依學系分類學分」預設關閉；關閉時 App 不讀 D33、不寫 `category` 與 D8-B 的分類欄位（`categoriesTouched`），沒重跑 SQL 也不會同步失敗。
 - 各校的時間字串只在腳本裡讀（`common.periods_to_sessions` 加各校節次表），App 拿到的就是時段；新增一所學校＝一個 Python 模組＋`schools.json` 一筆，App 從 D32 自動多出那所學校的搜尋入口。
 - 一門課的時段在同一列，所以新增、修改、刪除、還原、訪客合併都是一次寫入。
+- 開學日（2026-10-03）：課表、今天的課、上課提醒、小工具都讀 `effectiveTermsProvider`——D30 自己設的優先，沒設的學期用 D32 自己學校的 `term_starts`；學校的不會寫進 D30。
+- 課程任務是一般的 D1 任務，多一個 `linked_course_id`；刪掉課程不動任務。
 - GPA、及格學分、目標試算都是由 D27 即時算出，不另外存；只有學期回顧把當時的 GPA 存進 D23 的 `stats`。
 
 ---

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/course.dart';
+import 'courses_provider.dart' show TermInfo, decodeTerms;
 
 // One course as its school lists it (course_catalog, D29), filled once a
 // semester by scripts/catalog/fetch_catalog.py. Read-only, and readable
@@ -73,6 +74,9 @@ class CatalogSchool {
   // Every department name the catalog files required courses under, for the
   // user to pick their own from
   final List<String> audiences;
+  // Each semester's first day of classes as the school publishes it: the
+  // default for a semester the user has not set themselves
+  final Map<String, TermInfo> termStarts;
 
   const CatalogSchool({
     required this.code,
@@ -80,6 +84,7 @@ class CatalogSchool {
     required this.shortName,
     this.semesters = const [],
     this.audiences = const [],
+    this.termStarts = const {},
   });
 
   factory CatalogSchool.fromJson(Map<String, dynamic> j) => CatalogSchool(
@@ -88,6 +93,7 @@ class CatalogSchool {
         shortName: j['short_name'] as String,
         semesters: [for (final s in (j['semesters'] as List<dynamic>? ?? const [])) s as String],
         audiences: [for (final a in (j['audiences'] as List<dynamic>? ?? const [])) a as String],
+        termStarts: decodeTerms(j['term_starts']),
       );
 }
 

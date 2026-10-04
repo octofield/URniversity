@@ -483,8 +483,6 @@ class StringsZhTw implements AppStrings {
   @override String get classReminder => '上課前提醒';
   @override String get classReminderDesc => '只在上課週內提醒，寒暑假不響';
   @override String minutesBefore(int minutes) => '$minutes 分鐘前';
-  @override String get tourTimetableTitle => '課表在這裡';
-  @override String get tourTimetableBody => '打開整週課表與成績：搜尋台大課程一鍵加入，或手動新增；今天的課會列在上方。側邊欄也找得到。';
   @override String get courseTitleRequired => '請輸入課程名稱';
   @override String courseCreditsTooMany(int max) => '學分最多 $max';
   @override String get courseGradeLabel => '成績';
@@ -510,6 +508,13 @@ class StringsZhTw implements AppStrings {
   @override String get degreeBachelor => '學士班（C- 及格）';
   @override String get degreeGraduate => '研究所（B- 及格）';
   @override String get gradesOtherSchool => '等第與換算依台大官方表，其他學校可能不同';
+  @override String semesterCredits(String credits) => '本學期 $credits 學分';
+  @override String get exportTimetable => '匯出課表圖片';
+  @override String get exportFailed => '匯出失敗，請再試一次';
+  @override String get courseTasks => '這堂課的任務';
+  @override String termFromSchool(String week) => '$week（學校預設）';
+  @override String get postponeOneDay => '延後一天';
+  @override String postponedTo(String when) => '已延後到 $when';
   @override String get adminTitle => '後台';
   @override String get adminEntryHint => '統計數據與功能控制';
   @override String get adminNoAccess => '這個帳號沒有後台權限';

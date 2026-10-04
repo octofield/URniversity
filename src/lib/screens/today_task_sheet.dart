@@ -328,10 +328,14 @@ Widget _suggestionChips(BuildContext context, List<(String, VoidCallback)> items
 // Public so HomeScreen FAB can call it
 // One sheet for both modes: [existing] null means add, non-null means edit.
 // Keeping them apart meant every field change had to be made twice
+// [courseId] and [due] start a new task as a course's homework (UC18): linked
+// to the course and due when it next meets
 void showTaskSheet(
   BuildContext context,
   WidgetRef ref, {
   Task? existing,
+  String? courseId,
+  DateTime? due,
 }) {
   final isEdit = existing != null;
   // When adding, the task does not exist yet, so the weekly/monthly fallback
@@ -344,9 +348,10 @@ void showTaskSheet(
   // Sheet state must outlive the modal route builder: Flutter re-invokes that
   // builder whenever MediaQuery changes (e.g. the keyboard hides when a picker
   // dialog opens), which would otherwise reset every field to its default
-  DateTime? dueTime = existing?.dueTime;
+  DateTime? dueTime = existing?.dueTime ?? due;
   RecurrenceRule? recurrence = existing?.recurrence;
   String? linkedTargetId = existing?.linkedTargetId;
+  String? linkedCourseId = existing?.courseId ?? courseId;
 
   showAppSheet(
     context,
@@ -362,6 +367,9 @@ void showTaskSheet(
           ).where((g) => g.id != linkedTargetId).toList();
           final linkedTarget = linkedTargetId != null
               ? targets.where((g) => g.id == linkedTargetId).firstOrNull
+              : null;
+          final linkedCourse = linkedCourseId != null
+              ? ref.read(coursesProvider).where((c) => c.id == linkedCourseId).firstOrNull
               : null;
 
           return SheetBody(
@@ -396,6 +404,7 @@ void showTaskSheet(
                             dueTime,
                             recurrence,
                             linkedTargetId,
+                            linkedCourseId,
                           ),
                 )),
                 const SizedBox(height: AppSpacing.sm),
@@ -469,6 +478,18 @@ void showTaskSheet(
                   for (final target in targetSuggestions)
                     (target.title, () => setState(() => linkedTargetId = target.id)),
                 ]),
+                // The course this is homework for; only shown once there is one
+                if (linkedCourse != null) ...[
+                  const SizedBox(height: 2),
+                  _linkRow(
+                    accent: Color(linkedCourse.color),
+                    icon: Icons.menu_book_outlined,
+                    label: linkedCourse.title,
+                    active: true,
+                    onTap: () {},
+                    onClear: () => setState(() => linkedCourseId = null),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 TourAnchor(id: 'task.submit', child: SizedBox(
                   width: double.infinity,
@@ -483,6 +504,7 @@ void showTaskSheet(
                           dueTime,
                           recurrence,
                           linkedTargetId,
+                          linkedCourseId,
                         );
                         return;
                       }
@@ -502,6 +524,8 @@ void showTaskSheet(
                               dueTime: dueTime,
                               recurrence: recurrence,
                               linkedTargetId: linkedTargetId,
+                              // Removed: written as "" so the column clears
+                              linkedCourseId: linkedCourseId ?? (existing.linkedCourseId != null ? '' : null),
                             ),
                           );
                       _rememberPicks(ref, linkedTargetId, dueTime);
@@ -527,6 +551,7 @@ void _submitTask(
   DateTime? dueTime,
   RecurrenceRule? recurrence,
   String? linkedTargetId,
+  String? linkedCourseId,
 ) {
   final title = titleCtrl.text.trim();
   if (title.isEmpty) return;
@@ -538,6 +563,7 @@ void _submitTask(
         dueTime: dueTime,
         recurrence: recurrence,
         linkedTargetId: linkedTargetId,
+        linkedCourseId: linkedCourseId,
       );
   _rememberPicks(ref, linkedTargetId, dueTime);
   Navigator.pop(context);
@@ -603,12 +629,11 @@ void showAddInspirationSheet(BuildContext context, WidgetRef ref) {
   );
 }
 
-Color? _dueColor(DateTime dueTime) {
-  final now = DateTime.now();
-  if (dueTime.isBefore(now)) return AppColors.error;
-  if (dueTime.difference(now).inHours < 24) return AppColors.warning;
-  return null;
-}
+Color? _dueColor(DateTime dueTime) => switch (dueLevel(dueTime, DateTime.now())) {
+      DueLevel.warning => AppColors.warning,
+      DueLevel.late => AppColors.error,
+      DueLevel.none => null,
+    };
 
 String _formatDueTime(DateTime dt) {
   final mm = dt.month.toString().padLeft(2, '0');

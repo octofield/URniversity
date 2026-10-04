@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/course.dart';
 import '../utils/category_helpers.dart' show categoryColorPresets;
 import 'synced_list_notifier.dart';
+import 'course_catalog_provider.dart' show CatalogSchool, catalogSchoolsProvider;
+import 'profile_provider.dart';
 
 // The courses (D27). Each row carries its own weekly meetings, so adding,
 // editing and deleting a course is always one write
@@ -176,3 +178,18 @@ Future<Map<String, TermInfo>> fetchCloudTerms(String uid) async {
       .maybeSingle();
   return decodeTerms(row?['term_starts']);
 }
+
+// The first days of classes in force (D30, D32): the user's own where they set
+// one, else the date their school publishes (read by scripts/catalog from its
+// calendar). Only a user with a school asks the catalog
+final effectiveTermsProvider = Provider<Map<String, TermInfo>>((ref) {
+  final own = ref.watch(termsProvider);
+  final school = ref.watch(profileProvider)?.school;
+  if (school == null || school.isEmpty) return own;
+  final mine = (ref.watch(catalogSchoolsProvider).valueOrNull ?? const <CatalogSchool>[])
+      .where((s) => s.name == school)
+      .firstOrNull;
+  if (mine == null) return own;
+  return {...mine.termStarts, ...own};
+});
+

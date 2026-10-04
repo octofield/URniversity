@@ -71,6 +71,7 @@
 | `parent_task_id` | text（自我參照 FK → 本表 `id`） | ✗ | `null` | **保留欄位，App 已不再讀寫**。原本是子任務的父任務 id，2026-09 移除子任務功能後新增的任務一律寫 `null`；欄位留著不動 |
 | `sort_order` | int | ✓ | `0` | 手動拖曳排序用；子任務移除後任務是單層清單，新增時取最小值 `−1000`（新的排最上面，可為負數） |
 | `completed_dates` | text（JSON 字串，`List<String>`） | ✗ | `null` | 僅循環任務使用；陣列內為 `"yyyy-MM-dd"` 字串，記錄哪些日期已完成 |
+| `linked_course_id` | text（**不是外鍵**） | ✗ | `null` | 2026-10-03。這個任務是哪堂課的（D27 `courses.id`，課程任務，system_design.md UC18）。`Task.linkedCourseId`，讀取一律用 `Task.courseId`。**空字串＝移除了連結**：要寫出去才清得掉欄位；從沒連過的任務不輸出這個 key（見下方說明）。課程刪除後不清除，畫面上找不到那堂課就不顯示課名 |
 
 **特別說明：**
 - 這些欄位需在 Supabase 執行過一次性 migration：
@@ -79,7 +80,10 @@
   ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id text;
   ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_weekdays int[];
   ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_month_days int[];
+  ALTER TABLE tasks ADD COLUMN IF NOT EXISTS linked_course_id text;  -- supabase/courses.sql
   ```
+  `linked_course_id` 同樣**只在不是 `null` 時輸出**，所以 `courses.sql` 重跑之前，一般任務照常同步，
+  只有連到課程的任務會失敗（並記進同步紀錄）。
   ⚠️ `Task.toJson()` **只在 `monthDays` 非空時才輸出 `recurrence_month_days` 這個 key**。
   原因是 PostgREST 只要看到不存在的欄位就會拒絕整筆寫入——若無條件輸出，在 migration 執行前
   連「所有其他任務的儲存」都會一起失敗。這個條件輸出讓未使用該功能時完全不受影響。
@@ -802,6 +806,8 @@ RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
 
 - 決定課表的「第幾週」、上課提醒與小工具「課表」只在上課週內出現。
 - 每學期在課表頁問一次（「設定開學日」），預設建議是學期起始月的第一個週一，上課週數預設 16。
+- 2026-10-03：這把 key 只存**使用者自己設的**。沒設的學期用自己學校的開學日（D32 `term_starts`），
+  兩者由 `effectiveTermsProvider` 合併（自己的優先），不寫回這把 key；在對話框按儲存才成為自己的設定。
 - 訪客與登入帳號都存這把 key；登入帳號另同步 D8-B `user_settings.term_starts`，登入時合併雲端的值。
 - 背景 isolate（小工具重繪）也讀這把 key。
 
@@ -830,6 +836,7 @@ RLS 只開 `SELECT TO anon, authenticated`——訪客也能搜。
 | `short_name` | text | 「台大」「清大」，組成「搜尋{簡稱}課程」 |
 | `semesters` | text[] | 有目錄的學期；舊的保留，新寫的加進去 |
 | `audiences` | text[] | 目錄裡出現過的所有系名（來自 `required_for`），讓使用者從中選「你的系在課程目錄的名稱」 |
+| `term_starts` | jsonb，預設 `'{}'` | 2026-10-03。各學期開學日，格式同 D30：`{"115-1": {"first_day": "2026-09-07", "weeks": 16}}`。腳本先讀學校的行事曆（台大 Excel、清大 PDF），讀不到用 `schools.json` 的 `term_starts`（維護者填），兩者都沒有就不寫那學期；舊的保留，新的覆蓋同一學期。App 讀成 `CatalogSchool.termStarts`，作為使用者沒設時的預設 |
 | `updated_at` | timestamptz | |
 
 **為什麼要這張表**：「新增課程」依它列出每個學校的搜尋入口，所以新增一所學校只要跑腳本，不用發新版 App。

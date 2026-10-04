@@ -10,10 +10,12 @@ import 'core/theme/app_motion.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_styles.dart';
 import 'core/theme/app_theme.dart';
+import 'l10n/app_strings.dart';
 import 'providers/admin_provider.dart';
 import 'providers/app_style_provider.dart';
 import 'providers/auth_link_error_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/auth_status_provider.dart';
 import 'providers/date_provider.dart';
 import 'providers/guest_provider.dart';
 import 'providers/future_goals_provider.dart';
@@ -138,7 +140,8 @@ class App extends ConsumerStatefulWidget {
 
 class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   // Made once: a new router on every build would forget where the user is
-  late final GoRouter _router = _buildRouter();
+  final _routerRefresh = ValueNotifier<int>(0);
+  late final GoRouter _router = _buildRouter(ref, _routerRefresh);
 
   @override
   void initState() {
@@ -149,6 +152,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _router.dispose();
+    _routerRefresh.dispose();
     super.dispose();
   }
 
@@ -164,6 +169,9 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     ref.watch(syncProvider);
+    // Signing in or out, or a stored session settling, moves the router
+    ref.listen<AuthStatus>(authStatusProvider, (_, _) => _routerRefresh.value++);
+    ref.listen<bool>(passwordRecoveryProvider, (_, _) => _routerRefresh.value++);
 
     // The style is applied here, above everything that reads it: App is the
     // shallowest dirty element, so it rebuilds first in the frame
@@ -252,41 +260,85 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   }
 }
 
-// Every address, and what it shows (CLAUDE.md §13). Each page sits behind
-// _AuthGate, so a signed-out visitor to /timetable signs in right there and
-// then sees the timetable. Anything unknown — a mistyped address, or a sign-in
-// deep link on Android, which the router is handed too — lands on the tasks
-GoRouter _buildRouter() {
+// Every address, and what it shows (CLAUDE.md §13). Signed out, every address
+// but /login goes there, carrying where it was headed (?from=); signed in, or
+// as a guest, /login goes back there. [refresh] fires on every change of
+// authStatusProvider, which is when these are worked out again. Anything
+// unknown — a mistyped address, or a sign-in deep link on Android, which the
+// router is handed too — lands on the tasks
+GoRouter _buildRouter(WidgetRef ref, Listenable refresh) {
   const pages = {AppRoutes.timetable, AppRoutes.grades, AppRoutes.settings, AppRoutes.admin};
   return GoRouter(
     navigatorKey: _navigatorKey,
     // Lets the first-run tour follow the user into sheets and pages
     observers: [tourRouteObserver],
     initialLocation: AppRoutes.tasks,
+    refreshListenable: refresh,
     redirect: (context, state) {
       final path = state.uri.path;
-      if (AppRoutes.tabs.contains(path) || pages.contains(path)) return null;
-      return AppRoutes.tasks;
+      final known = AppRoutes.tabs.contains(path) || pages.contains(path) || path == AppRoutes.login;
+      if (!known) return AppRoutes.tasks;
+      // A reset link wins over everything: _AuthGate shows the password page
+      // wherever the user is, so never send them to /login meanwhile
+      if (ref.read(passwordRecoveryProvider)) return path == AppRoutes.login ? AppRoutes.tasks : null;
+      final status = ref.read(authStatusProvider);
+      if (path == AppRoutes.login) {
+        if (status != AuthStatus.signedIn) return null;
+        final from = state.uri.queryParameters['from'];
+        return from != null && from.startsWith('/') && !from.startsWith(AppRoutes.login) ? from : AppRoutes.tasks;
+      }
+      if (status == AuthStatus.signedOut) {
+        return Uri(path: AppRoutes.login, queryParameters: {'from': state.uri.toString()}).toString();
+      }
+      return null;
     },
     routes: [
-      GoRoute(path: AppRoutes.timetable, builder: (_, _) => const _AuthGate(child: TimetableScreen())),
-      GoRoute(path: AppRoutes.grades, builder: (_, _) => const _AuthGate(child: TimetableScreen(grades: true))),
-      GoRoute(path: AppRoutes.settings, builder: (_, _) => const _AuthGate(child: SettingsScreen())),
+      GoRoute(path: AppRoutes.login, builder: (_, _) => _titled((s) => s.login, const LoginScreen())),
+      GoRoute(
+        path: AppRoutes.timetable,
+        builder: (_, _) => _titled((s) => s.timetable, const _AuthGate(child: TimetableScreen())),
+      ),
+      GoRoute(
+        path: AppRoutes.grades,
+        builder: (_, _) => _titled((s) => s.grades, const _AuthGate(child: TimetableScreen(grades: true))),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        builder: (_, _) => _titled((s) => s.settings, const _AuthGate(child: SettingsScreen())),
+      ),
       // Anyone can open the address; AdminScreen shows nothing to a non-admin
-      GoRoute(path: AppRoutes.admin, builder: (_, _) => const _AuthGate(child: AdminScreen())),
+      GoRoute(
+        path: AppRoutes.admin,
+        builder: (_, _) => _titled((s) => s.adminTitle, const _AuthGate(child: AdminScreen())),
+      ),
       // The four tabs are one page under one key, so moving between them keeps
       // HomeScreen — its tab state, scroll positions, dragged buttons — and
       // only tells it which tab to show
       GoRoute(
         path: '/:tab',
-        pageBuilder: (_, state) => NoTransitionPage(
-          key: const ValueKey('home'),
-          child: _AuthGate(child: HomeScreen(tab: AppRoutes.tabs.indexOf(state.uri.path))),
-        ),
+        pageBuilder: (_, state) {
+          final tab = AppRoutes.tabs.indexOf(state.uri.path);
+          return NoTransitionPage(
+            key: const ValueKey('home'),
+            child: _titled(
+              (s) => [s.tasks, s.targets, s.goals, s.me][tab],
+              _AuthGate(child: HomeScreen(tab: tab)),
+            ),
+          );
+        },
       ),
     ],
   );
 }
+
+// The browser tab's title on the web, "任務 · URniversity", in the app's language
+Widget _titled(String Function(AppStrings s) name, Widget child) => Consumer(
+      builder: (context, ref, _) => Title(
+        title: '${name(ref.watch(stringsProvider))} · URniversity',
+        color: AppColors.primary,
+        child: child,
+      ),
+    );
 
 class _AuthGate extends ConsumerWidget {
   // What this address shows once the user is in: a tab of HomeScreen, or a page
@@ -295,44 +347,31 @@ class _AuthGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Checked first: opening a reset link while browsing as a guest must still
+    // land on the password screen
+    if (ref.watch(passwordRecoveryProvider)) return const ResetPasswordScreen();
+
+    // Not yet known whether a stored, expired session still holds: the wait
+    // screen rather than a page that may be taken away a moment later. Signed
+    // out, the router is about to move to /login; this covers the frame before
+    final status = ref.watch(authStatusProvider);
+    if (status != AuthStatus.signedIn) return const SplashScreen();
+
+    if (!ref.watch(guestModeProvider)) {
+      // Profile null = still loading; show the page to avoid a flash for
+      // returning users. Email users with no username get the one-time setup
+      final profile = ref.watch(profileProvider);
+      final user = ref.watch(currentUserProvider);
+      final provider = user?.appMetadata['provider'] as String? ?? 'email';
+      if (profile != null && provider != 'google' && (profile.username == null || profile.username!.isEmpty)) {
+        return const SetupProfileScreen();
+      }
+    }
+
     // Maintenance mode (admin backend) stands in for every page, but not for
     // the login page: an admin signs in there and is let through
     final maintenance = ref.watch(remoteConfigProvider).maintenance && !(ref.watch(isAdminProvider).value ?? false);
-    final child = maintenance ? const MaintenanceScreen() : this.child;
-
-    // Checked before guest mode: opening a reset link while browsing as a guest
-    // must still land on the password screen
-    if (ref.watch(passwordRecoveryProvider)) return const ResetPasswordScreen();
-
-    final isGuest = ref.watch(guestModeProvider);
-    if (isGuest) {
-      return ref.watch(pendingGuestLoginProvider) ? const LoginScreen() : child;
-    }
-
-    final authState = ref.watch(authStateProvider);
-    return authState.when(
-      loading: () {
-        final session = Supabase.instance.client.auth.currentSession;
-        return session != null ? child : const LoginScreen();
-      },
-      error: (_, _) => const LoginScreen(),
-      data: (authData) {
-        if (authData.session == null) return const LoginScreen();
-
-        // Profile null = still loading; show HomeScreen to avoid flash for returning users.
-        final profile = ref.watch(profileProvider);
-        if (profile == null) return child;
-
-        // Email users with no username get the one-time setup screen.
-        final user = ref.watch(currentUserProvider);
-        final provider = user?.appMetadata['provider'] as String? ?? 'email';
-        if (provider != 'google' && (profile.username == null || profile.username!.isEmpty)) {
-          return const SetupProfileScreen();
-        }
-
-        return child;
-      },
-    );
+    return maintenance ? const MaintenanceScreen() : child;
   }
 }
 

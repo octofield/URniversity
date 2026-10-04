@@ -131,3 +131,16 @@ def test_a_departments_credits_to_graduate():
 def test_a_department_with_a_group_reads_by_its_full_code():
     # Medicine, fetched as dpt=40100 (the form's value) rather than 4010
     assert ntu.parse_requirement_totals(fixture('requirements_40100_114.html')) == (201, 24, 0, 225)
+
+
+# First day of classes (2026-10-03)
+
+def test_the_calendar_sheet_gives_both_terms_first_days():
+    import datetime
+    import openpyxl
+    sheet = openpyxl.load_workbook(os.path.join(FIXTURES, 'calendar_115.xlsx'), data_only=True).worksheets[0]
+    rows = [tuple(c.value for c in row) for row in sheet.iter_rows()]
+    assert ntu.class_starts_from_rows(rows) == {
+        '115-1': datetime.date(2026, 9, 7),
+        '115-2': datetime.date(2027, 2, 22),
+    }

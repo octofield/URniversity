@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urniversity/core/input_limits.dart';
+import 'package:urniversity/core/save_image/save_image.dart';
 import 'package:urniversity/core/period_tables.dart';
+import 'package:urniversity/core/timetable.dart' show nextMeetingStart;
+import 'package:urniversity/providers/tasks_provider.dart';
 import 'package:urniversity/core/review_stats.dart' show termAt;
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/models/course.dart';
@@ -18,6 +22,8 @@ import 'package:urniversity/providers/settings_provider.dart';
 import 'package:urniversity/providers/trash_provider.dart';
 import 'package:urniversity/screens/settings_screen.dart';
 import 'package:urniversity/screens/timetable_screen.dart';
+import 'package:urniversity/widgets/page_header.dart';
+import 'package:urniversity/screens/task_history_screen.dart';
 import 'package:urniversity/screens/today_screen.dart' show TodayScreen;
 import 'package:urniversity/widgets/timetable_grid.dart';
 import 'package:urniversity/widgets/swipe_switcher.dart';
@@ -548,26 +554,33 @@ void main() {
   Finder onTaskPage(String text) =>
       find.descendant(of: find.byType(TodayScreen), matching: find.text(text));
 
-  testWidgets('a phone has the timetable beside the progress card and in the drawer', (tester) async {
+  // The task page shows today's classes only; the way into the timetable is the
+  // side menu (2026-10-03). On a phone the progress is a ring in the header
+  testWidgets('a phone: a progress ring in the header, the timetable only in the drawer', (tester) async {
     await pumpApp(tester, width: 360);
+    expect(onTaskPage(zh.timetable), findsNothing);
     final ring = tester.getRect(find.byTooltip(zh.taskHistory));
-    final card = tester.getRect(onTaskPage(zh.timetable));
-    expect(card.left, greaterThan(ring.right));
-    expect(card.center.dy, closeTo(ring.center.dy, 24));
+    final header = tester.getRect(find.byType(PageHeader).first);
+    expect(header.contains(ring.center), isTrue, reason: 'in the header, not over the tasks');
+    expect(find.text(zh.tasksCompleted(0, 0)), findsNothing, reason: 'no progress card on a phone');
     expect(tester.takeException(), isNull);
-    await opens(tester, onTaskPage(zh.timetable));
 
     tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
     await tester.pumpAndSettle();
     await opens(tester, find.descendant(of: find.byType(Drawer), matching: find.text(zh.timetable)));
   });
 
-  testWidgets('desktop has it under the progress card and in the rail', (tester) async {
+  testWidgets('the ring opens the history', (tester) async {
+    await pumpApp(tester, width: 360);
+    await tester.tap(find.byTooltip(zh.taskHistory));
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskHistoryScreen), findsOneWidget);
+  });
+
+  testWidgets('desktop keeps the progress card; the timetable is in the rail', (tester) async {
     await pumpApp(tester, width: 1280);
-    final ring = tester.getRect(find.byTooltip(zh.taskHistory));
-    final card = tester.getRect(onTaskPage(zh.timetable));
-    expect(card.top, greaterThan(ring.bottom));
-    await opens(tester, onTaskPage(zh.timetable));
+    expect(onTaskPage(zh.timetable), findsNothing);
+    expect(find.text(zh.tasksCompleted(0, 0)), findsOneWidget);
     await opens(tester, find.descendant(of: find.byType(NavigationRail), matching: find.text(zh.timetable)));
 
     // The narrow rail has no labels: an icon with a tooltip
@@ -606,6 +619,98 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('the week shows its credits, and exports as a PNG', (tester) async {
+    final c = await open(tester);
+    c.read(coursesProvider.notifier)
+      ..add(semester: semesterNow(c), title: '微積分', credits: 4,
+          sessions: const [CourseSession(weekday: 1, startMinute: 620, endMinute: 730)])
+      ..add(semester: semesterNow(c), title: '服務學習', credits: 0.5);
+    await tester.pumpAndSettle();
+    expect(find.text(zh.semesterCredits('4.5')), findsOneWidget);
+
+    // Capturing itself is tested on its own (save_image_test.dart): here only
+    // that the button captures the week and hands it on under its name
+    Uint8List? saved;
+    String? name;
+    final realSave = savePng;
+    final realCapture = capturePng;
+    capturePng = (key) async => Uint8List.fromList([1, 2, 3]);
+    savePng = (png, fileName) async {
+      saved = png;
+      name = fileName;
+    };
+    addTearDown(() {
+      savePng = realSave;
+      capturePng = realCapture;
+    });
+    await tester.tap(find.byTooltip(zh.exportTimetable));
+    await tester.pumpAndSettle();
+    expect(saved, [1, 2, 3]);
+    expect(name, 'URniversity-${semesterNow(c)}.png');
+  });
+
+  testWidgets('a course\'s own task: due at its next class, listed in the course', (tester) async {
+    final c = await open(tester);
+    final course = c.read(coursesProvider.notifier).add(
+          semester: semesterNow(c),
+          title: '線性代數',
+          sessions: const [CourseSession(weekday: 3, startMinute: 620, endMinute: 730)],
+        );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(TimetableGrid), matching: find.text('線性代數')));
+    await tester.pumpAndSettle();
+    expect(find.text(zh.courseTasks), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, zh.addTask));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, zh.titleField), '習題 3.1');
+    await tester.tap(find.widgetWithText(FilledButton, zh.add));
+    await tester.pumpAndSettle();
+
+    final task = c.read(tasksProvider).single;
+    expect(task.courseId, course.id);
+    expect(task.dueTime, nextMeetingStart(course, task.createdAt));
+    // Back on the course: it lists the new task
+    expect(find.text('習題 3.1'), findsOneWidget);
+  });
+
+  testWidgets('a task row names its course', (tester) async {
+    final c = await pumpApp(tester);
+    c.read(taskViewProvider.notifier).state = 0;
+    final course = c.read(coursesProvider.notifier).add(semester: semesterNow(c), title: '普通化學');
+    c.read(tasksProvider.notifier).add('實驗報告', linkedCourseId: course.id);
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byType(TodayScreen), matching: find.text('普通化學')), findsOneWidget);
+  });
+
+  testWidgets('the school\'s first day of classes is the default; the user\'s own wins', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('guest_profile', jsonEncode({'school': kNtuSchool}));
+    final now = DateTime.now();
+    final sem = termAt(now, SemesterSettings.defaultSettings);
+    final schoolDay = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 14));
+    final withTerms = CatalogSchool(
+      code: 'ntu', name: kNtuSchool, shortName: '台大', semesters: [sem],
+      termStarts: {sem: TermInfo(schoolDay), '100-1': TermInfo(DateTime(2011, 9, 12))},
+    );
+    final other = CatalogSchool(code: 'nthu', name: kNthuSchool, shortName: '清大',
+        termStarts: {'99-1': TermInfo(DateTime(2010, 9, 13))});
+    final c = await open(tester, schools: [withTerms, other]);
+    await c.read(profileProvider.notifier).loadGuest();
+    await c.read(catalogSchoolsProvider.future);
+    await tester.pumpAndSettle();
+
+    expect(c.read(effectiveTermsProvider)[sem]!.firstDay, schoolDay);
+    expect(c.read(effectiveTermsProvider).containsKey('99-1'), isFalse, reason: 'not the user\'s school');
+    // Two weeks in: the third week, marked as the school's
+    expect(find.text(zh.termFromSchool(zh.timetableWeek(3))), findsOneWidget);
+
+    await c.read(termsProvider.notifier).set(sem, TermInfo(schoolDay.add(const Duration(days: 7))));
+    await tester.pumpAndSettle();
+    expect(c.read(effectiveTermsProvider)[sem]!.firstDay, schoolDay.add(const Duration(days: 7)));
+    expect(find.text(zh.timetableWeek(2)), findsOneWidget);
+  });
 
   testWidgets('the week fits a phone without overflowing', (tester) async {
     final c = testContainer();

@@ -14,6 +14,7 @@ import '../providers/auth_provider.dart';
 import '../providers/remote_config_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/synced_list_notifier.dart' show newRowId, reportSyncErrorFromWidget;
+import '../widgets/pull_to_close.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/style_picker_sheet.dart' show appStyleChoiceName;
 import '../core/theme/app_motion.dart';
@@ -154,7 +155,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen> with SingleTickerProv
       ),
       // Clear of Android's navigation bar and the iPhone's home indicator: the
       // lists set their own padding, which drops the automatic inset
-      body: SafeArea(top: false, child: body),
+      // Pulled down from the top of a section, the backend closes (§3-Q)
+      body: PullToClose(child: SafeArea(top: false, child: body)),
     );
   }
 }

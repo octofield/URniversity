@@ -483,8 +483,6 @@ class StringsEn implements AppStrings {
   @override String get classReminder => 'Before class';
   @override String get classReminderDesc => 'Only during teaching weeks, never over the break';
   @override String minutesBefore(int minutes) => '$minutes min before';
-  @override String get tourTimetableTitle => 'Your timetable';
-  @override String get tourTimetableBody => 'Opens the week and your grades: add NTU courses by searching, or by hand. Today\'s classes line up above, and the side menu has it too.';
   @override String get courseTitleRequired => 'Enter a course name';
   @override String courseCreditsTooMany(int max) => 'At most $max credits';
   @override String get courseGradeLabel => 'Grade';
@@ -510,6 +508,13 @@ class StringsEn implements AppStrings {
   @override String get degreeBachelor => 'Undergraduate (pass at C-)';
   @override String get degreeGraduate => 'Graduate (pass at B-)';
   @override String get gradesOtherSchool => 'Grade points and the percentage follow NTU\'s official tables; other schools may differ';
+  @override String semesterCredits(String credits) => '$credits credits this term';
+  @override String get exportTimetable => 'Export as image';
+  @override String get exportFailed => 'Could not export. Please try again';
+  @override String get courseTasks => 'Tasks for this course';
+  @override String termFromSchool(String week) => '$week (school default)';
+  @override String get postponeOneDay => 'Postpone a day';
+  @override String postponedTo(String when) => 'Moved to $when';
   @override String get adminTitle => 'Admin';
   @override String get adminEntryHint => 'Numbers, switches and accounts';
   @override String get adminNoAccess => 'This account has no admin access';

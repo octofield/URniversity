@@ -41,10 +41,8 @@ List<CoachMarkStep> tourChapter(String id, WidgetRef ref, AppStrings s) {
         CoachMarkStep(close, anchor: 'task.submit', body: s.tourTaskSubmitBody),
         CoachMarkStep(open, anchor: 'today.summary', title: s.tourSummaryTitle, body: s.tourSummaryBody),
         CoachMarkStep(close, anchor: 'history.summary', body: s.tourHistoryBody),
-        CoachMarkStep(info, anchor: 'today.timetable', title: s.tourTimetableTitle, body: s.tourTimetableBody,
-            when: () => ref.read(featureOnProvider('timetable'))),
-        // After the progress and timetable cards, not before: the weekly view
-        // has neither, and trying out the switch may well leave the user there
+        // After the progress ring, not before: trying out the switch may well
+        // leave the user on the weekly view
         CoachMarkStep(tap, anchor: 'today.viewSwitch', title: s.tourViewTitle, body: s.tourViewBody),
         CoachMarkStep(open, anchor: 'fab.inspiration', title: s.tourInspAddTitle, body: s.tourInspAddBody, count: ideas),
         CoachMarkStep(field, anchor: 'insp.title', body: s.tourInspTitleBody),

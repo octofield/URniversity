@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:urniversity/main.dart' show App;
 import 'package:urniversity/core/app_routes.dart';
+import 'package:urniversity/screens/home_screen.dart';
+import 'package:urniversity/screens/splash_screen.dart';
+import 'package:urniversity/providers/auth_status_provider.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
+import 'package:urniversity/providers/guest_provider.dart';
 import 'package:urniversity/providers/home_tab_provider.dart';
 import 'package:urniversity/screens/auth/login_screen.dart';
 import 'package:urniversity/screens/future_screen.dart';
@@ -94,6 +100,31 @@ void main() {
       expect(find.byType(SemesterScreen).hitTestable(), findsOneWidget);
     });
 
+    testWidgets('the browser tab is titled after the page', (tester) async {
+      await pumpApp(tester);
+      String title() => tester.widgetList<Title>(find.byType(Title)).last.title;
+      expect(title(), '${zh.tasks} · URniversity');
+      await go(tester, AppRoutes.targets);
+      expect(title(), '${zh.targets} · URniversity');
+      await go(tester, AppRoutes.timetable);
+      expect(title(), '${zh.timetable} · URniversity');
+      await go(tester, AppRoutes.settings);
+      expect(title(), '${zh.settings} · URniversity');
+    });
+
+    testWidgets('while a stored session is still settling, the wait screen, not the tasks', (tester) async {
+      // Pumped by hand: the wait screen animates forever, so nothing settles
+      setViewWidth(tester, 400);
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: testContainer(overrides: [authStatusProvider.overrideWithValue(AuthStatus.unknown)]),
+        child: const App(),
+      ));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(SplashScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsNothing);
+    });
+
     testWidgets('an unknown address lands on the tasks', (tester) async {
       await pumpApp(tester);
       await go(tester, '/login-callback');
@@ -104,13 +135,26 @@ void main() {
   group('signed out', () {
     setUp(() => setUpTestSupabase(guest: false));
 
-    testWidgets('the login page shows at the address asked for, which is kept', (tester) async {
+    testWidgets('the login page has its own address, carrying where it was headed', (tester) async {
       await pumpApp(tester);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(location(tester), AppRoutes.login);
+
       await go(tester, AppRoutes.timetable);
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.byType(TimetableScreen), findsNothing);
-      expect(location(tester), AppRoutes.timetable);
+      expect(location(tester), AppRoutes.login);
+      expect(routerOf(tester).state.uri.queryParameters['from'], AppRoutes.timetable);
       expect(find.text(zh.timetable), findsNothing);
+    });
+
+    testWidgets('signing in (here: as a guest) goes on to where it was headed', (tester) async {
+      final scope = await pumpApp(tester);
+      await go(tester, AppRoutes.timetable);
+      await scope.read(guestModeProvider.notifier).enable();
+      await tester.pumpAndSettle();
+      expect(location(tester), AppRoutes.timetable);
+      expect(find.byType(TimetableScreen), findsOneWidget);
     });
   });
 }

@@ -259,9 +259,14 @@ holds the paths.
 | `/grades` | `TimetableScreen(grades: true)` |
 | `/settings` | `SettingsScreen` |
 | `/admin` | `AdminScreen` — admins only (the `admins` table, `supabase/admin.sql`) |
+| `/login` | `LoginScreen`; `?from=` is where to go once signed in |
 
-- **Every route sits behind `_AuthGate`.** A signed-out visitor sees the login page at the address they
-  asked for, then lands there. Maintenance mode replaces the page, never the login page.
+- **Signed out, the router sends every address to `/login?from=<address>`**, and signing in (or
+  entering as a guest) goes back there. `authStatusProvider` decides; while a stored session is still
+  being refreshed it is `unknown` and `_AuthGate` shows the splash, never a page.
+- **Every route but `/login` sits behind `_AuthGate`** (password reset, splash, profile setup,
+  maintenance). Maintenance mode replaces the page, never the login page.
+- **Every route is wrapped in `_titled()`**, so the browser tab reads e.g. 「任務 · URniversity」.
 - **Unknown addresses go to `/tasks`** — including sign-in deep links the router is handed on Android.
 - **Changing tabs goes through the address** (`context.go`), so browser Back/Forward work. With a page
   open on top, only the index changes and the address catches up when the page closes — `go()` would
@@ -271,8 +276,8 @@ holds the paths.
   keep using `Navigator.push`.
 - **A page reached by typing its address has nothing to go back to**: give its `AppBar` the
   `leading: homeButtonIfFirst(context)`.
-- **A new main page** gets a constant in `AppRoutes`, a `GoRoute` in `main.dart`'s `_buildRouter()`,
-  its path in the `pages` set there, a row in the table above and in `system_design.md` §1, and a case
+- **A new main page** gets a constant in `AppRoutes`, a `GoRoute` in `main.dart`'s `_buildRouter()`
+  wrapped in `_titled()`, its path in the `pages` set there, a row in the table above and in `system_design.md` §1, and a case
   in `test/widget/routes_test.dart`.
 
 ---

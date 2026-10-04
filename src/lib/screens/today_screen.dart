@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show FilteringTextInputFormatter, LengthLimitingTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/due_level.dart';
 import '../core/haptics.dart';
 import '../core/input_limits.dart';
 import '../core/theme/app_breakpoints.dart';
@@ -48,8 +49,7 @@ import '../widgets/review_prompt.dart';
 import '../widgets/today_classes_strip.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
-import 'timetable_screen.dart';
-import '../providers/remote_config_provider.dart';
+import '../providers/courses_provider.dart';
 
 // Split with `part` rather than separate libraries: every helper here is
 // library-private and used across all three files, so real imports would mean
@@ -135,6 +135,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
           actions: [
+            // On a phone the day's progress is a small ring up here rather
+            // than a card over the tasks; the desktop column keeps the card
+            if (!isDesktop) const _SummaryRing(),
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
@@ -378,8 +381,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                     const ReviewPromptCard(),
                                     const TodayClassesStrip(),
                                     const _SummaryCard(),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    const _TimetableCard(),
                                     const FocusChips(),
                                     const SizedBox(height: AppSpacing.lg),
                                     const _InspirationsQuickList(),
@@ -393,13 +394,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                             children: [
                               ReviewPromptCard(),
                               TodayClassesStrip(),
-                              Row(
-                                children: [
-                                  Expanded(child: _SummaryCard()),
-                                  SizedBox(width: AppSpacing.sm),
-                                  _TimetableCard(compact: true),
-                                ],
-                              ),
                               FocusChips(),
                               SizedBox(height: AppSpacing.lg),
                               _TasksSection(),
@@ -714,58 +708,62 @@ bool _isLastOutstanding(WidgetRef ref, DateTime date) =>
         .length ==
     1;
 
-// The way into the timetable and grades (UC18): a square beside the progress
-// card on a phone, a row under it on desktop. Sized to the progress card's
-// ring plus its padding, so the two stand level
-class _TimetableCard extends ConsumerWidget {
-  final bool compact;
-  const _TimetableCard({this.compact = false});
+// The day's progress on a phone (system_design.md §2-A): a ring in the page
+// header with the share done, which opens the history like the desktop card.
+// Same tour anchors as the card, so the tour and the confetti find it
+class _SummaryRing extends ConsumerWidget {
+  const _SummaryRing();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(featureOnProvider('timetable'))) return const SizedBox.shrink();
     final s = ref.watch(stringsProvider);
-    final icon = Icon(Icons.calendar_view_week_outlined, color: AppColors.primary);
-    final label = Text(
-      s.timetable,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.titleSmall,
-    );
+    final tasks = ref.watch(filteredTasksProvider);
+    final date = ref.watch(dateProvider);
+    final completed = tasks.where((t) => t.isCompletedOn(date)).length;
+    final total = tasks.length;
+    final allDone = total > 0 && completed == total;
+    final progress = total > 0 ? completed / total : 0.0;
 
-    return TourAnchor(id: 'today.timetable', child: HoverLift(
-      child: Container(
-        width: compact ? 88 : double.infinity,
-        height: compact ? 72 + AppSpacing.cardPadding * 2 : null,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border, width: 1),
+    return TourAnchor(id: 'today.summary', child: Tooltip(
+      message: s.taskHistory,
+      child: InkResponse(
+        radius: 24,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
         ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: () => openPage(context, AppRoutes.timetable, () => const TimetableScreen()),
-            child: Padding(
-              padding: compact
-                  ? const EdgeInsets.all(AppSpacing.sm)
-                  : const EdgeInsets.all(AppSpacing.cardPadding),
-              child: compact
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [icon, const SizedBox(height: AppSpacing.xs), label],
-                    )
-                  : Row(
-                      children: [
-                        icon,
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(child: label),
-                        Icon(Icons.chevron_right, color: AppColors.textTertiary),
-                      ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          child: TourAnchor(id: 'today.ring', child: SizedBox(
+            width: 36,
+            height: 36,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: scaled(context, AppMotion.enter),
+              curve: AppMotion.enterCurve,
+              builder: (context, value, _) => Stack(
+                fit: StackFit.expand,
+                children: [
+                  CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 3,
+                    strokeCap: StrokeCap.round,
+                    color: allDone ? AppColors.success : AppColors.primary,
+                    backgroundColor: AppColors.surfaceVariant,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(5),
+                    child: FittedBox(
+                      child: Text(
+                        total == 0 ? kEmptyValue : '${(value * 100).round()}%',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          )),
         ),
       ),
     ));

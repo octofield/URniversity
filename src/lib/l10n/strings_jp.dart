@@ -483,8 +483,6 @@ class StringsJp implements AppStrings {
   @override String get classReminder => '授業前の通知';
   @override String get classReminderDesc => '授業期間中だけ通知し、休み中は鳴りません';
   @override String minutesBefore(int minutes) => '$minutes 分前';
-  @override String get tourTimetableTitle => '時間割はここ';
-  @override String get tourTimetableBody => '週の時間割と成績を開けます。台大の授業を検索して追加するか、手動で追加。今日の授業は上に並びます。サイドメニューからも開けます。';
   @override String get courseTitleRequired => '授業名を入力してください';
   @override String courseCreditsTooMany(int max) => '単位は最大 $max です';
   @override String get courseGradeLabel => '成績';
@@ -510,6 +508,13 @@ class StringsJp implements AppStrings {
   @override String get degreeBachelor => '学部（C- で合格）';
   @override String get degreeGraduate => '大学院（B- で合格）';
   @override String get gradesOtherSchool => '評点と換算は台大の公式表に基づきます。他大学では異なる場合があります';
+  @override String semesterCredits(String credits) => '今学期 $credits 単位';
+  @override String get exportTimetable => '時間割を画像で書き出す';
+  @override String get exportFailed => '書き出せませんでした。もう一度お試しください';
+  @override String get courseTasks => 'この授業のタスク';
+  @override String termFromSchool(String week) => '$week（学校の既定）';
+  @override String get postponeOneDay => '1 日延期';
+  @override String postponedTo(String when) => '$when に延期しました';
   @override String get adminTitle => '管理画面';
   @override String get adminEntryHint => '統計と機能の管理';
   @override String get adminNoAccess => 'このアカウントには管理権限がありません';
