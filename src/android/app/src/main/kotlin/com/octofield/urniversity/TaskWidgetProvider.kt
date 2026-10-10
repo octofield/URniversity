@@ -34,6 +34,13 @@ class TaskWidgetProvider : HomeWidgetProvider() {
         widgetData: SharedPreferences,
     ) {
         render(context, appWidgetManager, appWidgetIds, widgetData)
+        // updatePeriodMillis only redraws what is on disk. Once that is older
+        // than a refresh period, have Dart fetch a new one; a push from the
+        // app also lands here, but it has just stamped the snapshot
+        val pushedAt = widgetData.getString(PUSHED_AT_KEY, null)?.toLongOrNull() ?: 0L
+        if (System.currentTimeMillis() - pushedAt > STALE_AFTER_MS) {
+            WidgetActionReceiver.forwardToDart(context, Uri.parse(action("refresh")))
+        }
     }
 
     /** Resizing crosses the compact threshold, so the layout is picked again. */
@@ -49,6 +56,13 @@ class TaskWidgetProvider : HomeWidgetProvider() {
 
     companion object {
         private const val ROW_ACTION = "com.octofield.urniversity.WIDGET_ROW"
+
+        // Written by HomeWidgetService.push on the Dart side, in milliseconds
+        private const val PUSHED_AT_KEY = "widget_pushed_at"
+
+        // A little under updatePeriodMillis (30 minutes), so every periodic
+        // update finds a snapshot from before the last one stale
+        private const val STALE_AFTER_MS = 25L * 60 * 1000
 
         /**
          * Narrower than this (in dp) and the full header no longer fits, which is
@@ -113,6 +127,10 @@ class TaskWidgetProvider : HomeWidgetProvider() {
                 // The card and the + in the app style's own shapes and colours
                 views.setInt(R.id.widget_root, "setBackgroundResource", style.background)
                 views.setInt(R.id.add_button, "setBackgroundResource", style.addPill)
+                // Fetch now: the snapshot is rebuilt from the cloud (or a
+                // guest's data) in the background
+                setColorRes(context, views, R.id.refresh_button, "setColorFilter", style.muted)
+                views.setOnClickPendingIntent(R.id.refresh_button, actionIntent(context, action("refresh")))
                 setColorRes(context, views, R.id.empty_label, "setTextColor", style.muted)
 
                 bindChoice(context, views, style, R.id.tab_tasks, state.mode == WidgetData.MODE_TASKS,

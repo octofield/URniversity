@@ -61,6 +61,24 @@ data class WidgetStyle(
                 R.drawable.widget_check_mono,
                 R.color.widget_text_mono, R.color.widget_accent_mono, R.color.widget_muted_mono,
             )
+            "lavender" -> WidgetStyle(
+                R.drawable.widget_background_lavender, R.drawable.widget_add_pill_lavender,
+                R.drawable.widget_check_on_lavender, R.drawable.widget_check_off_lavender,
+                R.drawable.widget_check_lavender,
+                R.color.widget_text_lavender, R.color.widget_accent_lavender, R.color.widget_muted_lavender,
+            )
+            "amber" -> WidgetStyle(
+                R.drawable.widget_background_amber, R.drawable.widget_add_pill_amber,
+                R.drawable.widget_check_on_amber, R.drawable.widget_check_off_amber,
+                R.drawable.widget_check_amber,
+                R.color.widget_text_amber, R.color.widget_accent_amber, R.color.widget_muted_amber,
+            )
+            "forest" -> WidgetStyle(
+                R.drawable.widget_background_forest, R.drawable.widget_add_pill_forest,
+                R.drawable.widget_check_on_forest, R.drawable.widget_check_off_forest,
+                R.drawable.widget_check_forest,
+                R.color.widget_text_forest, R.color.widget_accent_forest, R.color.widget_muted_forest,
+            )
             // Linen, or nothing written yet: the original look
             else -> WidgetStyle(
                 R.drawable.widget_background, R.drawable.widget_add_pill,

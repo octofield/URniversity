@@ -8,7 +8,13 @@ import 'sort_prefs.dart';
 // outline   — white cards outlined in the course colour, dashed hour lines
 // paper     — a ruled table like a printed timetable, text centred
 // agenda    — not a grid: a day at a time, its classes down a time line
-enum TimetableStyle { standard, solid, outline, paper, agenda }
+// Added 2026-10-10:
+// compact   — shorter rows, the course name only: a whole week on one phone screen
+// pastel    — soft tints with no lines and round corners, the name in a deep tone
+// inverse   — the week on a board of the text colour, blocks filled in
+// notebook  — ruled lines and a margin, each course marked as with a highlighter
+// weekList  — the agenda's whole week at once, day after day
+enum TimetableStyle { standard, solid, outline, paper, agenda, compact, pastel, inverse, notebook, weekList }
 
 // Remembered on the device (D39 timetable_style) and, signed in, with the
 // account (user_settings.timetable_style)

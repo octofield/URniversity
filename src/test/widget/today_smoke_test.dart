@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
+import 'package:urniversity/providers/courses_provider.dart';
 import 'package:urniversity/providers/inspirations_provider.dart';
 import 'package:urniversity/providers/recent_picks_provider.dart';
 import 'package:urniversity/providers/semester_goals_provider.dart';
@@ -232,6 +233,26 @@ void main() {
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
       expect(c.read(tasksProvider).single.isCompletedOn(now), isTrue);
+    });
+
+    // What a task is for shows in the week too (2026-10-10)
+    testWidgets('weekly view names the linked target and course, without overflow at 360', (tester) async {
+      final c = await pumpApp(tester, width: 360);
+      c.read(taskViewProvider.notifier).state = 2;
+      final now = DateTime.now();
+      c.read(semesterGoalsProvider.notifier).addGoal('多益 800', c.read(selectedSemesterProvider));
+      final target = c.read(semesterGoalsProvider).single;
+      final course = c.read(coursesProvider.notifier).add(semester: '115-1', title: '一門名字很長很長的通識課程');
+      c.read(tasksProvider.notifier).add(
+            '本週的事',
+            dueTime: DateTime(now.year, now.month, now.day, 23, 0),
+            linkedTargetId: target.id,
+            linkedCourseId: course.id,
+          );
+      await tester.pumpAndSettle();
+      expect(find.text('→ 多益 800'), findsOneWidget);
+      expect(find.text('一門名字很長很長的通識課程'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('lists completed tasks in their own section', (tester) async {

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 //
 // Category and avatar colours are not here: they are the user's own data and
 // keep their meaning whatever the style.
-enum AppStyle { linen, modern, midnight, sage, ocean, sakura, mono }
+enum AppStyle { linen, modern, midnight, sage, ocean, sakura, mono, lavender, amber, forest }
 
 // Stored as the enum's name; anything unknown (a newer build's style, a typo
 // in the database) falls back to the original look
@@ -191,5 +191,60 @@ const kStylePalettes = <AppStyle, StylePalette>{
     textTertiary: Color(0xFFA1A1AA),
     border: Color(0xFFE4E4E7),
     radius: 8,
+  ),
+  // Soft violet on a cool pale ground, round and calm (2026-10-10)
+  AppStyle.lavender: StylePalette(
+    fontFamily: 'Lexend',
+    cjkFontFamily: kCjkSans,
+    background: Color(0xFFF7F5FC),
+    surface: Color(0xFFFFFFFF),
+    surfaceVariant: Color(0xFFECE8F7),
+    primary: Color(0xFF7B5CC4),
+    primaryLight: Color(0xFFEEE8FA),
+    primaryDark: Color(0xFF5F44A3),
+    textPrimary: Color(0xFF241C38),
+    textSecondary: Color(0xFF5E5378),
+    textTertiary: Color(0xFFA399BD),
+    border: Color(0xFFE1DCF0),
+    radius: 18,
+  ),
+  // Terracotta and warm sand, an autumn afternoon (2026-10-10)
+  AppStyle.amber: StylePalette(
+    fontFamily: 'Outfit',
+    cjkFontFamily: kCjkSerif,
+    background: Color(0xFFFBF6F1),
+    surface: Color(0xFFFFFFFF),
+    surfaceVariant: Color(0xFFF3E7DC),
+    primary: Color(0xFFC2571F),
+    primaryLight: Color(0xFFFBE9DD),
+    primaryDark: Color(0xFF9C4313),
+    textPrimary: Color(0xFF2E1A10),
+    textSecondary: Color(0xFF6E4E3C),
+    textTertiary: Color(0xFFB39684),
+    border: Color(0xFFEBDACB),
+    radius: 12,
+  ),
+  // The second dark style: deep green, for night owls who find Midnight too blue (2026-10-10)
+  AppStyle.forest: StylePalette(
+    brightness: Brightness.dark,
+    fontFamily: 'Figtree',
+    cjkFontFamily: kCjkSans,
+    background: Color(0xFF0E1612),
+    surface: Color(0xFF15201A),
+    surfaceVariant: Color(0xFF1E2B24),
+    primary: Color(0xFF2F9E6C),
+    primaryLight: Color(0xFF1C3B2E),
+    primaryDark: Color(0xFF258558),
+    textPrimary: Color(0xFFE6EFE9),
+    textSecondary: Color(0xFFA7B8AE),
+    textTertiary: Color(0xFF6B7E73),
+    border: Color(0xFF26352D),
+    success: Color(0xFF34D399),
+    successLight: Color(0xFF0F2E26),
+    warning: Color(0xFFFBBF24),
+    warningLight: Color(0xFF332A0F),
+    error: Color(0xFFF87171),
+    errorLight: Color(0xFF3A1A1A),
+    radius: 12,
   ),
 };

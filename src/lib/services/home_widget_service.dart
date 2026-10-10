@@ -23,6 +23,10 @@ class HomeWidgetService {
   static const languageKey = 'widget_language';
   // The app style in use; must match WidgetStyle.KEY in WidgetStyle.kt
   static const styleKey = 'app_style';
+  // When the snapshot was last written, in milliseconds. The native side's
+  // half-hourly update asks Dart for a fresh one only once this is old, so a
+  // push — which itself fires that update — never sets off another fetch
+  static const pushedAtKey = 'widget_pushed_at';
 
   // Must match the provider's class name in AndroidManifest
   static const _providerName = 'TaskWidgetProvider';
@@ -38,6 +42,7 @@ class HomeWidgetService {
     if (!isSupported) return;
     try {
       await HomeWidget.saveWidgetData<String>(snapshotKey, snapshot.encode());
+      await HomeWidget.saveWidgetData<String>(pushedAtKey, '${DateTime.now().millisecondsSinceEpoch}');
       if (languageCode != null) {
         await HomeWidget.saveWidgetData<String>(languageKey, languageCode);
       }

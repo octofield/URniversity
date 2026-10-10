@@ -125,6 +125,39 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name=".StyleLavender"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_lavender"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleAmber"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_amber"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".StyleForest"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_forest"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
         <!-- flutter_local_notifications: receives the taps on the notification's
              action buttons. WITHOUT THIS DECLARATION THE BUTTONS DO NOTHING AT
              ALL and no error is reported anywhere (see the plugin's README) -->

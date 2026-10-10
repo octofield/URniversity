@@ -78,6 +78,30 @@ class NotificationSettingsScreen extends ConsumerWidget {
                         notifier.update(settings.copyWith(taskLeadMinutes: v)),
                   ),
                 ),
+              ],
+            ),
+            const Divider(height: 1),
+
+            // Repeating tasks on their own (2026-10-10)
+            _KindSection(
+              title: s.notifRecurringTasks,
+              enabled: settings.recurringEnabled,
+              masterOn: settings.enabled,
+              onToggle: (v) => notifier.update(settings.copyWith(recurringEnabled: v)),
+              details: [
+                (
+                  label: s.notifTaskLead,
+                  value: s.notifLeadMinutes(settings.recurringLeadMinutes),
+                  onTap: () => _pickOption<int>(
+                    context: context,
+                    title: s.notifTaskLead,
+                    options: NotificationConstants.taskLeadMinuteOptions,
+                    current: settings.recurringLeadMinutes,
+                    label: s.notifLeadMinutes,
+                    onPicked: (v) =>
+                        notifier.update(settings.copyWith(recurringLeadMinutes: v)),
+                  ),
+                ),
                 (
                   label: s.notifRecurringTime,
                   value: _hhmm(settings.recurringMinuteOfDay),

@@ -471,6 +471,12 @@ abstract class AppStrings {
   String get styleSakuraDesc;
   String get styleMono;
   String get styleMonoDesc;
+  String get styleLavender;
+  String get styleLavenderDesc;
+  String get styleAmber;
+  String get styleAmberDesc;
+  String get styleForest;
+  String get styleForestDesc;
 
   // App styles: random, and the Chinese typefaces
   String get styleRandom;
@@ -564,6 +570,11 @@ abstract class AppStrings {
   String get timetableStyleOutline;
   String get timetableStylePaper;
   String get timetableStyleAgenda;
+  String get timetableStyleCompact;
+  String get timetableStylePastel;
+  String get timetableStyleInverse;
+  String get timetableStyleNotebook;
+  String get timetableStyleWeekList;
   String get termStartsSetting;
   String get termStartsSettingHint;
   String termStartSummary(String day, int weeks);
@@ -766,6 +777,15 @@ abstract class AppStrings {
   String get notifEnabled;
   String get notifEnabledHint;
   String get notifTaskDue;
+  String get notifRecurringTasks;
+  String get syncNow;
+  String get courseTasksView;
+  String get courseViewEmpty;
+  String get syncing;
+  String get syncNever;
+  String get syncedJustNow;
+  String syncedMinutesAgo(int minutes);
+  String syncedAt(String time);
   String get notifTaskLead;
   // When a repeating task with no due time is reminded about
   String get notifRecurringTime;

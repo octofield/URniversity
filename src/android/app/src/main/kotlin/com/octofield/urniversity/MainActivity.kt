@@ -80,6 +80,9 @@ class MainActivity : FlutterActivity() {
                 "ocean" -> R.style.LaunchTheme_Ocean
                 "sakura" -> R.style.LaunchTheme_Sakura
                 "mono" -> R.style.LaunchTheme_Mono
+                "lavender" -> R.style.LaunchTheme_Lavender
+                "amber" -> R.style.LaunchTheme_Amber
+                "forest" -> R.style.LaunchTheme_Forest
                 else -> R.style.LaunchTheme
             },
         )
@@ -89,6 +92,6 @@ class MainActivity : FlutterActivity() {
         private const val CHANNEL = "urniversity/style"
 
         // Same order and names as AppStyle in lib/core/theme/app_styles.dart
-        private val STYLES = listOf("linen", "modern", "midnight", "sage", "ocean", "sakura", "mono")
+        private val STYLES = listOf("linen", "modern", "midnight", "sage", "ocean", "sakura", "mono", "lavender", "amber", "forest")
     }
 }

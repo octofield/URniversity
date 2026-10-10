@@ -296,7 +296,7 @@
 | `date_format` | text | ✗ | `mmddWeekday` | 列舉：`mmddWeekday` / `mmdd` / `yyyymmdd` / `longDate` |
 | `semester_count` | int | ✗ | `2` | 每學年分幾學期（2／3／4） |
 | `semester_start_months` | int[] | ✗ | `[8, 2]` | 各學期起始月份，陣列長度需等於 `semester_count` |
-| `default_task_view` | int | ✗ | `0` | 任務頁預設檢視：0=全部、1=每日、2=每週 |
+| `default_task_view` | int | ✗ | `0` | 任務頁預設檢視：0=全部、1=每日、2=每週、3=課程（2026-10-10；顯示順序是全部／每日／課程／每週，存的值不變） |
 | `show_day_counter` | bool | ✗ | `true` | 日記是否顯示「第 N 天」徽章 |
 | `term_starts` | jsonb | ✗ | `null` | 各學期的開學日與上課週數：`{"115-1": {"first_day": "2026-09-07", "weeks": 16}}`（D30 的雲端副本）。由 `supabase/courses.sql` 新增，**單獨讀寫**（`_loadTerms` / `_saveTerms`） |
 | `graduation_credits` | int | ✗ | `null`（＝128） | 畢業學分（Phase 6），1–400。與 `degree_level` 一起**單獨讀寫**（`_loadGradeSettings` / `_saveGradeSettings`） |
@@ -307,7 +307,7 @@
 | `catalog_department` | text | ✗ | `null` | 目錄裡的系名（簡稱，例如「資工系」），≤ 50；比對 D29 `required_for` 判斷必修 |
 | `credits_required`、`credits_general`、`credits_elective` | int | ✗ | `null` | 學校沒公告時使用者自填的三個門檻，0–400 |
 | `timetable_style` | text | ✗ | `null`（＝`standard`） | 課表樣式：`standard` / `solid` / `outline` / `paper` / `agenda`，≤ 20 字；由 `supabase/timetable_style.sql` 新增（2026-10-04）。與 `app_style` 一樣**單獨讀寫**（`_loadTimetableStyle` / `_saveTimetableStyle`），沒跑 SQL 只有這一項同步失敗；不認得的值退回 `standard`。雲端沒有值時保留這台裝置的選擇 |
-| `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono`，或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
+| `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono` / `lavender` / `amber` / `forest`（後三者 2026-10-10），或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
 
 **特別說明：**
 - 兩個處理程序各自只夾帶自己負責的欄位做 `upsert`，不會整列覆寫，因此可以放心獨立修改，但新增
@@ -384,9 +384,11 @@
 | 欄位（JSON key） | 型別 | 必填 | 預設值 | 說明 |
 |---|---|---|---|---|
 | `enabled` | bool | ✗ | `false` | 總開關。**預設關閉**：要先向系統要到通知權限才有意義，而在使用者還沒有任何資料時就跳權限請求最容易被永久拒絕 |
-| `task_due_enabled` | bool | ✗ | `true` | 任務到期提醒 |
-| `task_lead_minutes` | int | ✗ | `30` | 提前幾分鐘提醒；`0` = 準時。可選值見 `NotificationConstants.taskLeadMinuteOptions` |
-| `recurring_minute_of_day` | int | ✗ | `480` | **沒設截止時間的重複任務**在它落到的每一天的提醒時刻，以「當日第幾分鐘」儲存（480 = 08:00）。不套用 `task_lead_minutes`（那是「截止前多久」，這種任務沒有截止時刻）；由 `task_due_enabled` 一起控制。2026-09 第十一批新增，舊版寫入的 JSON 缺這個 key 時退回預設 |
+| `task_due_enabled` | bool | ✗ | `true` | **一次性**任務的到期提醒（2026-10-10 起不再管循環任務） |
+| `task_lead_minutes` | int | ✗ | `30` | 一次性任務提前幾分鐘提醒；`0` = 準時。可選值見 `NotificationConstants.taskLeadMinuteOptions` |
+| `recurring_enabled` | bool | ✗ | 舊值 `task_due_enabled`，再沒有就 `true` | 循環任務的提醒（2026-10-10）。舊版寫的 JSON 沒有這個 key，沿用 `task_due_enabled`，升級後行為不變 |
+| `recurring_lead_minutes` | int | ✗ | 舊值 `task_lead_minutes`，再沒有就 `30` | 有時間的循環任務提前幾分鐘提醒（2026-10-10），選項同上 |
+| `recurring_minute_of_day` | int | ✗ | `480` | **沒設截止時間的重複任務**在它落到的每一天的提醒時刻，以「當日第幾分鐘」儲存（480 = 08:00）。不套用提前時間（這種任務沒有截止時刻）；由 `recurring_enabled` 控制（2026-10-10 前是 `task_due_enabled`）。2026-09 第十一批新增，舊版寫入的 JSON 缺這個 key 時退回預設 |
 | `daily_summary_enabled` | bool | ✗ | `true` | 每日摘要 |
 | `summary_minute_of_day` | int | ✗ | `480` | 摘要時間，以「當日第幾分鐘」儲存（480 = 08:00） |
 | `goal_deadline_enabled` | bool | ✗ | `true` | 學期目標截止提醒 |
@@ -460,6 +462,7 @@ FlutterEngine 來處理（`ActionBroadcastReceiver.java:83-89`，不檢查主 Ap
 | Key | 型別 | 說明 |
 |---|---|---|
 | `widget_snapshot` | JSON 字串 | `buildWidgetSnapshot()` 的完整輸出（見下表）。**原生端勾選時會先改這份**，把該列的 `check` 標成 `checked` |
+| `widget_pushed_at` | 字串（毫秒） | 上次寫入快照的時間（2026-10-10）。原生端每 30 分鐘的更新只在它超過 25 分鐘時請背景引擎重抓；App 的推送也會觸發那次更新，靠它避免迴圈 |
 | `widget_snapshot` 的 `classes` view | （snapshot 內） | 小工具「課表」分頁：今天還沒上完的課；都上完了就顯示明天的課（前面一列「明天」標頭）。點一門課開 App 的課表頁 |
 | `app_style` | 字串 | 目前生效的風格名稱（隨機模式是當次抽到的那一個）。原生端 `WidgetStyle.of()` 換成該風格的顏色與形狀；暖棕或沒寫過時用原本的資源（並跟著系統深淺色） |
 | `widget_state` | JSON 字串 | **原生端寫入**（`WidgetData.writeState()`）：`mode`（`tasks` / `targets` / `goals` / `filterPicker`）/ `period`（`all` / `day` / `week` / `month`）/ `filter_id`（null＝不篩選）。使用者在小工具上的選擇，App 重開後沿用。Dart 不讀也不寫 |
@@ -944,6 +947,7 @@ RLS 只開 `SELECT TO anon, authenticated`。
 媒介：SharedPreferences（`String`，列舉名稱）。讀寫處理程序：`timetableStyleProvider`（`EnumPrefNotifier`，`providers/timetable_style_provider.dart`）。
 
 - 課表的畫法（system_design.md §3-S），預設 `standard`；不認得的值退回 `standard`。
+- 值：`standard` / `solid` / `outline` / `paper` / `agenda`，2026-10-10 加 `compact` / `pastel` / `inverse` / `notebook` / `weekList`（最長 8 字，SQL 的 20 字上限夠用）。
 - 訪客也存；登入帳號另同步 D8-B `user_settings.timetable_style`（登入時讀雲端，有值就套用；每次改選就寫上去）。
 
 ---

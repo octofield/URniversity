@@ -83,7 +83,8 @@ void main() {
         .update(const NotificationSettings(enabled: true));
 
     await pumpScreen(tester, const NotificationSettingsScreen(), container: c);
-    await tester.tap(find.text(zh.notifTaskLead));
+    // One-off tasks first, repeating tasks second (2026-10-10)
+    await tester.tap(find.text(zh.notifTaskLead).first);
     await tester.pumpAndSettle();
 
     await tester.tap(find.descendant(
@@ -94,6 +95,16 @@ void main() {
 
     expect(c.read(notificationSettingsProvider).taskLeadMinutes, 60);
     expect(NotificationConstants.taskLeadMinuteOptions, contains(60));
+
+    await tester.tap(find.text(zh.notifTaskLead).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(SimpleDialog),
+      matching: find.text(zh.notifLeadMinutes(5)),
+    ));
+    await tester.pumpAndSettle();
+    expect(c.read(notificationSettingsProvider).recurringLeadMinutes, 5);
+    expect(c.read(notificationSettingsProvider).taskLeadMinutes, 60, reason: 'each its own');
   });
 
   testWidgets('the settings screen offers a way in', (tester) async {

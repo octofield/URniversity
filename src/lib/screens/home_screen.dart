@@ -29,6 +29,8 @@ import '../widgets/announcement_banner.dart';
 import '../widgets/app_page.dart';
 import '../providers/admin_provider.dart' show isAdminProvider;
 import 'admin_screen.dart';
+import '../providers/realtime_sync.dart';
+import '../widgets/sync_controls.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   // Which tab to show, from the address (/tasks, /targets …, CLAUDE.md §13)
@@ -243,11 +245,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           index: _index,
           child: IndexedStack(
             index: _index,
+            // Each tab pulled down from its top syncs (§3-I)
             children: const [
-              TodayScreen(),
-              SemesterScreen(),
-              FutureScreen(),
-              MeScreen(),
+              PullToSync(child: TodayScreen()),
+              PullToSync(child: SemesterScreen()),
+              PullToSync(child: FutureScreen()),
+              PullToSync(child: MeScreen()),
             ],
           ),
         ),
@@ -350,6 +353,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       width: railWidth - AppSpacing.sm * 2,
                       onTap: openAdmin,
                     ),
+                  // Sync now; when it last did shows on hover and long press
+                  if (ref.watch(canSyncProvider))
+                    _RailEntry(
+                      icon: ref.watch(syncingProvider) ? Icons.hourglass_top : Icons.sync,
+                      label: s.syncNow,
+                      hint: ref.watch(syncingProvider)
+                          ? s.syncing
+                          : lastSyncedLabel(ref.watch(lastSyncedProvider), DateTime.now(), s),
+                      extended: extended,
+                      width: railWidth - AppSpacing.sm * 2,
+                      onTap: () => ref.read(liveSyncProvider).refreshAll(),
+                    ),
                 ],
               ),
             ),
@@ -428,6 +443,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     openAdmin();
                   },
                 ),
+              // Stays open while it syncs, so the time can be seen to change
+              const SyncNowTile(),
             ],
           ),
         ),
@@ -624,6 +641,8 @@ class _FabPresence extends StatelessWidget {
 class _RailEntry extends StatelessWidget {
   final IconData icon;
   final String label;
+  // A tooltip in place of the label's own (the last sync, for "sync now")
+  final String? hint;
   final bool extended;
   final double width;
   final VoidCallback onTap;
@@ -631,6 +650,7 @@ class _RailEntry extends StatelessWidget {
   const _RailEntry({
     required this.icon,
     required this.label,
+    this.hint,
     required this.extended,
     required this.width,
     required this.onTap,
@@ -643,11 +663,11 @@ class _RailEntry extends StatelessWidget {
       return IconButton(
         icon: Icon(icon),
         iconSize: rail.unselectedIconTheme?.size,
-        tooltip: label,
+        tooltip: hint == null ? label : '$label · $hint',
         onPressed: onTap,
       );
     }
-    return SizedBox(
+    final entry = SizedBox(
       width: width,
       height: 56,
       child: InkWell(
@@ -667,6 +687,7 @@ class _RailEntry extends StatelessWidget {
         ),
       ),
     );
+    return hint == null ? entry : Tooltip(message: hint!, child: entry);
   }
 }
 

@@ -10,9 +10,14 @@ class NotificationSettings {
   // individual kinds are still on, because it is what the OS permission maps to
   final bool enabled;
 
+  // One-off tasks
   final bool taskDueEnabled;
   // How long before dueTime to fire. 0 means at the due time itself
   final int taskLeadMinutes;
+  // Repeating tasks, switched and timed on their own (2026-10-10): a daily
+  // habit wants a different nudge from a deadline
+  final bool recurringEnabled;
+  final int recurringLeadMinutes;
   // Minutes since midnight. A repeating task with no due time has no moment of
   // its own, so it is reminded about at this time on every day it lands on
   final int recurringMinuteOfDay;
@@ -38,6 +43,8 @@ class NotificationSettings {
     this.enabled = false,
     this.taskDueEnabled = true,
     this.taskLeadMinutes = NotificationConstants.defaultTaskLeadMinutes,
+    this.recurringEnabled = true,
+    this.recurringLeadMinutes = NotificationConstants.defaultTaskLeadMinutes,
     this.recurringMinuteOfDay = NotificationConstants.defaultRecurringMinuteOfDay,
     this.dailySummaryEnabled = true,
     this.summaryMinuteOfDay = NotificationConstants.defaultSummaryMinuteOfDay,
@@ -54,6 +61,10 @@ class NotificationSettings {
   // fastest way to get permanently denied
   static const initial = NotificationSettings();
 
+  // Repeating tasks share the taskDue kind (one channel, one id block) but
+  // have their own switch
+  bool get recurringOn => enabled && recurringEnabled;
+
   bool isOn(NotificationKind kind) {
     if (!enabled) return false;
     return switch (kind) {
@@ -69,6 +80,8 @@ class NotificationSettings {
     bool? enabled,
     bool? taskDueEnabled,
     int? taskLeadMinutes,
+    bool? recurringEnabled,
+    int? recurringLeadMinutes,
     int? recurringMinuteOfDay,
     bool? dailySummaryEnabled,
     int? summaryMinuteOfDay,
@@ -83,6 +96,8 @@ class NotificationSettings {
         enabled: enabled ?? this.enabled,
         taskDueEnabled: taskDueEnabled ?? this.taskDueEnabled,
         taskLeadMinutes: taskLeadMinutes ?? this.taskLeadMinutes,
+        recurringEnabled: recurringEnabled ?? this.recurringEnabled,
+        recurringLeadMinutes: recurringLeadMinutes ?? this.recurringLeadMinutes,
         recurringMinuteOfDay: recurringMinuteOfDay ?? this.recurringMinuteOfDay,
         dailySummaryEnabled: dailySummaryEnabled ?? this.dailySummaryEnabled,
         summaryMinuteOfDay: summaryMinuteOfDay ?? this.summaryMinuteOfDay,
@@ -98,6 +113,8 @@ class NotificationSettings {
         'enabled': enabled,
         'task_due_enabled': taskDueEnabled,
         'task_lead_minutes': taskLeadMinutes,
+        'recurring_enabled': recurringEnabled,
+        'recurring_lead_minutes': recurringLeadMinutes,
         'recurring_minute_of_day': recurringMinuteOfDay,
         'daily_summary_enabled': dailySummaryEnabled,
         'summary_minute_of_day': summaryMinuteOfDay,
@@ -117,6 +134,12 @@ class NotificationSettings {
         enabled: j['enabled'] as bool? ?? false,
         taskDueEnabled: j['task_due_enabled'] as bool? ?? true,
         taskLeadMinutes: j['task_lead_minutes'] as int? ??
+            NotificationConstants.defaultTaskLeadMinutes,
+        // Saved before they were split: repeating tasks went by the task
+        // switch and lead time, so they carry on doing so until changed
+        recurringEnabled: j['recurring_enabled'] as bool? ?? j['task_due_enabled'] as bool? ?? true,
+        recurringLeadMinutes: j['recurring_lead_minutes'] as int? ??
+            j['task_lead_minutes'] as int? ??
             NotificationConstants.defaultTaskLeadMinutes,
         recurringMinuteOfDay: j['recurring_minute_of_day'] as int? ??
             NotificationConstants.defaultRecurringMinuteOfDay,

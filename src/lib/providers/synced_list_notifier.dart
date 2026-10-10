@@ -293,10 +293,11 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
   }
 
   // What other devices wrote since: asked for on coming back to the app
-  // (system_design.md §3-I). Writes that failed here are sent again first
-  Future<void> refresh() async {
+  // (system_design.md §3-I). Writes that failed here are sent again first.
+  // True once the rows came back
+  Future<bool> refresh() async {
     final userId = _userId;
-    if (userId == null || isGuest) return;
+    if (userId == null || isGuest) return false;
     for (final MapEntry(:key, :value) in {..._pending}.entries) {
       if (value.failed) _send(key, value.item, value.item == null ? 'delete' : 'upsert');
     }
@@ -304,12 +305,14 @@ abstract class SyncedListNotifier<T> extends StateNotifier<List<T>> {
       late List<T> server;
       await runWithRetry(() async => server = await _fetch(userId));
       // Signed out, or into another account, while asking
-      if (_userId != userId) return;
+      if (_userId != userId) return false;
       state = _withPending(server);
       _settled();
       await afterLoad();
+      return true;
     } catch (e) {
       reportSyncError(e, 'refresh');
+      return false;
     }
   }
 

@@ -64,7 +64,8 @@ List<ScheduledNotification> buildNotificationSchedule({
   final horizon =
       now.add(const Duration(days: NotificationConstants.scheduleHorizonDays));
 
-  if (settings.isOn(NotificationKind.taskDue)) {
+  // One-off and repeating tasks are switched separately (2026-10-10)
+  if (settings.isOn(NotificationKind.taskDue) || settings.recurringOn) {
     out.addAll(_taskReminders(tasks, settings, s, now, horizon));
   }
   if (settings.isOn(NotificationKind.dailySummary)) {
@@ -82,21 +83,44 @@ List<ScheduledNotification> buildNotificationSchedule({
 
   out.sort((a, b) => a.when.compareTo(b.when));
 
-  // Ids are handed out after sorting rather than derived from the row id: the
-  // caller always cancels everything first, so sequential ids cannot collide,
-  // and hashing a row id into an int range could
+  // Ids come from what each reminder is about and when (2026-10-10), not from
+  // its place in the list. Placed ids moved along: once a reminder had fired
+  // the next one inherited its id, so the next rescheduling cancelled — and
+  // the next firing replaced — the reminder still sitting in the shade
   final capped = out.take(NotificationConstants.maxScheduled).toList();
+  final used = <int>{};
   return [
-    for (var i = 0; i < capped.length; i++)
+    for (final n in capped)
       ScheduledNotification(
-        id: _baseFor(capped[i].kind) + i,
-        kind: capped[i].kind,
-        when: capped[i].when,
-        title: capped[i].title,
-        body: capped[i].body,
-        payload: capped[i].payload,
+        id: _stableId(n, used),
+        kind: n.kind,
+        when: n.when,
+        title: n.title,
+        body: n.body,
+        payload: n.payload,
       ),
   ];
+}
+
+int _stableId(ScheduledNotification n, Set<int> used) {
+  const block = NotificationConstants.idBlock;
+  var slot = _hash('${n.payload ?? n.title}|${n.when.toIso8601String()}') % block;
+  // Two reminders hashing alike: the later one takes the next free slot
+  while (!used.add(_baseFor(n.kind) + slot)) {
+    slot = (slot + 1) % block;
+  }
+  return _baseFor(n.kind) + slot;
+}
+
+// A string hash that is the same on every run and every platform (String's own
+// hashCode promises neither). Kept to 31 bits at each step, so the arithmetic
+// stays exact on the web's doubles as well
+int _hash(String text) {
+  var h = 0;
+  for (final unit in text.codeUnits) {
+    h = (h * 31 + unit) & 0x7fffffff;
+  }
+  return h;
 }
 
 int _baseFor(NotificationKind kind) => switch (kind) {
@@ -119,9 +143,11 @@ Iterable<ScheduledNotification> _taskReminders(
   DateTime horizon,
 ) sync* {
   final lead = Duration(minutes: settings.taskLeadMinutes);
+  final recurringLead = Duration(minutes: settings.recurringLeadMinutes);
 
   for (final task in tasks) {
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
+    if (isRecurring ? !settings.recurringOn : !settings.isOn(NotificationKind.taskDue)) continue;
     if (task.dueTime == null) {
       if (isRecurring) {
         yield* _untimedRecurringReminders(task, settings, now, horizon);
@@ -162,7 +188,7 @@ Iterable<ScheduledNotification> _taskReminders(
         task.dueTime!.hour,
         task.dueTime!.minute,
       );
-      final fireAt = dueThatDay.subtract(lead);
+      final fireAt = dueThatDay.subtract(recurringLead);
       if (fireAt.isAfter(now) && fireAt.isBefore(horizon)) {
         yield ScheduledNotification(
           id: 0,

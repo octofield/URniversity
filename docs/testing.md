@@ -77,7 +77,7 @@
 | `test/merge_order_test.dart` | `mergeOrder()` 的拓撲排序：父先於子、懸空 parent 視為根、循環不會無窮迴圈 |
 | `test/trash_snapshot_test.dart` | `remove()` 回傳整棵子樹（目標／願景／任務），還原後父子關係完整 |
 | `test/auth_link_error_test.dart` | 失效的驗證連結分類：query string／fragment／Android custom scheme 三種形式，以及 PKCE 跨裝置與一般登入錯誤的區分 |
-| `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期 |
+| `test/notification_schedule_test.dart` | 通知排程的產生規則（system_design.md §3-K）：三種提醒的觸發與排除條件、循環任務逐日展開、視野與則數上限、id 不碰撞、payload 帶對日期；**id 穩定**：同一份資料兩次排程 id 相同、前一則觸發後重排其餘 id 不變且不重用已觸發的 id、id 在各自的一億區段；**一次性與循環分開**：各自的開關與提前時間、舊設定沿用舊值（`2026-10-10-round5.md` 6–8） |
 | `test/notification_schedule_test.dart`（Phase 4 追加） | 每週回顧提醒：兩個週日、帶 `open_review`、已回顧的週不排、跟著時刻與開關、marker 不會被當成任務 payload、設定 JSON 來回。基準設定 `allOn` 關掉回顧提醒，因為其他案例是「關掉別種以隔離一種」寫成的 |
 | `test/notification_schedule_test.dart`（第十一批追加） | 沒設時間的重複任務（§3-K）：在設定的時刻排、不套提前量、當天時刻已過就從明天起、跳過已完成那天、跟著任務提醒開關；設定 JSON 來回與舊資料缺 key 時的預設 |
 | `test/notification_action_test.dart` | 通知動作依賴的純邏輯（§3-L）：`Task.toggledOn()` 與 `isCompletedOn()` 互為反函式、payload 編解碼、畸形輸入回 null 不拋例外、動作結果的成功／失敗記錄 |
@@ -91,7 +91,7 @@
 | `test/history_stats_test.dart` | 完成度頁的數字（§2-H）：連續達成的三種邊界（今天未完成、昨天未完成、空白日）、區間加總、最強星期幾取平均而非最忙、分類排序與排除無分類、逾期排序含循環任務 |
 | `test/sign_in_failure_test.dart` | 登入錯誤的分類（§2-A）：帳號不存在與密碼錯誤同屬一種說法、信箱未驗證、嘗試過多、連線失敗、其他；有碼與只有訊息兩種來源都涵蓋 |
 | `test/account_delete_auth_test.dart` | 刪除帳號要哪一種身分證明（UC12）：有密碼就輸入密碼（即使也連結了 Google）、只有 Google 才跳出去重新登入 |
-| `test/task_sort_test.dart` | 任務排序（§3-A）：五種順序、沒有截止時間／沒有連結目標排最後、已刪除的目標視為未連結、同鍵值時退回自動順序 |
+| `test/task_sort_test.dart` | 任務排序（§3-A）：五種順序、沒有截止時間／沒有連結目標排最後、已刪除的目標視為未連結、同鍵值時退回自動順序；依時間排序時循環任務放在該列那一天的時:分（06:00、07:00 循環排在 09:00 期限前，沒時間的最後）（`2026-10-10-round5.md` 2） |
 | `test/goal_category_test.dart` | 沒有分類的目標（§2-C、§3-J）：`primaryCategoryOf()` 回 null、中性色與中性圖示、有分類時不受影響 |
 | `test/goal_sort_test.dart` | 目標與願景的排序（§3-C）：手動＝拖曳順序、A–Z 不分大小寫、依願景／依學期時沒有值的排最後、未完成優先、同鍵值時退回手動順序 |
 | `test/category_inherit_test.dart` | 連結願景時帶入分類（UC4）：沒有分類才帶入、已有分類不覆蓋、取消連結不清掉 |
@@ -165,7 +165,7 @@
 | `test/widget/responsive_test.dart` | 單欄畫面在 767／768px 的斷點切換與限寬值（420／640），四個分頁不得使用 `ResponsiveBody`；登入／註冊改為在 768 切成雙欄（`AuthLayout`） | `2026-08-23-style-and-responsive.md` 23–38 |
 | `test/widget/password_reset_test.dart` | 忘記密碼入口與預填、新密碼的不一致／長度驗證、`_AuthGate` 的 recovery 優先序、關閉後離開 recovery、失效連結的提示（含訪客在首頁時也看得到）、三語在地化 | `2026-09-05-phase0-reliability.md` 7、8、10、14、15、17 |
 | `test/widget/goal_link_visibility_test.dart` | 「只有頂層目標能連結願景」在新增／編輯表單、詳情頁、願景選單四處一致 | `2026-08-23-known-issues.md` 20–25、28 |
-| `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊 | `2026-08-23-known-issues.md` 30、31、33、34、35 |
+| `test/widget/today_smoke_test.dart` | `showTaskSheet`／`showAddInspirationSheet` 的新增與編輯、視角切換、篩選橫幅、已完成區塊；週檢視那一列顯示連結的目標與課程，360 寬不溢出 | `2026-08-23-known-issues.md` 30、31、33、34、35、`2026-10-10-round5.md` 3 |
 | `test/widget/inspirations_archive_test.dart` | 靈感封存的三段分區、預設收合、封存與完成互不影響 | `2026-09-25-phase3-onboarding-templates.md` 1–4 |
 | `test/goal_template_test.dart` | 範本批次建立的筆數、父子連結、分類繼承、**連續套用兩次不碰撞 id**；每個範本一個願景、只有頂層目標連到它、沒分類的目標沿用願景分類、三語標題都不超過字數上限 | `2026-09-25-phase3-onboarding-templates.md` 5–9、`2026-09-26-startup-cache-and-vision-templates.md` 5–8 |
 | `test/widget/goal_template_sheet_test.dart` | 目標頁與願景頁的 ✨ 入口、套用後的寫入與 SnackBar、套用的資料可正常刪除 | `2026-09-25-phase3-onboarding-templates.md` 10–12、`2026-09-26-startup-cache-and-vision-templates.md` 9 |
@@ -174,7 +174,7 @@
 | `test/widget/coach_mark_test.dart` | 導覽引擎：`info` 步驟連光圈內也擋住、桌面 rail 的光圈位置、轉向後重新對位、`HomeScreen` 被換掉時遮罩跟著收掉且**不**算看過、✕ 算看過 | `2026-09-25-phase3-onboarding-chapters.md` 1–6 |
 | `test/widget/home_tour_test.dart` | 親手操作的章節：**光圈外點不到、光圈內點得到**、跟進真的 sheet 逐欄標示、**存了才前進、關掉沒存就倒回**、選擇器打開時導覽讓開、先跳過這步不留資料、上一步不跨越已完成的動作、每個分頁只播一次、任務章 5 步（課表卡一站已移除，2026-10-03）、沒建目標就跳過里程碑段、日記鈕先捲進畫面、有別的頁面在上面時等它關掉才開始、指南頁重播 | `2026-09-25-phase3-onboarding-chapters.md` 7–22、`2026-10-03-round3.md` 6 |
 | `test/widget/settings_dialogs_test.dart` | 語言／日期格式／預設視角／學期制四個對話框，回收桶清空確認 | `2026-08-23-style-and-responsive.md` 19、21 |
-| `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去 | —（新功能） |
+| `test/widget/notification_settings_test.dart` | 通知設定畫面：總開關關閉時三個分項不可動、不支援平台顯示提示並鎖住開關、提前時間選擇寫得回去；一次性與循環任務各自的提前時間寫回各自的欄位 | `2026-10-10-round5.md` 8 |
 | `test/widget/completion_effect_test.dart` | 完成效果：勾選框**先下壓、再微彈、最後回到原大小**（殘留 bug 的回歸測試）；設定為關閉時完全不縮放；只有當天最後一筆會在 `Overlay` 上放彩帶並自行清掉；系統要求減少動態時什麼都不動 | `2026-09-26-motion-redesign.md` 9–11 |
 | `test/widget/animated_rows_test.dart` | 清單列的進出（§3-Q）：第一次顯示不播動畫、移除的列先停留再收合、離場中的列點不到、新列展開、留下的列 state 不變、立刻加回的列不會遺失、減少動態時直接消失 | `2026-09-26-motion-redesign.md` 1–4 |
 | `test/widget/task_tick_motion_test.dart` | 打勾整段：刪除線正在畫、停留期間仍是全高、之後離開並出現在已完成區；「沒有任務」等最後一列離開才展開；從已完成區取消勾會回來；減少動態時立刻消失 | `2026-09-26-motion-redesign.md` 5–8 |
@@ -191,7 +191,10 @@
 | `test/widget/task_postpone_test.dart` | 延後一天（§2-B）：先問、取消不變；確認後過期 3 天的任務變成明天同一時間、之後鈕消失；未過期與重複任務沒有這個鈕 | `2026-10-03-round3.md` 9 |
 | `test/task_course_link_test.dart` | 課程連結（D1 `linked_course_id`）：沒連時 JSON 不含這個 key、連了有、移除寫空字串且 `courseId` 為 null（讀回也是） | `2026-10-03-round3.md` 10 |
 | `test/save_image_test.dart` | 匯出 PNG：`capturePng` 擷取出的是 PNG（開頭的 8 個位元組） | `2026-10-03-round3.md` 11 |
-| `test/widget/timetable_styles_test.dart` | 課表樣式（§3-S）：五種 × Linen／Midnight × 360／768／1280 不溢出；AppBar 選擇會畫出並記住；不認得的名稱退回預設；時間軸開在今天、上課中、換日、沒有課；匯出列出整週；色塊的字依 WCAG 對比選白或近黑 | `2026-10-04-styles-errors-admin.md` 5–10 |
+| `test/widget/timetable_styles_test.dart` | 課表樣式（§3-S）：五種 × Linen／Midnight × 360／768／1280 不溢出；AppBar 選擇會畫出並記住；不認得的名稱退回預設；時間軸開在今天、上課中、換日、沒有課；匯出列出整週；色塊的字依 WCAG 對比選白或近黑；**十種**（精簡、粉彩、反白、筆記本、週清單）× 亮暗 × 三寬度；紙本外框畫在課程方塊之上且有右框線；週清單在畫面上標出今天上課中 | `2026-10-04-styles-errors-admin.md` 5–10、`2026-10-10-round5.md` 1、16–17 |
+| `test/widget/sync_controls_test.dart` | 同步（§3-I）：5 分鐘的計時器只在前景跑、登出後停、沒開始就不跑；分頁下拉（非 primary 的短清單也能拉）會同步；「立即同步」同步並顯示「剛剛同步」；訪客兩者都沒有；上次同步的說法（剛剛／N 分鐘前／時刻） | `2026-10-10-round5.md` 9–11 |
+| `test/widget/course_view_test.dart` | 課程視角（§2-B）：順序是全部／每日／課程／每週，左右滑照這個順序；依上課時間排課、課下列任務（`TaskTile`）、沒任務的課也列出、已完成收起可展開；「＋」新增的任務連到課程且有截止時間；沒有課時提示 | `2026-10-10-round5.md` 4–5 |
+| `test/widget_refresh_test.dart` | 小工具重新整理（§3-M）：`refresh` 從目前的資料重建快照並寫入 `widget_pushed_at` | `2026-10-10-round5.md` 12 |
 | `test/widget/app_page_test.dart` | 頁面模板（§3-Q）：下拉時底下那頁露出來再關閉、往回（即使過了門檻）就不關、拉一點彈回、任何地方右滑返回、左滑沒事、沒有上一頁就沒有手勢（拖曳中也不動）、別種路由下頁面自己移動也能關、減少動態效果時直接關、文字框上的橫滑不關頁、有前後頁的頁面左右滑換頁而下拉關閉；設定、通知設定、分類、回收桶、靈感、日記、回顧列表、同步紀錄、關聯圖逐頁右滑與下拉都能關；課表不右滑返回 | `2026-10-04-round4.md` 13–16 |
 | `test/live_sync_test.dart` | 保持最新（§3-I）：refresh 帶進另一台的新增與修改、失敗的寫入撐過 refresh 並重送、送出途中的修改與刪除不被 refresh 蓋掉、取回途中才確認的寫入不被較舊的資料蓋掉、推送的新增／修改／刪除套用、`_pending` 中的列不被推送蓋掉、訪客不收推送 | `2026-10-04-round4.md` 17–19 |
 | `test/widget/recurring_time_test.dart` | 循環任務的時間（§2-B）：`anchoredTo` 補星期／號數、已選或其他類型不變；任務列只有「每週X 07:00」沒有日期與延後鈕；sheet 只顯示時間、沒有「5 分鐘後」；新任務 10/08 + 每週存成每週四；舊任務沒改規則與時間時存檔規則不變 | `2026-10-04-round4.md` 1–3 |

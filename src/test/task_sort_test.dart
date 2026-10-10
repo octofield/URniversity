@@ -78,6 +78,22 @@ void main() {
     expect(ids(applyTaskSort(tasks, TaskSort.due)), ['soon', 'later', 'none']);
   });
 
+  // A repeating task's due time is a time of day; its date means nothing
+  // (2026-10-10): on the day shown, 06:00 and 07:00 runs come before a 09:00
+  // deadline however long ago they were first set
+  test('by due time places a repeating task at its time on the row\'s day', () {
+    const daily = RecurrenceRule(type: RecurrenceType.daily);
+    final day = DateTime(2026, 10, 12);
+    final tasks = [
+      task('deadline 09:00', due: DateTime(2026, 10, 12, 9)),
+      Task(id: 'run 07:00', title: 'r', createdAt: base, dueTime: DateTime(2025, 1, 1, 7), recurrence: daily),
+      Task(id: 'stretch 06:00', title: 's', createdAt: base, dueTime: DateTime(2026, 12, 31, 6), recurrence: daily),
+      Task(id: 'no time', title: 'n', createdAt: base, recurrence: daily),
+    ];
+    expect(ids(applyTaskSort(tasks, TaskSort.due, rowDate: (_) => day)),
+        ['stretch 06:00', 'run 07:00', 'deadline 09:00', 'no time']);
+  });
+
   test('a tie keeps the order the list already had', () {
     final tasks = [
       task('first', due: base, title: 'same'),

@@ -403,6 +403,7 @@ String _taskViewLabel(int view, AppStrings s) {
   switch (view) {
     case 1:  return s.dailyTasks;
     case 2:  return s.weeklyTasks;
+    case kCourseTaskView: return s.courseTasksView;
     default: return s.allTasks;
   }
 }
@@ -438,7 +439,7 @@ void _showDefaultTaskViewDialog(BuildContext context, WidgetRef ref,
     builder: (ctx) => SimpleDialog(
       title: Text(s.defaultTaskView),
       children: [
-        for (final entry in [(0, s.allTasks), (1, s.dailyTasks), (2, s.weeklyTasks)])
+        for (final entry in [(0, s.allTasks), (1, s.dailyTasks), (kCourseTaskView, s.courseTasksView), (2, s.weeklyTasks)])
           ListTile(
             title: Text(entry.$2),
             leading: Icon(

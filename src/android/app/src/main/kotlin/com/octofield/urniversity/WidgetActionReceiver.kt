@@ -92,18 +92,19 @@ class WidgetActionReceiver : BroadcastReceiver() {
         TaskWidgetProvider.redrawAll(context)
     }
 
-    // Silent: hand it to the Dart background engine the way home_widget's own
-    // helper would have
-    private fun forwardToDart(context: Context, uri: Uri) {
-        val forwarded = Intent().apply {
-            component = ComponentName(context.packageName, BACKGROUND_RECEIVER)
-            action = BACKGROUND_ACTION
-            data = uri
-        }
-        context.sendBroadcast(forwarded)
-    }
-
     companion object {
+        // Silent: hand it to the Dart background engine the way home_widget's
+        // own helper would have. Also the half-hourly update's way to ask for
+        // a fresh snapshot (TaskWidgetProvider.onUpdate)
+        fun forwardToDart(context: Context, uri: Uri) {
+            val forwarded = Intent().apply {
+                component = ComponentName(context.packageName, BACKGROUND_RECEIVER)
+                action = BACKGROUND_ACTION
+                data = uri
+            }
+            context.sendBroadcast(forwarded)
+        }
+
         private const val TAG = "WidgetActionReceiver"
 
         const val HOST_OPEN = "open"

@@ -20,6 +20,9 @@ String appStyleName(AppStyle style, AppStrings s) => switch (style) {
       AppStyle.ocean => s.styleOcean,
       AppStyle.sakura => s.styleSakura,
       AppStyle.mono => s.styleMono,
+      AppStyle.lavender => s.styleLavender,
+      AppStyle.amber => s.styleAmber,
+      AppStyle.forest => s.styleForest,
     };
 
 // The settings line under "Style": the choice, which may be random
@@ -40,6 +43,9 @@ String _styleDescription(AppStyle style, AppStrings s) => switch (style) {
       AppStyle.ocean => s.styleOceanDesc,
       AppStyle.sakura => s.styleSakuraDesc,
       AppStyle.mono => s.styleMonoDesc,
+      AppStyle.lavender => s.styleLavenderDesc,
+      AppStyle.amber => s.styleAmberDesc,
+      AppStyle.forest => s.styleForestDesc,
     };
 
 // The style picker (system_design.md §3-R): a grid of small previews, each

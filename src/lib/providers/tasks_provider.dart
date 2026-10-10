@@ -121,7 +121,13 @@ final tasksProvider = StateNotifierProvider<TasksNotifier, List<Task>>(
   (ref) => TasksNotifier(ref),
 );
 
-// 0 = all tasks, 1 = daily view, 2 = weekly view
+// The order the views are shown and swiped through. The stored numbers stay as
+// they were — 0 all, 1 day, 2 week — and the course view (2026-10-10) is 3, so
+// a default view saved before it still means the same view
+const kTaskViewOrder = [0, 1, 3, 2];
+const kCourseTaskView = 3;
+
+// 0 = all tasks, 1 = daily view, 2 = weekly view, 3 = by course
 final taskViewProvider = StateProvider<int>((ref) => ref.read(defaultTaskViewProvider));
 
 DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
@@ -202,7 +208,8 @@ DateTime? currentOccurrence(Task task, DateTime now) {
 // until the 20th comes round again
 final taskRowDateProvider = Provider.family<DateTime, Task>((ref, task) {
   final selected = ref.watch(dateProvider);
-  if (ref.watch(taskViewProvider) != 0) return selected;
+  final view = ref.watch(taskViewProvider);
+  if (view != 0 && view != kCourseTaskView) return selected;
   return currentOccurrence(task, ref.watch(effectiveNowProvider)) ?? selected;
 });
 
@@ -227,10 +234,14 @@ final taskSortModeProvider = StateProvider<bool>((ref) => false);
 // then by due time), which is what decides ties: two tasks created in the same
 // minute, or both linked to the same target, keep the order the list already
 // had rather than swapping about on every rebuild.
+//
+// [rowDate] is the day each row is about, for the by-time sort: a repeating
+// task's due time is a time of day, placed on that day (sortTime)
 List<Task> applyTaskSort(
   List<Task> autoOrdered,
   TaskSort sort, {
   Map<String, String> targetTitles = const {},
+  DateTime? Function(Task task)? rowDate,
 }) {
   if (sort == TaskSort.manual) return _applyManualOrder(autoOrdered);
 
@@ -256,8 +267,8 @@ List<Task> applyTaskSort(
         return at.toLowerCase().compareTo(bt.toLowerCase());
       case TaskSort.due:
         // Soonest first; no due time at all goes last
-        final ad = a.dueTime;
-        final bd = b.dueTime;
+        final ad = sortTime(a, rowDate?.call(a));
+        final bd = sortTime(b, rowDate?.call(b));
         if (ad == null || bd == null) {
           if (ad == null && bd == null) return 0;
           return ad == null ? 1 : -1;
@@ -272,6 +283,18 @@ List<Task> applyTaskSort(
       final byKey = compare(a, b);
       return byKey != 0 ? byKey : autoIndex[a.id]!.compareTo(autoIndex[b.id]!);
     });
+}
+
+// When a task is due, for the by-time sort (2026-10-10): a one-off task's due
+// time; a repeating task's time of day on [rowDate], the occurrence its row is
+// about — its due date means nothing, so sorting by it put a 07:00 run after a
+// 09:00 deadline. A repeating task with no time, or no day to place it on, has
+// none
+DateTime? sortTime(Task task, DateTime? rowDate) {
+  final due = task.dueTime;
+  if (!_isRecurring(task)) return due;
+  if (due == null || rowDate == null) return null;
+  return DateTime(rowDate.year, rowDate.month, rowDate.day, due.hour, due.minute);
 }
 
 List<Task> _applyManualOrder(List<Task> autoOrdered) {
@@ -299,7 +322,7 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
     final nonRecurring = matching.where((t) => !_isRecurring(t)).toList()
       ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
     return applyTaskSort([...recurring, ...nonRecurring], sort,
-        targetTitles: targetTitles);
+        targetTitles: targetTitles, rowDate: (_) => date);
   }
 
   // All tasks: recurring first, then with dueTime, then without dueTime
@@ -309,8 +332,9 @@ final filteredTasksProvider = Provider<List<Task>>((ref) {
     ..sort((a, b) => a.dueTime!.compareTo(b.dueTime!));
   final withoutDue = all.where((t) => !_isRecurring(t) && t.dueTime == null).toList()
     ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  final now = ref.watch(effectiveNowProvider);
   return applyTaskSort([...recurring, ...withDue, ...withoutDue], sort,
-      targetTitles: targetTitles);
+      targetTitles: targetTitles, rowDate: (t) => currentOccurrence(t, now));
 });
 
 // Target titles by id, for the "by target" sort. Its own provider so the sort

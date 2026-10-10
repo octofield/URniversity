@@ -43,6 +43,12 @@ Future<void> handleWidgetAction(Uri? uri) async {
 // native side against views that are already computed, so it never wakes this
 // engine — that round trip is what used to take over a second per tap
 Future<void> applyWidgetAction(Uri uri) async {
+  // The widget's refresh button, and its half-hourly update once the snapshot
+  // has gone stale (2026-10-10): fetch everything again and redraw
+  if (uri.host == 'refresh') {
+    await refreshWidgetFromStorage();
+    return;
+  }
   if (uri.host != 'toggle') {
     debugPrint('[widget] not a background action: $uri');
     return;

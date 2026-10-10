@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/period_tables.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
+import '../core/theme/app_spacing.dart';
 import '../core/timetable.dart';
 import '../l10n/app_strings.dart';
 import '../models/course.dart';
@@ -45,6 +46,9 @@ class TimetableGrid extends StatelessWidget {
   // A period is 50 minutes; an hour row is a little taller for its 60
   static const _periodHeight = 56.0;
   static const _hourHeight = 60.0;
+  // Compact: short enough for a whole week on one phone screen
+  static const _compactPeriodHeight = 40.0;
+  static const _compactHourHeight = 44.0;
 
   @override
   Widget build(BuildContext context) {
@@ -54,11 +58,24 @@ class TimetableGrid extends StatelessWidget {
     final rows = gridRows(periods, sessions);
     // Hour rows carry no label; period rows do
     final byPeriod = rows.first.label.isNotEmpty;
-    final rowHeight = byPeriod ? _periodHeight : _hourHeight;
+    final compact = style == TimetableStyle.compact;
+    final rowHeight = byPeriod ? (compact ? _compactPeriodHeight : _periodHeight) : (compact ? _compactHourHeight : _hourHeight);
     double y(int minute) => rowPosition(rows, minute) * rowHeight;
     final paper = style == TimetableStyle.paper;
-    // The paper table is ruled in ink; the others barely
-    final lineColor = paper ? AppColors.textSecondary.withValues(alpha: 0.45) : AppColors.border.withValues(alpha: 0.6);
+    final inverse = style == TimetableStyle.inverse;
+    final notebook = style == TimetableStyle.notebook;
+    // The paper table is ruled in ink, the notebook in the style's colour, the
+    // board in chalk; the others barely
+    final lineColor = switch (style) {
+      TimetableStyle.paper => AppColors.textSecondary.withValues(alpha: 0.45),
+      TimetableStyle.notebook => AppColors.primary.withValues(alpha: 0.25),
+      TimetableStyle.inverse => AppColors.surface.withValues(alpha: 0.22),
+      _ => AppColors.border.withValues(alpha: 0.6),
+    };
+    // On the board, the labels are in the page's own background colour
+    final labelColor = inverse ? AppColors.surface.withValues(alpha: 0.75) : AppColors.textTertiary;
+    // Lines between the days: only where the week is a ruled table
+    final columnLines = style == TimetableStyle.standard || paper || compact;
     final frame = BorderSide(color: AppColors.textSecondary, width: 1.5);
     // How far a block sits inside its cells: the paper table keeps its rules
     // showing, the cards float a little
@@ -68,7 +85,13 @@ class TimetableGrid extends StatelessWidget {
       _ => 1.5,
     };
 
-    return LayoutBuilder(builder: (context, constraints) {
+    // The board is drawn round the whole week, so the days are measured inside it
+    return Container(
+      decoration: inverse
+          ? BoxDecoration(color: AppColors.textPrimary, borderRadius: BorderRadius.circular(AppRadius.lg))
+          : null,
+      padding: EdgeInsets.all(inverse ? AppSpacing.xs : 0),
+      child: LayoutBuilder(builder: (context, constraints) {
       final dayWidth = (constraints.maxWidth - _railWidth) / days;
       final height = rows.length * rowHeight;
 
@@ -119,7 +142,11 @@ class TimetableGrid extends StatelessWidget {
                       child: Text(
                         s.weekdayShort(d),
                         style: theme.labelLarge?.copyWith(
-                          color: now?.weekday == d ? AppColors.primary : AppColors.textSecondary,
+                          color: inverse
+                              ? AppColors.surface
+                              : now?.weekday == d
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
                           fontWeight: now?.weekday == d ? FontWeight.w700 : null,
                         ),
                       ),
@@ -158,7 +185,16 @@ class TimetableGrid extends StatelessWidget {
                   ),
                 // A line under each row (dashed for outline, from the rail's
                 // edge on paper), and a tap target per empty cell
-                if (style != TimetableStyle.solid)
+                // The notebook's margin, down the rail's edge
+                if (notebook)
+                  Positioned(
+                    left: _railWidth - 3,
+                    top: 0,
+                    bottom: 0,
+                    width: 1.5,
+                    child: Container(color: AppColors.error.withValues(alpha: 0.5)),
+                  ),
+                if (style != TimetableStyle.solid && style != TimetableStyle.pastel)
                   for (var i = 0; i <= rows.length; i++)
                     Positioned(
                       left: paper ? 0 : _railWidth,
@@ -184,19 +220,18 @@ class TimetableGrid extends StatelessWidget {
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: now?.weekday == d && style != TimetableStyle.solid
+                          color: now?.weekday == d && style != TimetableStyle.solid && !inverse
                               ? AppColors.primaryLight.withValues(alpha: 0.35)
                               : null,
                           // The last day closes the grid on the right, so the
                           // week does not look as if it ran on past the edge.
-                          // Solid and outline go without column lines
-                          border: switch (style) {
-                            TimetableStyle.solid || TimetableStyle.outline => null,
-                            _ => Border(
-                                left: BorderSide(color: lineColor),
-                                right: d == days ? (paper ? frame : BorderSide(color: lineColor)) : BorderSide.none,
-                              ),
-                          },
+                          // The open styles go without column lines
+                          border: columnLines
+                              ? Border(
+                                  left: BorderSide(color: lineColor),
+                                  right: d == days && !paper ? BorderSide(color: lineColor) : BorderSide.none,
+                                )
+                              : null,
                         ),
                       ),
                     ),
@@ -230,18 +265,21 @@ class TimetableGrid extends StatelessWidget {
                       child: Text(
                         byPeriod ? '${rows[i].label}\n${formatMinute(rows[i].start)}' : formatMinute(rows[i].start),
                         textAlign: TextAlign.center,
-                        style: theme.labelSmall?.copyWith(color: AppColors.textTertiary, height: 1.2),
+                        style: theme.labelSmall?.copyWith(color: labelColor, height: 1.2),
                       ),
                     ),
-                // Paper: the table's outer rule, left and bottom (the header
-                // carries the top, the last day the right)
+                ...blocks,
+                // Paper: the table's outer rule (the header carries the top),
+                // over the blocks — drawn under them, a course on the last day
+                // covered the right edge (reported 2026-10-10)
                 if (paper)
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: DecoratedBox(decoration: BoxDecoration(border: Border(left: frame, bottom: frame))),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(border: Border(left: frame, right: frame, bottom: frame)),
+                      ),
                     ),
                   ),
-                ...blocks,
                 if (showNow)
                   Positioned(
                     left: _railWidth + (now!.weekday - 1) * dayWidth,
@@ -254,7 +292,8 @@ class TimetableGrid extends StatelessWidget {
           ),
         ],
       );
-    });
+    }),
+    );
   }
 }
 
@@ -292,6 +331,8 @@ class _Block extends StatelessWidget {
     final color = Color(course.color);
     // Solid: the course colour deepened, so white text reads on most of them
     final fill = Color.lerp(color, Colors.black, 0.28)!;
+    // Pastel: a light tint of it over the page
+    final tint = Color.alphaBlend(color.withValues(alpha: 0.28), AppColors.background);
     final (Color background, ShapeBorder shape, Color title, Color secondary) = switch (style) {
       TimetableStyle.solid => (
           fill,
@@ -314,6 +355,26 @@ class _Block extends StatelessWidget {
           AppColors.textPrimary,
           AppColors.textSecondary,
         ),
+      // The board's blocks are filled in like solid ones
+      TimetableStyle.inverse => (
+          fill,
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+          _onCourseColor(fill),
+          _onCourseColor(fill).withValues(alpha: 0.85),
+        ),
+      TimetableStyle.pastel => (
+          tint,
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+          _deepTone(color, tint),
+          AppColors.textSecondary,
+        ),
+      // No box at all: the name is marked as with a highlighter instead
+      TimetableStyle.notebook => (
+          Colors.transparent,
+          const RoundedRectangleBorder(),
+          AppColors.textPrimary,
+          AppColors.textSecondary,
+        ),
       _ => (
           color.withValues(alpha: 0.18),
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xs)),
@@ -329,11 +390,11 @@ class _Block extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          decoration: style == TimetableStyle.standard
+          decoration: style == TimetableStyle.standard || style == TimetableStyle.compact
               ? BoxDecoration(border: Border(left: BorderSide(color: color, width: 3)))
               : null,
           padding: switch (style) {
-            TimetableStyle.standard => const EdgeInsets.fromLTRB(4, 3, 3, 2),
+            TimetableStyle.standard || TimetableStyle.compact => const EdgeInsets.fromLTRB(4, 3, 3, 2),
             TimetableStyle.paper => const EdgeInsets.all(2),
             _ => const EdgeInsets.fromLTRB(5, 4, 4, 3),
           },
@@ -341,16 +402,24 @@ class _Block extends StatelessWidget {
             // As many lines as the block has room for; the title always first.
             // Paper gives one line to its colour mark
             final lines = ((c.maxHeight - (paper ? 7 : 0)) / 14).floor().clamp(1, 6);
-            // The credits only once the title and room have a line each
-            final showCredits = credits != null && lines > 2;
-            final below = (lines > 1 && session.location != null ? 1 : 0) + (showCredits ? 1 : 0);
+            // Compact keeps to the name; elsewhere the credits only once the
+            // title and room have a line each
+            final titleOnly = style == TimetableStyle.compact;
+            final showRoom = !titleOnly && lines > 1 && session.location != null;
+            final showCredits = !titleOnly && credits != null && lines > 2;
+            final below = (showRoom ? 1 : 0) + (showCredits ? 1 : 0);
             final align = paper ? TextAlign.center : TextAlign.start;
             final titleText = Text(
               course.title,
               maxLines: lines - below > 0 ? lines - below : 1,
               overflow: TextOverflow.ellipsis,
               textAlign: align,
-              style: theme.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: title),
+              style: theme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: title,
+                // The notebook's highlighter stroke, in the course colour
+                background: style == TimetableStyle.notebook ? (Paint()..color = color.withValues(alpha: 0.35)) : null,
+              ),
             );
             return Column(
               crossAxisAlignment: paper ? CrossAxisAlignment.center : CrossAxisAlignment.start,
@@ -381,7 +450,7 @@ class _Block extends StatelessWidget {
                         )
                       : titleText,
                 ),
-                if (lines > 1 && session.location != null)
+                if (showRoom)
                   Text(
                     session.location!,
                     maxLines: 1,
@@ -406,6 +475,16 @@ class _Block extends StatelessWidget {
       ),
     );
   }
+}
+
+// Pastel: the course colour taken deep enough to read on its own tint; a
+// colour that will not get there gives way to the body text colour
+Color _deepTone(Color color, Color tint) {
+  final deep = Color.lerp(color, Colors.black, 0.6)!;
+  final a = deep.computeLuminance();
+  final b = tint.computeLuminance();
+  final ratio = (a > b ? a + 0.05 : b + 0.05) / (a > b ? b + 0.05 : a + 0.05);
+  return ratio >= 4.5 ? deep : AppColors.textPrimary;
 }
 
 // The outline style's hour lines

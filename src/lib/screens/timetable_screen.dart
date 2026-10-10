@@ -257,13 +257,14 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: Text('${formatSemester(_semester, settings, s)}$kDotSeparator$credits', style: theme.titleMedium),
                         ),
-                      // The agenda is not a grid; exported, it lists the whole week
-                      if (style == TimetableStyle.agenda)
+                      // The agenda is not a grid; exported, it lists the whole
+                      // week, which is all the week list ever shows
+                      if (style == TimetableStyle.agenda || style == TimetableStyle.weekList)
                         TimetableAgenda(
                           courses: courses,
                           s: s,
                           now: isCurrent && !_exporting ? today : null,
-                          allDays: _exporting,
+                          allDays: _exporting || style == TimetableStyle.weekList,
                           onTapCourse: (c) => showCourseSheet(context, semester: _semester, existing: c),
                         )
                       else
@@ -310,6 +311,11 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                       TimetableStyle.outline => s.timetableStyleOutline,
                       TimetableStyle.paper => s.timetableStylePaper,
                       TimetableStyle.agenda => s.timetableStyleAgenda,
+                      TimetableStyle.compact => s.timetableStyleCompact,
+                      TimetableStyle.pastel => s.timetableStylePastel,
+                      TimetableStyle.inverse => s.timetableStyleInverse,
+                      TimetableStyle.notebook => s.timetableStyleNotebook,
+                      TimetableStyle.weekList => s.timetableStyleWeekList,
                     }),
                   ),
               ],

@@ -31,4 +31,19 @@
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo_mono</item>
         <item name="android:windowBackground">@color/widget_splash_mono</item>
     </style>
+    <style name="LaunchTheme.Lavender" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/widget_splash_lavender</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo_lavender</item>
+        <item name="android:windowBackground">@color/widget_splash_lavender</item>
+    </style>
+    <style name="LaunchTheme.Amber" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/widget_splash_amber</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo_amber</item>
+        <item name="android:windowBackground">@color/widget_splash_amber</item>
+    </style>
+    <style name="LaunchTheme.Forest" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/widget_splash_forest</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo_forest</item>
+        <item name="android:windowBackground">@color/widget_splash_forest</item>
+    </style>
 </resources>

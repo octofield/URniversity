@@ -92,7 +92,8 @@ flowchart TD
     User -- "App 回到前景（最多每 30 秒）" --> P4
     SBTables -- "七張清單表的變動" --> SBRealtime
     SBRealtime -- "postgres_changes（user_id = 自己）" --> P4
-    P4 -- "applyRemote(列 / 刪除的 id)\n重連或回前景 → refresh()" --> D1
+    P4 -- "applyRemote(列 / 刪除的 id)\n重連、回前景、前景每 5 分鐘 → refresh()" --> D1
+    User -- "分頁下拉 / 側邊欄「立即同步」" --> P4
     D1 -- "refresh：failed 的寫入重送 → SELECT → 蓋上 _pending / _landed" --> SBTables
 ```
 
@@ -294,7 +295,7 @@ flowchart LR
     D14[("D14 notification_action_log")]
     OS(["作業系統的待送通知佇列"])
 
-    User -- "開關 / 提前時間 / 摘要時間 / 無時間重複任務的時刻" --> P5
+    User -- "開關 / 一次性與循環任務各自的開關與提前時間 / 摘要時間 / 無時間重複任務的時刻" --> P5
     P5 -- "寫入 JSON" --> D13
     D13 -- "讀取設定" --> P6
     D1 -- "讀取（到期時間、循環規則、完成狀態）" --> P6
@@ -351,6 +352,10 @@ flowchart LR
     Native -- "顯示" --> Home
 
     Home -- "切換模式/期間/篩選" --> Native
+    Home -- "重新整理鈕" --> Native
+    Native -- "refresh：按鈕，或每 30 分鐘且 widget_pushed_at 已超過 25 分鐘" --> P12
+    P12 -- "refreshWidgetFromStorage：雲端（或訪客本機）整批重抓 → 重算" --> P11
+    P11 -- "推送時寫 widget_pushed_at" --> D15
     Native -- "widget_state" --> D15
     Home -- "勾選任務" --> Native
     Native -- "先標成已勾" --> D15

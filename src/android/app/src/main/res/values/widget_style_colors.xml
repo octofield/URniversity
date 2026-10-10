@@ -43,4 +43,25 @@
     <color name="widget_muted_mono">#A1A1AA</color>
     <color name="widget_box_mono">#52525B</color>
     <color name="widget_splash_mono">#FAFAFA</color>
+    <color name="widget_background_lavender">#F7F5FC</color>
+    <color name="widget_border_lavender">#E1DCF0</color>
+    <color name="widget_text_lavender">#241C38</color>
+    <color name="widget_accent_lavender">#7B5CC4</color>
+    <color name="widget_muted_lavender">#A399BD</color>
+    <color name="widget_box_lavender">#5E5378</color>
+    <color name="widget_splash_lavender">#F7F5FC</color>
+    <color name="widget_background_amber">#FBF6F1</color>
+    <color name="widget_border_amber">#EBDACB</color>
+    <color name="widget_text_amber">#2E1A10</color>
+    <color name="widget_accent_amber">#C2571F</color>
+    <color name="widget_muted_amber">#B39684</color>
+    <color name="widget_box_amber">#6E4E3C</color>
+    <color name="widget_splash_amber">#FBF6F1</color>
+    <color name="widget_background_forest">#0E1612</color>
+    <color name="widget_border_forest">#26352D</color>
+    <color name="widget_text_forest">#E6EFE9</color>
+    <color name="widget_accent_forest">#2F9E6C</color>
+    <color name="widget_muted_forest">#6B7E73</color>
+    <color name="widget_box_forest">#A7B8AE</color>
+    <color name="widget_splash_forest">#0E1612</color>
 </resources>

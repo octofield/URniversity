@@ -15,13 +15,16 @@ class NotificationConstants {
   static const classChannelId = 'class_reminders';
 
   // ── Id ranges ─────────────────────────────────────────────────────────────
-  // One task can produce several pending notifications (a recurring task fires
-  // on many days), so each kind gets a block big enough not to reach the next
-  static const summaryIdBase = 1000;
-  static const taskIdBase = 100000;
-  static const goalIdBase = 500000;
-  static const reviewIdBase = 700000;
-  static const classIdBase = 800000;
+  // Each kind gets a block of a hundred million; within it a reminder's id
+  // comes from what it is about and when (notification_schedule.dart), so the
+  // same reminder keeps its id from one rescheduling to the next. The largest
+  // id stays well inside Android's 32-bit range
+  static const idBlock = 100000000;
+  static const taskIdBase = 1 * idBlock;
+  static const summaryIdBase = 2 * idBlock;
+  static const goalIdBase = 3 * idBlock;
+  static const reviewIdBase = 4 * idBlock;
+  static const classIdBase = 5 * idBlock;
 
   // ── Defaults ──────────────────────────────────────────────────────────────
   static const defaultTaskLeadMinutes = 30;

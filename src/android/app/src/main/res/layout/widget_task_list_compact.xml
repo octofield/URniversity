@@ -49,6 +49,15 @@
             android:layout_height="1dp"
             android:layout_weight="1" />
 
+        <ImageView
+            android:id="@+id/refresh_button"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginEnd="4dp"
+            android:padding="7dp"
+            android:src="@drawable/widget_ic_refresh"
+            android:contentDescription="@string/widget_refresh" />
+
         <FrameLayout
             android:id="@+id/add_button"
             android:layout_width="40dp"

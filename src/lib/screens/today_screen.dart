@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../core/app_routes.dart';
 import 'package:flutter/material.dart';
@@ -51,12 +52,17 @@ import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import '../providers/courses_provider.dart';
 import '../widgets/app_page.dart';
+import '../core/review_stats.dart' show termAt;
+import '../core/timetable.dart' show nextMeetingStart;
+import 'timetable_screen.dart';
+import '../models/course.dart';
 
 // Split with `part` rather than separate libraries: every helper here is
 // library-private and used across all three files, so real imports would mean
 // making a dozen names public for no benefit
 part 'today_task_list.dart';
 part 'today_task_sheet.dart';
+part 'today_course_tasks.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
@@ -93,6 +99,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
     final taskView = ref.watch(taskViewProvider);
+    // Where it sits in the order shown; an unknown stored value is the first
+    final viewAt = kTaskViewOrder.indexOf(taskView).clamp(0, kTaskViewOrder.length - 1);
     final sortMode = ref.watch(taskSortModeProvider);
     final selectedDate = ref.watch(dateProvider);
     final dateFormat = ref.watch(settingsProvider);
@@ -165,6 +173,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ButtonSegment(
                     value: 1,
                     label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.dailyTasks)),
+                  ),
+                  ButtonSegment(
+                    value: kCourseTaskView,
+                    label: FittedBox(fit: BoxFit.scaleDown, child: Text(s.courseTasksView)),
                   ),
                   ButtonSegment(
                     value: 2,
@@ -317,25 +329,27 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ),
           ),
         Expanded(
-          // Swiping the body moves between 全部 / 當日 / 當週, in the order the
-          // segmented button shows them
+          // Swiping the body moves between 全部 / 當日 / 課程 / 當週, in the order
+          // the segmented button shows them (kTaskViewOrder)
           // Off while rearranging, so a sideways drag of a handle does not
           // turn the page instead
           child: SwipeSwitcher(
             onNext: sortMode
                 ? null
-                : taskView < 2
-                    ? () => ref.read(taskViewProvider.notifier).state = taskView + 1
+                : viewAt < kTaskViewOrder.length - 1
+                    ? () => ref.read(taskViewProvider.notifier).state = kTaskViewOrder[viewAt + 1]
                     : null,
             // Nothing before the first view, so that swipe pulls out the
             // drawer instead — the same direction as dragging from the edge
             onPrevious: sortMode
                 ? null
-                : taskView > 0
-                    ? () => ref.read(taskViewProvider.notifier).state = taskView - 1
+                : viewAt > 0
+                    ? () => ref.read(taskViewProvider.notifier).state = kTaskViewOrder[viewAt - 1]
                     : () => Scaffold.of(context).openDrawer(),
             child: taskView == 2
                 ? _WeeklyGrid(weekStart: _weekStart)
+                : taskView == kCourseTaskView
+                ? const _CourseTasksView()
                 : SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageHorizontal,
@@ -631,6 +645,10 @@ class _WeekTaskTile extends ConsumerWidget {
         ? _repeatLine(task.recurrence!, task.dueTime, s, task.createdAt)
         : (task.dueTime != null ? _formatDueTime(task.dueTime!) : null);
     final metaStyle = Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary);
+    // What it is for, as the day list shows it (2026-10-10)
+    final course = task.courseId == null
+        ? null
+        : ref.watch(coursesProvider).where((c) => c.id == task.courseId).firstOrNull;
 
     return InkWell(
       onTap: () => showTaskSheet(context, ref, existing: task),
@@ -688,6 +706,28 @@ class _WeekTaskTile extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                      ],
+                    ),
+                  if (linkedTarget != null || course != null)
+                    Row(
+                      children: [
+                        if (linkedTarget != null)
+                          Flexible(
+                            child: Text(
+                              '$kArrow ${linkedTarget.title}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        if (linkedTarget != null && course != null) const SizedBox(width: AppSpacing.sm),
+                        if (course != null) ...[
+                          Icon(Icons.menu_book_outlined, size: 12, color: Color(course.color)),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(course.title, style: metaStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
                       ],
                     ),
                 ],

@@ -206,13 +206,14 @@ void main() {
       expect(scheduled, hasLength(NotificationConstants.scheduleHorizonDays - 1));
     });
 
-    test('an untimed repeating task follows the task reminder switch', () {
+    // Its own switch since 2026-10-10, no longer the one-off tasks'
+    test('an untimed repeating task follows the repeating-task switch', () {
       final scheduled = build(
         tasks: [
           task(recurrence: const RecurrenceRule(type: RecurrenceType.daily)),
         ],
         settings: allOn.copyWith(
-          taskDueEnabled: false,
+          recurringEnabled: false,
           dailySummaryEnabled: false,
           goalDeadlineEnabled: false,
         ),
@@ -231,7 +232,7 @@ void main() {
         settings: allOn.copyWith(
             dailySummaryEnabled: false,
             goalDeadlineEnabled: false,
-            taskLeadMinutes: 0),
+            recurringLeadMinutes: 0),
       );
       // Today's 21:00 is still ahead, so every day of the horizon counts
       expect(scheduled, hasLength(NotificationConstants.scheduleHorizonDays));
@@ -404,6 +405,49 @@ void main() {
     });
   });
 
+  // Repeating tasks have their own switch and lead time (2026-10-10)
+  group('repeating task reminders on their own', () {
+    final oneOff = task(id: 'once', dueTime: DateTime(2026, 9, 15, 15, 0));
+    final daily = task(
+      id: 'daily',
+      dueTime: DateTime(2026, 1, 1, 21, 0),
+      recurrence: const RecurrenceRule(type: RecurrenceType.daily),
+    );
+    List<String?> taskIds(List<ScheduledNotification> all) => [
+          for (final n in all)
+            if (n.kind == NotificationKind.taskDue) TaskNotificationPayload.decode(n.payload)?.taskId,
+        ];
+
+    test('switching repeating tasks off leaves the one-off ones, and the other way round', () {
+      final noRepeats = build(tasks: [oneOff, daily], settings: allOn.copyWith(recurringEnabled: false));
+      expect(taskIds(noRepeats).toSet(), {'once'});
+      final noOneOffs = build(tasks: [oneOff, daily], settings: allOn.copyWith(taskDueEnabled: false));
+      expect(taskIds(noOneOffs).toSet(), {'daily'});
+    });
+
+    test('each goes by its own lead time', () {
+      final scheduled = build(
+        tasks: [oneOff, daily],
+        settings: allOn.copyWith(taskLeadMinutes: 60, recurringLeadMinutes: 5),
+      );
+      final once = scheduled.firstWhere((n) => TaskNotificationPayload.decode(n.payload)?.taskId == 'once');
+      expect(once.when, DateTime(2026, 9, 15, 14, 0));
+      final firstRun = scheduled.firstWhere((n) => TaskNotificationPayload.decode(n.payload)?.taskId == 'daily');
+      expect(firstRun.when.hour * 60 + firstRun.when.minute, 20 * 60 + 55);
+    });
+
+    test('settings saved before the split keep behaving as they did', () {
+      final old = NotificationSettings.fromJson({'enabled': true, 'task_due_enabled': false, 'task_lead_minutes': 30});
+      expect(old.recurringEnabled, isFalse);
+      expect(old.recurringLeadMinutes, 30);
+      final roundTrip = NotificationSettings.fromJson(
+        allOn.copyWith(recurringEnabled: false, recurringLeadMinutes: 120).toJson(),
+      );
+      expect(roundTrip.recurringEnabled, isFalse);
+      expect(roundTrip.recurringLeadMinutes, 120);
+    });
+  });
+
   group('the whole schedule', () {
     test('is ordered by time and capped', () {
       final scheduled = build(
@@ -439,7 +483,29 @@ void main() {
           NotificationKind.classStart => NotificationConstants.classIdBase,
         };
         expect(n.id, greaterThanOrEqualTo(base));
-        expect(n.id, lessThan(base + NotificationConstants.maxScheduled));
+        expect(n.id, lessThan(base + NotificationConstants.idBlock));
+      }
+    });
+
+    // A reminder already in the shade must not share an id with one still to
+    // come: rescheduling cancels pending ids, and Android takes the shown one
+    // down with it; a later firing under that id would replace it as well.
+    // Placed ids did exactly that (reported 2026-10-10)
+    test('a reminder keeps its id when the schedule is rebuilt, even after an earlier one fired', () {
+      final tasks = [
+        for (var i = 0; i < 4; i++) task(id: 't$i', dueTime: DateTime(2026, 9, 15, 9 + i, 0)),
+      ];
+      final before = build(tasks: tasks);
+      final again = build(tasks: tasks);
+      expect([for (final n in again) n.id], [for (final n in before) n.id], reason: 'the same data, the same ids');
+
+      // The 09:00 one has fired and sits in the shade; everything is rebuilt
+      final fired = before.firstWhere((n) => n.payload != null && n.when.hour == 9 && n.kind == NotificationKind.taskDue);
+      final later = build(tasks: tasks, at: fired.when.add(const Duration(minutes: 1)));
+      expect(later.map((n) => n.id), isNot(contains(fired.id)), reason: 'its id is not handed to another');
+      for (final n in later) {
+        final same = before.where((b) => b.payload == n.payload && b.when == n.when && b.kind == n.kind);
+        if (same.isNotEmpty) expect(n.id, same.single.id, reason: 'still the same reminder, still the same id');
       }
     });
   });

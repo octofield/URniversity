@@ -56,6 +56,9 @@ class _TimetableAgendaState extends State<TimetableAgenda> {
             ? today
             : [for (var d = 1; d <= days; d++) d].firstWhere((d) => _on(d).isNotEmpty, orElse: () => 1));
 
+    // The week list's day, and an exported picture's: every day with classes.
+    // On screen today's class under way is still marked; a picture has no now
+    final nowOfDay = widget.now == null ? null : widget.now!.hour * 60 + widget.now!.minute;
     if (widget.allDays) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,14 +66,19 @@ class _TimetableAgendaState extends State<TimetableAgenda> {
           for (var d = 1; d <= days; d++)
             if (_on(d).isNotEmpty) ...[
               _DayHeading(text: '${s.weekdayFull(d)}$kDotSeparator${s.agendaClassCount(_on(d).length)}'),
-              _Timeline(meetings: _on(d), s: s, nowMinute: null, onTapCourse: widget.onTapCourse),
+              _Timeline(
+                meetings: _on(d),
+                s: s,
+                nowMinute: d == today ? nowOfDay : null,
+                onTapCourse: widget.onTapCourse,
+              ),
             ],
         ],
       );
     }
 
     final meetings = _on(picked);
-    final nowMinute = widget.now != null && picked == today ? widget.now!.hour * 60 + widget.now!.minute : null;
+    final nowMinute = picked == today ? nowOfDay : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

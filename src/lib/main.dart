@@ -166,7 +166,11 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     if (lifecycle == AppLifecycleState.resumed) {
       ref.read(effectiveNowProvider.notifier).refresh();
       // And whatever other devices changed meanwhile (§3-I)
-      ref.read(liveSyncProvider).refreshAll(minGap: kResumeRefreshGap);
+      ref.read(liveSyncProvider)
+        ..setForeground(true)
+        ..refreshAll(minGap: kResumeRefreshGap);
+    } else if (lifecycle == AppLifecycleState.paused || lifecycle == AppLifecycleState.hidden) {
+      ref.read(liveSyncProvider).setForeground(false);
     }
   }
 
