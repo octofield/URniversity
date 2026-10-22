@@ -638,7 +638,7 @@ class _FabPresence extends StatelessWidget {
 // their icon column (half the rail's 80-pixel minWidth) and the label starting
 // where theirs do, in the rail's own icon size and label style; collapsed, an
 // icon with a tooltip
-class _RailEntry extends StatelessWidget {
+class _RailEntry extends StatefulWidget {
   final IconData icon;
   final String label;
   // A tooltip in place of the label's own (the last sync, for "sync now")
@@ -656,38 +656,81 @@ class _RailEntry extends StatelessWidget {
     required this.onTap,
   });
 
+  // Measured from the Material 3 rail's own destinations, so these rows sit
+  // at the same pitch and highlight the same way (2026-10-22): a 44-pixel
+  // row, and a 56 x 32 capsule around the icon
+  static const height = 44.0;
+  static const indicatorWidth = 56.0;
+  static const indicatorHeight = 32.0;
+
+  @override
+  State<_RailEntry> createState() => _RailEntryState();
+}
+
+class _RailEntryState extends State<_RailEntry> {
+  bool _hovered = false;
+  bool _pressed = false;
+  bool _focused = false;
+
   @override
   Widget build(BuildContext context) {
     final rail = NavigationRailTheme.of(context);
-    if (!extended) {
+    if (!widget.extended) {
       return IconButton(
-        icon: Icon(icon),
+        icon: Icon(widget.icon),
         iconSize: rail.unselectedIconTheme?.size,
-        tooltip: hint == null ? label : '$label · $hint',
-        onPressed: onTap,
+        tooltip: widget.hint == null ? widget.label : '${widget.label} · ${widget.hint}',
+        onPressed: widget.onTap,
       );
     }
-    final entry = SizedBox(
-      width: width,
-      height: 56,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.full),
+    // Material 3 state layers: 8% on hover or focus, 12% pressed — on the
+    // capsule round the icon only, as the destinations above do, never the
+    // whole row (reported 2026-10-22)
+    final layer = _pressed ? 0.12 : (_hovered || _focused ? 0.08 : 0.0);
+    final entry = InkWell(
+      onTap: widget.onTap,
+      onHover: (v) => setState(() => _hovered = v),
+      onHighlightChanged: (v) => setState(() => _pressed = v),
+      onFocusChange: (v) => setState(() => _focused = v),
+      overlayColor: WidgetStateProperty.all(Colors.transparent),
+      splashFactory: NoSplash.splashFactory,
+      child: SizedBox(
+        width: widget.width,
+        height: _RailEntry.height,
         child: Row(
           children: [
+            // The icon column of the destinations: half the rail's 80-pixel
+            // minWidth from its edge
             SizedBox(
               width: 80 - AppSpacing.sm * 2,
-              child: Icon(icon, size: rail.unselectedIconTheme?.size),
+              child: Center(
+                child: AnimatedContainer(
+                  duration: scaled(context, AppMotion.quick),
+                  width: _RailEntry.indicatorWidth,
+                  height: _RailEntry.indicatorHeight,
+                  decoration: BoxDecoration(
+                    color: AppColors.textPrimary.withValues(alpha: layer),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                  child: Icon(widget.icon, size: rail.unselectedIconTheme?.size),
+                ),
+              ),
             ),
             const SizedBox(width: AppSpacing.sm),
+            // The rail sets its labels' style outright, without the ambient
+            // line height a plain Text would merge in
             Expanded(
-              child: Text(label, style: rail.unselectedLabelTextStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+              child: DefaultTextStyle(
+                style: rail.unselectedLabelTextStyle ?? const TextStyle(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                child: Text(widget.label),
+              ),
             ),
           ],
         ),
       ),
     );
-    return hint == null ? entry : Tooltip(message: hint!, child: entry);
+    return widget.hint == null ? entry : Tooltip(message: widget.hint!, child: entry);
   }
 }
-

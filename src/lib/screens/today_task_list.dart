@@ -251,24 +251,14 @@ class TaskTile extends ConsumerWidget {
               children: [
                 if (task.content != null)
                   Text(task.content!, style: Theme.of(context).textTheme.bodySmall),
-                // Repeating: "⟳ 每週四 07:00", the time of each occurrence, with
-                // no date and no due colour (2026-10-04)
+                // Repeating: this occurrence and the rule (2026-10-22)
                 if (task.recurrence != null && !task.recurrence!.isNone)
-                  Row(
-                    children: [
-                      Icon(Icons.repeat, size: 12, color: AppColors.textSecondary),
-                      const SizedBox(width: 2),
-                      Flexible(
-                        child: Text(
-                          _repeatLine(task.recurrence!, task.dueTime, s, task.createdAt),
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  _RepeatMeta(
+                    task: task,
+                    day: effectiveDate,
+                    done: isCompleted,
+                    s: s,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
                   )
                 else if (task.dueTime != null)
                   Row(

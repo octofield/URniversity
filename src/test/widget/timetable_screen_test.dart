@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -608,6 +609,31 @@ void main() {
       }
     });
   }
+
+  // The same pitch and the same highlight as the destinations above: a capsule
+  // round the icon, not the whole row (reported 2026-10-22)
+  testWidgets('the rail\'s timetable row is a tab\'s height and lights up like one', (tester) async {
+    await pumpApp(tester, width: 1280);
+    final rail = find.byType(NavigationRail);
+    double top(String text) => tester.getRect(find.descendant(of: rail, matching: find.text(text))).top;
+    final pitch = top(zh.targets) - top(zh.tasks);
+    final row = find.ancestor(of: find.text(zh.timetable), matching: find.byType(InkWell)).first;
+    expect(tester.getSize(row).height, moreOrLessEquals(pitch, epsilon: 0.5));
+
+    final capsule = find.ancestor(of: find.byIcon(Icons.calendar_view_week_outlined), matching: find.byType(AnimatedContainer)).first;
+    Color fill() => (tester.widget<AnimatedContainer>(capsule).decoration as BoxDecoration).color!;
+    expect(fill().a, 0, reason: 'nothing at rest');
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.text(zh.timetable)));
+    await tester.pumpAndSettle();
+    expect(fill().a, greaterThan(0), reason: 'hovering the label lights the capsule');
+    final indicator = tester.getSize(find.descendant(of: rail, matching: find.byType(NavigationIndicator)).first);
+    expect(tester.getSize(capsule), indicator);
+    expect(tester.getSize(capsule).width, lessThan(tester.getSize(row).width / 2));
+  });
 
   testWidgets('in the drawer the timetable entry lines up with the tabs', (tester) async {
     await pumpApp(tester, width: 360);

@@ -54,6 +54,17 @@ class RecurrenceRule {
   }
 }
 
+// A time read back from the server, as the local clock it was written as
+// (2026-10-22). The app writes the local clock with no zone; the timestamptz
+// columns keep that clock as UTC and return it as "…+00:00", which parses to a
+// UTC moment — right on the clock face, but off by the zone against "now": a
+// reminder or a due colour moved by eight hours in Taiwan. Times stored on the
+// device have no zone and parse as local already
+DateTime _wallClock(String text) {
+  final t = DateTime.parse(text);
+  return t.isUtc ? DateTime(t.year, t.month, t.day, t.hour, t.minute, t.second, t.millisecond, t.microsecond) : t;
+}
+
 String _dateKey(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
@@ -140,10 +151,10 @@ class Task {
       id: j['id'] as String,
       title: j['title'] as String,
       content: j['content'] as String?,
-      dueTime: j['due_time'] != null ? DateTime.parse(j['due_time'] as String) : null,
+      dueTime: j['due_time'] != null ? _wallClock(j['due_time'] as String) : null,
       priority: j['priority'] as int? ?? 1,
       isCompleted: j['is_completed'] as bool? ?? false,
-      createdAt: DateTime.parse(j['created_at'] as String),
+      createdAt: _wallClock(j['created_at'] as String),
       recurrence: j['recurrence_type'] != null
           ? RecurrenceRule(
               type: RecurrenceType.values.byName(j['recurrence_type'] as String),

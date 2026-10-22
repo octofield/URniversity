@@ -14,6 +14,7 @@ import 'reviews_provider.dart';
 import 'settings_provider.dart';
 import 'tasks_provider.dart';
 import 'remote_config_provider.dart';
+import '../models/task.dart';
 
 class NotificationSettingsNotifier extends StateNotifier<NotificationSettings> {
   NotificationSettingsNotifier() : super(NotificationSettings.initial) {
@@ -83,6 +84,11 @@ final notificationScheduleProvider = Provider<List<ScheduledNotification>>((ref)
   );
 });
 
+// Takes down the reminders in the shade whose task is now done or deleted.
+// Replaceable in tests, which have no notification plugin
+Future<void> Function(List<Task> tasks) dismissFinishedReminders =
+    (tasks) => NotificationService.instance.dismissFinished(tasks);
+
 // Pushes that schedule to the OS whenever it changes. Watched once from App so
 // the wiring lives in exactly one place, the way syncProvider does
 final notificationSyncProvider = Provider<void>((ref) {
@@ -93,4 +99,8 @@ final notificationSyncProvider = Provider<void>((ref) {
     (_, next) => unawaited(NotificationService.instance.apply(next)),
     fireImmediately: true,
   );
+  // Ticking a task here takes its reminder down already (cancelForTask); one
+  // finished or deleted elsewhere arrives only as a change to the list
+  // (2026-10-22)
+  ref.listen<List<Task>>(tasksProvider, (_, next) => unawaited(dismissFinishedReminders(next)));
 });

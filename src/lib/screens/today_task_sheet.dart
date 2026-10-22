@@ -38,11 +38,57 @@ Future<DateTime?> _showTimeOfDayPicker(BuildContext context, DateTime initial) a
 
 // ─── Recurrence helpers ───────────────────────────────────────────────────────
 
-// How a repeating task reads wherever it is listed: "每週四 07:00". Its due
-// time is when each occurrence is, not a deadline, so no date and no colour
-String _repeatLine(RecurrenceRule rule, DateTime? time, AppStrings s, DateTime createdAt) {
-  final when = _recurrenceShort(rule, s, createdAt);
-  return time == null ? when : '$when ${formatClock(time)}';
+// How a repeating task reads wherever it is listed (2026-10-22): the occurrence
+// its row is about, then the rule — "⏰ 10/23（四）07:00 · ⟳ 每週四". The time
+// takes the due colours of a one-off task for that occurrence, unless it is
+// done; one with no time of day shows its date alone, uncoloured
+class _RepeatMeta extends StatelessWidget {
+  final Task task;
+  // The day of the occurrence: the day shown, or the task's current occurrence
+  final DateTime day;
+  final bool done;
+  final AppStrings s;
+  final TextStyle? style;
+
+  const _RepeatMeta({required this.task, required this.day, required this.done, required this.s, this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final time = task.dueTime;
+    final at = time == null ? null : DateTime(day.year, day.month, day.day, time.hour, time.minute);
+    final colour = (at == null || done ? null : _dueColor(at)) ?? style?.color;
+    final date = s.dateWithWeekday(
+      '${day.month.toString().padLeft(2, '0')}/${day.day.toString().padLeft(2, '0')}',
+      s.weekdayShort(day.weekday),
+    );
+    return Row(
+      children: [
+        if (at != null) ...[
+          Icon(Icons.access_time, size: 12, color: colour),
+          const SizedBox(width: 2),
+        ],
+        Flexible(
+          child: Text(
+            at == null ? date : '$date ${formatClock(at)}',
+            style: style?.copyWith(color: colour),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Text(kDotSeparator, style: style),
+        Icon(Icons.repeat, size: 12, color: style?.color),
+        const SizedBox(width: 2),
+        Flexible(
+          child: Text(
+            _recurrenceShort(task.recurrence!, s, task.createdAt),
+            style: style,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 String _recurrenceLabel(RecurrenceType type, AppStrings s) {

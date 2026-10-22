@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:urniversity/core/theme/app_colors.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/models/task.dart';
 import 'package:urniversity/providers/tasks_provider.dart';
@@ -39,21 +40,71 @@ void main() {
     });
   });
 
-  testWidgets('the row reads "每週四 07:00": no date, no colour', (tester) async {
-    final c = await pumpApp(tester);
-    c.read(taskViewProvider.notifier).state = 0;
+  // The row shows the occurrence it is about and the rule (2026-10-22):
+  // "⏰ 10/23（四）07:00 · ⟳ 每週四", the time coloured as a one-off's would be
+  String occurrence(DateTime day, [String? time]) {
+    final date = zh.dateWithWeekday(
+      '${day.month.toString().padLeft(2, '0')}/${day.day.toString().padLeft(2, '0')}',
+      zh.weekdayShort(day.weekday),
+    );
+    return time == null ? date : '$date $time';
+  }
+
+  Color? colourOf(WidgetTester tester, String text) => tester.widget<Text>(find.text(text)).style?.color;
+
+  testWidgets('the day view shows that day\'s time and the rule, not the stored date', (tester) async {
+    final c = await pumpApp(tester, width: 360);
     final today = DateTime.now();
-    // Its date long gone: a deadline would have been red by now
+    final day = DateTime(today.year, today.month, today.day);
     c.read(tasksProvider.notifier).add('晨跑',
-        dueTime: DateTime(2026, 1, 1, 7),
+        dueTime: DateTime(2026, 1, 1, 23, 59),
         recurrence: RecurrenceRule(type: RecurrenceType.weekly, weekdays: [today.weekday]));
+    c.read(taskViewProvider.notifier).state = 1;
     await tester.pumpAndSettle();
 
-    final line = '${zh.repeatWeeklyOn(zh.weekdayShort(today.weekday))} 07:00';
-    expect(find.text(line), findsOneWidget);
+    expect(find.text(occurrence(day, '23:59')), findsOneWidget);
+    expect(find.text(zh.repeatWeeklyOn(zh.weekdayShort(today.weekday))), findsOneWidget);
     expect(find.textContaining('01/01'), findsNothing);
-    expect(find.byIcon(Icons.access_time), findsNothing);
     expect(find.byTooltip(zh.postponeOneDay), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an occurrence two days gone is red; one with no time is plain', (tester) async {
+    final c = await pumpApp(tester);
+    c.read(taskViewProvider.notifier).state = 0;
+    final now = DateTime.now();
+    final twoDaysAgo = DateTime(now.year, now.month, now.day - 2);
+    // Weekly on that day: in the all-tasks view its current occurrence is then
+    final weekly = RecurrenceRule(type: RecurrenceType.weekly, weekdays: [twoDaysAgo.weekday]);
+    // Set up long ago, so the rule has come round before today
+    c.read(tasksProvider.notifier).state = [
+      Task(id: 'run', title: '晨跑', createdAt: DateTime(2026, 1, 1), dueTime: DateTime(2026, 1, 1, 7), recurrence: weekly),
+      Task(id: 'stretch', title: '伸展', createdAt: DateTime(2026, 1, 1), recurrence: weekly),
+    ];
+    await tester.pumpAndSettle();
+
+    expect(colourOf(tester, occurrence(twoDaysAgo, '07:00')), AppColors.error);
+    // No time of day: its date alone, no clock, no colour
+    expect(colourOf(tester, occurrence(twoDaysAgo)), AppColors.textSecondary);
+    expect(find.byIcon(Icons.access_time), findsOneWidget, reason: 'only the timed one has a clock');
+  });
+
+  testWidgets('once that occurrence is done, it is no longer coloured', (tester) async {
+    final c = await pumpApp(tester);
+    final today = DateTime.now();
+    final day = DateTime(today.year, today.month, today.day);
+    c.read(tasksProvider.notifier).add('晨跑',
+        dueTime: DateTime(2026, 1, 1, 0, 1),
+        recurrence: const RecurrenceRule(type: RecurrenceType.daily));
+    c.read(taskViewProvider.notifier).state = 1;
+    await tester.pumpAndSettle();
+    expect(colourOf(tester, occurrence(day, '00:01')), AppColors.warning, reason: 'just gone: orange');
+
+    c.read(tasksProvider.notifier).toggleOnDate(c.read(tasksProvider).single.id, day);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining(zh.completedTasks));
+    await tester.pumpAndSettle();
+    expect(colourOf(tester, occurrence(day, '00:01')), AppColors.textSecondary);
   });
 
   testWidgets('in the sheet: a time, not a date, and no "minutes from now"', (tester) async {

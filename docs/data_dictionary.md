@@ -59,7 +59,7 @@
 | `user_id` | text (FK → auth.users.id) | ✓ | — | 由 Provider 在寫入時附加，不在 `Task.toJson()` 內 |
 | `title` | text | ✓ | — | 任務標題；≤ 100 字 |
 | `content` | text | ✗ | `null` | 備註內容；≤ 500 字 |
-| `due_time` | timestamptz | ✗ | `null` | 截止時間；非循環任務靠此欄位判斷「屬於哪一天」。**循環任務只用它的時:分**——每一次的時間（2026-10-04 起畫面只顯示時:分，通知一直是如此）；日期只在存檔時用來補上沒選的星期／號數（`RecurrenceRule.anchoredTo`，存進 `recurrence_weekdays`／`recurrence_month_days`） |
+| `due_time` | timestamptz | ✗ | `null` | 截止時間。**存的是本地時鐘**：App 寫出沒有時區的本地時間，資料庫把它當 UTC 保存，讀回時 `Task.fromJson` 再取同一個時鐘當本地時間（`_wallClock`，2026-10-22；之前讀成 UTC，提醒與到期顏色差一個時區）。`created_at` 同樣處理。非循環任務靠此欄位判斷「屬於哪一天」。**循環任務只用它的時:分**——每一次的時間（2026-10-04 起畫面只顯示時:分，通知一直是如此）；日期只在存檔時用來補上沒選的星期／號數（`RecurrenceRule.anchoredTo`，存進 `recurrence_weekdays`／`recurrence_month_days`） |
 | `priority` | int | ✓ | `1` | **保留欄位，App 已不再讀寫**。原本是 1=低、2=中、3=高，2026-09-20 移除優先度功能後新增的任務一律寫預設值 `1`；欄位留著不動 |
 | `is_completed` | bool | ✓ | `false` | **僅供非循環任務使用**；循環任務的完成狀態改看 `completed_dates` |
 | `created_at` | timestamptz | ✓ | — | 建立時間；循環任務用來計算「哪些日期符合循環規則」的起算點 |

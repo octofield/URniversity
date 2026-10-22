@@ -1,4 +1,5 @@
 import 'notification_payload.dart';
+import '../models/task.dart';
 
 // Which of the notifications currently on screen belong to one task.
 //
@@ -24,3 +25,25 @@ List<int> notificationIdsForTask(
   }
   return ids;
 }
+
+// The task reminders in the shade that should go (2026-10-22): their task has
+// been done for the day the reminder was about, or deleted — on this device or,
+// through sync, on another. Other kinds (the daily summary) stay. A list with
+// nothing in it yet, as at start-up before the tasks arrive, deletes nothing
+List<int> notificationIdsToDismiss(
+  Iterable<({int? id, String? payload})> shown,
+  List<Task> tasks,
+) {
+  final byId = {for (final t in tasks) t.id: t};
+  final ids = <int>[];
+  for (final n in shown) {
+    final id = n.id;
+    final payload = TaskNotificationPayload.decode(n.payload);
+    if (id == null || payload == null) continue;
+    final task = byId[payload.taskId];
+    final gone = task == null && tasks.isNotEmpty;
+    if (gone || (task != null && task.isCompletedOn(payload.date))) ids.add(id);
+  }
+  return ids;
+}
+

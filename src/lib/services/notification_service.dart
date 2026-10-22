@@ -9,6 +9,7 @@ import '../core/notification_constants.dart';
 import '../core/notification_schedule.dart';
 import '../models/notification_settings.dart';
 import 'notification_background.dart';
+import '../models/task.dart';
 
 // The only part of the feature that talks to the platform. Everything about
 // *what* to schedule lives in core/notification_schedule.dart as a pure
@@ -173,6 +174,26 @@ class NotificationService {
       // Reading active notifications is unsupported on older Androids; the
       // reminder simply stays until the user swipes it
       debugPrint('[notifications] could not take down the reminder: $e');
+    }
+  }
+
+  // Takes down every reminder in the shade whose task is now done or gone
+  // (notificationIdsToDismiss): run on each change to the task list, so a
+  // task finished on another device clears this one's reminder too
+  Future<void> dismissFinished(List<Task> tasks) async {
+    if (!await _ensureReady()) return;
+    try {
+      final shown = await _plugin.getActiveNotifications();
+      for (final id in notificationIdsToDismiss(
+        [for (final n in shown) (id: n.id, payload: n.payload)],
+        tasks,
+      )) {
+        await _plugin.cancel(id: id);
+      }
+    } catch (e) {
+      // Reading active notifications is unsupported on older Androids; the
+      // reminder simply stays until the user swipes it
+      debugPrint('[notifications] could not take down finished reminders: $e');
     }
   }
 

@@ -641,9 +641,8 @@ class _WeekTaskTile extends ConsumerWidget {
             targetVision: visionOf(linkedTarget, ref.watch(futureGoalsProvider))) ??
         Colors.transparent;
     final isRecurring = task.recurrence != null && !task.recurrence!.isNone;
-    final meta = isRecurring
-        ? _repeatLine(task.recurrence!, task.dueTime, s, task.createdAt)
-        : (task.dueTime != null ? _formatDueTime(task.dueTime!) : null);
+    // A repeating task's line is its own: that day's time and the rule
+    final meta = isRecurring ? null : (task.dueTime != null ? _formatDueTime(task.dueTime!) : null);
     final metaStyle = Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary);
     // What it is for, as the day list shows it (2026-10-10)
     final course = task.courseId == null
@@ -689,6 +688,8 @@ class _WeekTaskTile extends ConsumerWidget {
                         ),
                     maxLines: 1,
                   ),
+                  if (isRecurring)
+                    _RepeatMeta(task: task, day: date, done: isCompleted, s: s, style: metaStyle),
                   if (meta != null)
                     Row(
                       children: [

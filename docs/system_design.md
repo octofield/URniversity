@@ -210,7 +210,10 @@ API，等於把那份名單公開出去。
 先前截止前一天就變橘、一過期就變紅。
 
 **循環任務的時間**（2026-10-04）：循環任務的截止時間是「每一次的時間」，不是期限——
-- 任務列只有一行「⟳ 每週四 07:00」（`_repeatLine`）：不顯示日期、時鐘圖示與截止顏色，也沒有延後鈕。週檢視同樣格式。
+- 任務列一行「⏰ 10/23（四）07:00 · ⟳ 每週四」（`_RepeatMeta`，2026-10-22 改）：**那一列講的那一次**的日期（每日、週檢視是那天，
+  全部與課程檢視是 `currentOccurrence`）加任務的時:分，再接重複規則。時間部分依 `dueLevel(這次的時間)` 變橘、變紅，
+  與一次性任務相同；這次已完成就不變色；沒設時間的只顯示日期、沒有時鐘、不變色。沒有延後鈕。週檢視同樣格式。
+  （2026-10-04 到 10-22 只顯示「每週四 07:00」，看不出這次是哪天、有沒有過期。）
 - sheet 選了循環後，「截止時間」欄改叫「時間」，只選時:分（`_showTimeOfDayPicker`，保留原本的日期）；「5 分鐘後」等相對建議不出現，最近用過的時間仍在。
 - 存檔時，**每週但沒選星期**的規則改用截止那天的星期幾，**每月但沒選日期**的改用那天的號數（`RecurrenceRule.anchoredTo`）：
   設 10/08 07:00、每週 → 每週四 07:00。以前沒選時用的是「建立那天」，所以截止日與重複日會不一致。
@@ -939,6 +942,10 @@ payload 仍是「這則通知屬於哪個任務」的依據（`cancelForTask`）
 循環任務（有時間的、沒時間的）看 `recurringEnabled`／`recurringLeadMinutes`，沒時間的循環任務在 `recurringMinuteOfDay` 提醒。
 兩者都是 `taskDue` 這一種（同一個通知頻道、同一個 id 區段）。
 
+**讀回的時間是本地時鐘**（2026-10-22）：App 把截止時間寫成沒有時區的本地時間，`due_time` 是 `timestamptz`，Supabase 把那個時鐘當 UTC 存、
+回傳 `…+00:00`。`Task.fromJson` 原本照樣解析成 UTC 的時刻：時鐘數字對，但和「現在」比較都差一個時區（台灣 8 小時），
+一次性任務的提醒、到期顏色、是否過期全部跟著錯。現在讀回 UTC 時取它的年月日時分秒當本地時間（`_wallClock`），與寫入方式一致，舊資料不用轉。
+
 **通知要留到任務完成為止**（2026-09-19 回報「點進 App 通知就不見了」）。三件事一起：
 
 | 行為 | 作法 |
@@ -946,6 +953,7 @@ payload 仍是「這則通知屬於哪個任務」的依據（`cancelForTask`）
 | 重算排程不動已經跳出來的通知 | `apply()` 只取消 `pendingNotificationRequests()`，**不呼叫 `cancelAll()`**——`cancelAll()` 連通知欄裡的也一起掃掉，等於「勾掉任一筆不相干的任務」就讓使用者眼前的提醒消失 |
 | 點一下不自動關掉 | `AndroidNotificationDetails(autoCancel: false)`；「重新安排時間」動作也帶 `cancelNotification: false`（改時間不等於做完） |
 | 完成時才收掉 | `toggleOnDate()` 完成該任務後呼叫 `NotificationService.cancelForTask(taskId)`，掃 `getActiveNotifications()` 比對 payload 的 taskId 再 `cancel(id:)`；「標示為已完成」動作維持 `cancelNotification: true` |
+| 在別處完成或刪除也要收（2026-10-22） | 網頁或另一台裝置完成、刪除的任務只會以「清單變了」的形式同步進來。`notificationSyncProvider` 監聽任務清單，每次變動呼叫 `dismissFinished()`：讀 `getActiveNotifications()`，以 `notificationIdsToDismiss()` 收起**那一次已完成**或**任務已不存在**的提醒；清單還是空的（啟動中、還沒載入）時不把任何一則當成已刪除 |
 | 小工具勾掉也要收 | 小工具的勾選走**背景 isolate**（`background_task_writer.dart`），那裡沒有 `NotificationService`，所以寫入成功且**該次變成已完成**時自己呼叫 `cancelShownReminder()`。比對規則只有一份：`core/notification_cancel.dart` 的 `notificationIdsForTask()`，兩個 isolate 共用 |
 
 `notification_service.dart` 碰 platform channel，`flutter test` 裡沒有通道可用，所以這三項
