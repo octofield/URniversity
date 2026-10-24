@@ -9,6 +9,7 @@ import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
 import '../widgets/coach_mark.dart';
+import '../widgets/desktop_selection.dart';
 import '../widgets/draggable_fab.dart';
 import '../providers/settings_provider.dart';
 import '../providers/date_provider.dart';
@@ -30,7 +31,8 @@ import '../widgets/app_page.dart';
 import '../providers/admin_provider.dart' show isAdminProvider;
 import 'admin_screen.dart';
 import '../providers/realtime_sync.dart';
-import '../providers/friends_provider.dart' show incomingInviteCountProvider;
+import '../providers/friends_provider.dart' show friendsAvailableProvider, incomingInviteCountProvider;
+import 'friends_screen.dart';
 import '../widgets/sync_controls.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -191,15 +193,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // A red dot on the Me tab while friend requests wait for an answer
     // (Phase 7). Fetched at sign-in and on every sync; there is no push
     final invites = ref.watch(incomingInviteCountProvider);
-    Widget navIcon(int i, Widget icon) => i == 3
-        ? Badge(
-            key: const ValueKey('nav.invites'),
-            isLabelVisible: invites > 0,
-            backgroundColor: AppColors.error,
-            smallSize: 8,
-            child: icon,
-          )
-        : icon;
+    Widget navIcon(int i, Widget icon) =>
+        i == 3 ? _Dotted(key: const ValueKey('nav.invites'), dot: invites > 0, child: icon) : icon;
+
+    // Below the timetable, for an account (2026-10-24): the same page as 👥
+    // in the Me tab's header, with the same dot
+    final friendsOn = ref.watch(friendsAvailableProvider);
+    void openFriends() => openPage(context, AppRoutes.friends, () => const FriendsScreen());
 
     void openTimetable() => openPage(context, AppRoutes.timetable, () => const TimetableScreen());
     // Switched off from the admin backend (kRemoteFeatures): no way in
@@ -259,12 +259,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           index: _index,
           child: IndexedStack(
             index: _index,
-            // Each tab pulled down from its top syncs (§3-I)
-            children: const [
-              PullToSync(child: TodayScreen()),
-              PullToSync(child: SemesterScreen()),
-              PullToSync(child: FutureScreen()),
-              PullToSync(child: MeScreen()),
+            // Each tab pulled down from its top syncs (§3-I); only the one
+            // showing takes part in selecting text on a computer
+            children: [
+              TabSelectionScope(showing: _index == 0, child: const PullToSync(child: TodayScreen())),
+              TabSelectionScope(showing: _index == 1, child: const PullToSync(child: SemesterScreen())),
+              TabSelectionScope(showing: _index == 2, child: const PullToSync(child: FutureScreen())),
+              TabSelectionScope(showing: _index == 3, child: const PullToSync(child: MeScreen())),
             ],
           ),
         ),
@@ -320,66 +321,81 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return Scaffold(
         body: Row(
           children: [
-            NavigationRail(
-              selectedIndex: _index,
-              onDestinationSelected: _onDestinationSelected,
-              extended: extended,
-              destinations: [
-                for (var i = 0; i < destinations.length; i++)
-                  NavigationRailDestination(
-                    icon: TourAnchor(id: 'nav.$i', child: navIcon(i, Icon(destinations[i].icon))),
-                    selectedIcon: TourAnchor(
-                      id: 'nav.$i',
-                      child: navIcon(i, Icon(destinations[i].selectedIcon,
-                          color: AppColors.primary)),
-                    ),
-                    label: Text(destinations[i].label),
-                  ),
-              ],
-              // Same divider as the mobile drawer — secondary features sit
-              // below the four main destinations and open as pages.
-              // NavigationRail centers trailing in an unbounded-width Column,
-              // so the Divider needs an explicit finite width (matching the
-              // rail's own current width) rather than double.infinity, which
-              // crashes hit-testing when the incoming constraint is unbounded.
-              trailing: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                    child: SizedBox(
-                      width: railWidth - AppSpacing.sm * 2,
-                      child: Divider(color: AppColors.border),
-                    ),
-                  ),
-                  if (timetableOn)
-                    _RailEntry(
-                      icon: Icons.calendar_view_week_outlined,
-                      label: s.timetable,
-                      extended: extended,
-                      width: railWidth - AppSpacing.sm * 2,
-                      onTap: openTimetable,
-                    ),
-                  if (isAdmin)
-                    _RailEntry(
-                      icon: Icons.admin_panel_settings_outlined,
-                      label: s.adminTitle,
-                      extended: extended,
-                      width: railWidth - AppSpacing.sm * 2,
-                      onTap: openAdmin,
-                    ),
-                  // Sync now; when it last did shows on hover and long press
-                  if (ref.watch(canSyncProvider))
-                    _RailEntry(
-                      icon: ref.watch(syncingProvider) ? Icons.hourglass_top : Icons.sync,
-                      label: s.syncNow,
-                      hint: ref.watch(syncingProvider)
-                          ? s.syncing
-                          : lastSyncedLabel(ref.watch(lastSyncedProvider), DateTime.now(), s),
-                      extended: extended,
-                      width: railWidth - AppSpacing.sm * 2,
-                      onTap: () => ref.read(liveSyncProvider).refreshAll(),
+            // Out of text selection on a computer: side by side with the page,
+            // its labels threw the selection's reading order off, and a drag
+            // over a task copied nothing (2026-10-24)
+            SelectionContainer.disabled(
+              child: NavigationRail(
+                selectedIndex: _index,
+                onDestinationSelected: _onDestinationSelected,
+                extended: extended,
+                destinations: [
+                  for (var i = 0; i < destinations.length; i++)
+                    NavigationRailDestination(
+                      icon: TourAnchor(id: 'nav.$i', child: navIcon(i, Icon(destinations[i].icon))),
+                      selectedIcon: TourAnchor(
+                        id: 'nav.$i',
+                        child: navIcon(i, Icon(destinations[i].selectedIcon,
+                            color: AppColors.primary)),
+                      ),
+                      label: Text(destinations[i].label),
                     ),
                 ],
+                // Same divider as the mobile drawer — secondary features sit
+                // below the four main destinations and open as pages.
+                // NavigationRail centers trailing in an unbounded-width Column,
+                // so the Divider needs an explicit finite width (matching the
+                // rail's own current width) rather than double.infinity, which
+                // crashes hit-testing when the incoming constraint is unbounded.
+                trailing: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      child: SizedBox(
+                        width: railWidth - AppSpacing.sm * 2,
+                        child: Divider(color: AppColors.border),
+                      ),
+                    ),
+                    if (timetableOn)
+                      _RailEntry(
+                        icon: Icons.calendar_view_week_outlined,
+                        label: s.timetable,
+                        extended: extended,
+                        width: railWidth - AppSpacing.sm * 2,
+                        onTap: openTimetable,
+                      ),
+                    if (friendsOn)
+                      _RailEntry(
+                        key: const ValueKey('rail.friends'),
+                        icon: Icons.group_outlined,
+                        label: s.friends,
+                        dot: invites > 0,
+                        extended: extended,
+                        width: railWidth - AppSpacing.sm * 2,
+                        onTap: openFriends,
+                      ),
+                    if (isAdmin)
+                      _RailEntry(
+                        icon: Icons.admin_panel_settings_outlined,
+                        label: s.adminTitle,
+                        extended: extended,
+                        width: railWidth - AppSpacing.sm * 2,
+                        onTap: openAdmin,
+                      ),
+                    // Sync now; when it last did shows on hover and long press
+                    if (ref.watch(canSyncProvider))
+                      _RailEntry(
+                        icon: ref.watch(syncingProvider) ? Icons.hourglass_top : Icons.sync,
+                        label: s.syncNow,
+                        hint: ref.watch(syncingProvider)
+                            ? s.syncing
+                            : lastSyncedLabel(ref.watch(lastSyncedProvider), DateTime.now(), s),
+                        extended: extended,
+                        width: railWidth - AppSpacing.sm * 2,
+                        onTap: () => ref.read(liveSyncProvider).refreshAll(),
+                      ),
+                  ],
+                ),
               ),
             ),
             VerticalDivider(width: 1, color: AppColors.border),
@@ -446,6 +462,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onTap: () {
                     Navigator.pop(context);
                     openTimetable();
+                  },
+                ),
+              if (friendsOn)
+                ListTile(
+                  key: const ValueKey('drawer.friends'),
+                  leading: _Dotted(dot: invites > 0, child: const Icon(Icons.group_outlined)),
+                  title: Text(s.friends),
+                  onTap: () {
+                    Navigator.pop(context);
+                    openFriends();
                   },
                 ),
               if (isAdmin)
@@ -657,14 +683,18 @@ class _RailEntry extends StatefulWidget {
   final String label;
   // A tooltip in place of the label's own (the last sync, for "sync now")
   final String? hint;
+  // A red dot on the icon: friend requests waiting
+  final bool dot;
   final bool extended;
   final double width;
   final VoidCallback onTap;
 
   const _RailEntry({
+    super.key,
     required this.icon,
     required this.label,
     this.hint,
+    this.dot = false,
     required this.extended,
     required this.width,
     required this.onTap,
@@ -691,7 +721,7 @@ class _RailEntryState extends State<_RailEntry> {
     final rail = NavigationRailTheme.of(context);
     if (!widget.extended) {
       return IconButton(
-        icon: Icon(widget.icon),
+        icon: _Dotted(dot: widget.dot, child: Icon(widget.icon)),
         iconSize: rail.unselectedIconTheme?.size,
         tooltip: widget.hint == null ? widget.label : '${widget.label} · ${widget.hint}',
         onPressed: widget.onTap,
@@ -726,7 +756,7 @@ class _RailEntryState extends State<_RailEntry> {
                     color: AppColors.textPrimary.withValues(alpha: layer),
                     borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
-                  child: Icon(widget.icon, size: rail.unselectedIconTheme?.size),
+                  child: _Dotted(dot: widget.dot, child: Icon(widget.icon, size: rail.unselectedIconTheme?.size)),
                 ),
               ),
             ),
@@ -747,4 +777,20 @@ class _RailEntryState extends State<_RailEntry> {
     );
     return widget.hint == null ? entry : Tooltip(message: widget.hint!, child: entry);
   }
+}
+
+// The red dot of friend requests waiting, the same on every entry to friends
+class _Dotted extends StatelessWidget {
+  final bool dot;
+  final Widget child;
+
+  const _Dotted({super.key, required this.dot, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Badge(
+        isLabelVisible: dot,
+        backgroundColor: AppColors.error,
+        smallSize: 8,
+        child: child,
+      );
 }

@@ -43,6 +43,7 @@ import 'screens/auth/reset_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/maintenance_screen.dart';
 import 'widgets/coach_mark.dart';
+import 'widgets/desktop_selection.dart';
 import 'widgets/style_crossfade.dart';
 import 'screens/splash_screen.dart';
 import 'screens/settings_screen.dart';
@@ -255,7 +256,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       title: 'URniversity',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(palette),
-      builder: (context, child) => StyleCrossfade(key: _crossfadeKey, child: child!),
+      // Text selectable with the mouse on a computer (desktop_selection.dart)
+      builder: (context, child) => StyleCrossfade(key: _crossfadeKey, child: DesktopSelection(child: child!)),
       locale: _localeFor(lang),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

@@ -6,6 +6,9 @@ import 'package:urniversity/core/timetable.dart';
 import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/models/course.dart';
 import 'package:urniversity/models/friend.dart';
+import 'package:urniversity/models/future_goal.dart';
+import 'package:urniversity/models/semester_goal.dart';
+import 'package:urniversity/models/task.dart';
 import 'package:urniversity/providers/friends_provider.dart';
 import 'package:urniversity/providers/realtime_sync.dart';
 import 'package:urniversity/providers/remote_config_provider.dart';
@@ -24,6 +27,8 @@ class FakeFriends implements FriendsSource {
   List<FriendEntry> entries;
   FriendShares shares = const FriendShares();
   FriendTimetable? table;
+  List<Task>? tasks;
+  FriendGraph? graphData;
   FriendPreview? preview;
   Object? requestError;
   Object? saveError;
@@ -85,6 +90,12 @@ class FakeFriends implements FriendsSource {
 
   @override
   Future<FriendTimetable?> timetable(String friendId, String semester) async => table;
+
+  @override
+  Future<List<Task>?> rates(String friendId) async => tasks;
+
+  @override
+  Future<FriendGraph?> graph(String friendId) async => graphData;
 }
 
 FriendEntry entry(String id, String name, FriendStatus status, [FriendShares shares = const FriendShares()]) =>
@@ -311,8 +322,82 @@ void main() {
     });
   });
 
+  group('their rates and their graph (7-2)', () {
+    void reduceMotion(WidgetTester tester) {
+      // The graph's particles never settle otherwise
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // Two due today, one of them done: half this week
+    final tasks = [
+      Task(id: 't1', title: '', dueTime: today.add(const Duration(hours: 23)), isCompleted: true, createdAt: today.subtract(const Duration(days: 30))),
+      Task(id: 't2', title: '', dueTime: today.add(const Duration(hours: 23)), createdAt: today.subtract(const Duration(days: 30))),
+      // Two weeks back and never done: not this week's to count
+      Task(id: 't3', title: '', dueTime: today.subtract(const Duration(days: 14)), createdAt: today.subtract(const Duration(days: 30))),
+    ];
+    const graph = FriendGraph(
+      futures: [FutureGoal(id: 'f1', title: '出國交換', categories: ['exchange'])],
+      semesters: [SemesterGoal(id: 's1', title: '多益 800', semester: '115-1', futureGoalId: 'f1')],
+      taskCounts: {'s1': 3},
+    );
+
+    testWidgets('only the rates shared: that tab alone, with this week and the twelve weeks', (tester) async {
+      final friend = entry('c', '大雄', FriendStatus.friend, const FriendShares(rates: true));
+      final fake = FakeFriends([friend])..tasks = tasks;
+      await pumpScreen(tester, FriendScreen(entry: friend), container: signedIn(fake));
+      expect(find.byType(TabBar), findsOneWidget);
+      expect(find.widgetWithText(Tab, zh.shareRates), findsOneWidget);
+      expect(find.widgetWithText(Tab, zh.timetable), findsNothing);
+      expect(find.widgetWithText(Tab, zh.overview), findsNothing);
+      expect(tester.widget<Text>(find.byKey(const ValueKey('friendRate'))).data, '50%');
+      expect(find.text(zh.reviewDoneOf(1, 2)), findsOneWidget);
+      expect(find.text(zh.reviewHeatmapTitle), findsOneWidget);
+    });
+
+    testWidgets('only the graph shared: their visions and targets, read only', (tester) async {
+      reduceMotion(tester);
+      final friend = entry('c', '大雄', FriendStatus.friend, const FriendShares(graph: true));
+      final fake = FakeFriends([friend])..graphData = graph;
+      await pumpScreen(tester, FriendScreen(entry: friend), width: 1280, container: signedIn(fake));
+      expect(find.widgetWithText(Tab, zh.overview), findsOneWidget);
+      expect(find.widgetWithText(Tab, zh.shareRates), findsNothing);
+      expect(find.text('出國交換'), findsOneWidget);
+      expect(find.text('多益 800'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget, reason: 'the task count on the target');
+      // "This semester" judges by the viewer's own semesters: not offered
+      expect(find.text(zh.backToCurrentSem), findsNothing);
+
+      await tester.tap(find.text('多益 800'));
+      await tester.pumpAndSettle();
+      expect(find.text(zh.graphOpen), findsNothing, reason: 'not the viewer\'s to open');
+      expect(find.text(zh.graphNextDue), findsNothing, reason: 'their tasks never arrive');
+      expect(find.text(zh.tasks), findsWidgets);
+    });
+
+    testWidgets('all three shared: four tabs, and each fits a phone', (tester) async {
+      reduceMotion(tester);
+      final friend = entry('c', '大雄', FriendStatus.friend, const FriendShares(timetable: true, rates: true, graph: true));
+      final fake = FakeFriends([friend])
+        ..table = const FriendTimetable()
+        ..tasks = tasks
+        ..graphData = graph
+        ..shares = const FriendShares(timetable: true);
+      await pumpScreen(tester, FriendScreen(entry: friend), width: 360, container: signedIn(fake));
+      expect(find.byType(Tab), findsNWidgets(4));
+      for (final tab in [zh.commonFreeTime, zh.shareRates, zh.overview]) {
+        await tester.tap(find.widgetWithText(Tab, tab));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: tab);
+      }
+    });
+  });
+
   group('the red dot', () {
-    Badge dot(WidgetTester tester, String key) => tester.widget<Badge>(find.byKey(ValueKey(key)).first);
+    Badge dot(WidgetTester tester, String key) =>
+        tester.widget<Badge>(find.descendant(of: find.byKey(ValueKey(key)).first, matching: find.byType(Badge)).first);
 
     testWidgets('on the Me tab and on 👥 while a request waits', (tester) async {
       await pumpApp(tester, container: signedIn(FakeFriends(list)));
@@ -331,6 +416,39 @@ void main() {
       await pumpScreen(tester, const Scaffold(body: MeScreen()), container: signedIn(FakeFriends(calm)));
       final friends = find.byKey(const ValueKey('me.friends'));
       expect(tester.widget<Badge>(find.descendant(of: friends, matching: find.byType(Badge))).isLabelVisible, isFalse);
+    });
+
+    testWidgets('the side menu has Friends, with the dot, and it opens the page', (tester) async {
+      await pumpApp(tester, container: signedIn(FakeFriends(list)));
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+      await tester.pumpAndSettle();
+      final entry = find.byKey(const ValueKey('drawer.friends'));
+      expect(entry, findsOneWidget);
+      expect(tester.widget<Badge>(find.descendant(of: entry, matching: find.byType(Badge))).isLabelVisible, isTrue);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(find.byType(FriendsScreen), findsOneWidget);
+    });
+
+    for (final width in [900.0, 1280.0]) {
+      testWidgets('the rail has Friends at $width wide', (tester) async {
+        await pumpApp(tester, width: width, container: signedIn(FakeFriends(list)));
+        final entry = find.byKey(const ValueKey('rail.friends'));
+        expect(entry, findsOneWidget);
+        expect(tester.widget<Badge>(find.descendant(of: entry, matching: find.byType(Badge))).isLabelVisible, isTrue);
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        expect(find.byType(FriendsScreen), findsOneWidget);
+      });
+    }
+
+    testWidgets('a guest has no Friends in the side menu', (tester) async {
+      await pumpApp(tester);
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('drawer.friends')), findsNothing);
+      await pumpApp(tester, width: 1280);
+      expect(find.byKey(const ValueKey('rail.friends')), findsNothing);
     });
 
     testWidgets('a guest has no 👥 at all', (tester) async {

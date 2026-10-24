@@ -37,6 +37,9 @@ const _ringStep = 140.0; // Minimum radius increase between radial rings
 const _framePad = 16.0;
 const _compGap = 32.0;
 
+// The user's own planning graph: their visions, targets and tasks, through
+// OverviewGraph. A friend's graph (friend_screen.dart) is the same widget,
+// read only
 class OverviewGraphScreen extends ConsumerStatefulWidget {
   const OverviewGraphScreen({super.key});
 
@@ -50,9 +53,150 @@ class OverviewGraphScreen extends ConsumerStatefulWidget {
 // have I not connected to anything yet
 enum _GraphFilter { all, currentSemester, unfinished, unlinked }
 
-class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
-    with SingleTickerProviderStateMixin {
+class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen> {
   bool _radial = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+    final tasks = ref.watch(tasksProvider);
+
+    // Linked task counts shown as node badges
+    final taskCounts = <String, int>{};
+    for (final t in tasks) {
+      if (t.linkedTargetId != null) {
+        taskCounts[t.linkedTargetId!] = (taskCounts[t.linkedTargetId!] ?? 0) + 1;
+      }
+    }
+
+    return AppPage(child: Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context),
+            ),
+            Text(s.overview),
+          ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md),
+            child: GraphLayoutToggle(
+              radial: _radial,
+              onChanged: (v) => setState(() => _radial = v),
+            ),
+          ),
+        ],
+      ),
+      body: OverviewGraph(
+        futures: ref.watch(futureGoalsProvider),
+        semesters: ref.watch(semesterGoalsProvider),
+        tasks: tasks,
+        taskCounts: taskCounts,
+        categories: ref.watch(categoriesProvider),
+        radial: _radial,
+      ),
+    ));
+  }
+}
+
+// Layered or radial
+class GraphLayoutToggle extends StatelessWidget {
+  final bool radial;
+  final ValueChanged<bool> onChanged;
+
+  const GraphLayoutToggle({super.key, required this.radial, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => SegmentedButton<bool>(
+        segments: const [
+          ButtonSegment(
+              value: false,
+              icon: Icon(Icons.account_tree_outlined, size: 18)),
+          ButtonSegment(
+              value: true, icon: Icon(Icons.hub_outlined, size: 18)),
+        ],
+        selected: {radial},
+        onSelectionChanged: (v) => onChanged(v.first),
+        showSelectedIcon: false,
+        style: const ButtonStyle(visualDensity: VisualDensity.compact),
+      );
+}
+
+// The nodes and edges to draw from visions and targets already filtered.
+// Deterministic order keeps the layout stable between visits
+({List<_GraphNode> nodes, List<_GraphEdge> edges}) _buildGraph(
+  List<FutureGoal> futures,
+  List<SemesterGoal> semesters,
+) {
+  final nodes = <_GraphNode>[
+    for (final g in [...futures]
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
+      _GraphNode.future(g),
+    for (final g in [...semesters]
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
+      _GraphNode.semester(g),
+  ];
+  final futureIds = {for (final g in futures) g.id};
+  final semIds = {for (final g in semesters) g.id};
+  final edges = <_GraphEdge>[
+    for (final g in futures)
+      if (g.parentId != null && futureIds.contains(g.parentId))
+        _GraphEdge(from: g.parentId!, to: g.id),
+    for (final g in semesters) ...[
+      if (g.parentId != null && semIds.contains(g.parentId))
+        _GraphEdge(from: g.parentId!, to: g.id),
+      if (g.futureGoalId != null && futureIds.contains(g.futureGoalId))
+        _GraphEdge(from: g.futureGoalId!, to: g.id, isLink: true),
+    ],
+  ];
+  return (nodes: nodes, edges: edges);
+}
+
+// The graph itself, under whichever page holds it: filter chips, the canvas
+// with its legend, and the summary of a tapped node. [readOnly] is someone
+// else's graph (a friend's, system_design.md §2-P): no "this semester" filter,
+// which would judge by the viewer's own semesters, and a summary without
+// buttons into the viewer's own pages or tasks
+class OverviewGraph extends ConsumerStatefulWidget {
+  final List<FutureGoal> futures;
+  final List<SemesterGoal> semesters;
+  // The viewer's own tasks, for the summary's open count and next due; empty
+  // for a friend, whose tasks never leave the server
+  final List<Task> tasks;
+  // Tasks per target, the badge on each node
+  final Map<String, int> taskCounts;
+  // Whose colours and icons the categories take
+  final List<CategoryEntry> categories;
+  final bool radial;
+  final bool readOnly;
+
+  const OverviewGraph({
+    super.key,
+    required this.futures,
+    required this.semesters,
+    this.tasks = const [],
+    required this.taskCounts,
+    required this.categories,
+    required this.radial,
+    this.readOnly = false,
+  });
+
+  @override
+  ConsumerState<OverviewGraph> createState() => _OverviewGraphState();
+}
+
+class _OverviewGraphState extends ConsumerState<OverviewGraph>
+    with SingleTickerProviderStateMixin {
   _GraphFilter _filter = _GraphFilter.all;
   // The node whose summary card is open; tapping the canvas closes it
   String? _selectedId;
@@ -80,11 +224,11 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(stringsProvider);
-    final allFutures = ref.watch(futureGoalsProvider);
-    final allSemesters = ref.watch(semesterGoalsProvider);
-    final tasks = ref.watch(tasksProvider);
+    final allFutures = widget.futures;
+    final allSemesters = widget.semesters;
     final semSettings = ref.watch(semesterSettingsProvider);
-    final cats = ref.watch(categoriesProvider);
+    final cats = widget.categories;
+    final taskCounts = widget.taskCounts;
 
     // The filter narrows the semester goals; a vision stays as long as one of
     // the remaining goals still hangs off it, so the tree never loses its roots
@@ -109,79 +253,16 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
         allFutures.where((g) => keptVisionIds.contains(g.id)).toList(),
     };
 
-    // Linked task counts shown as node badges
-    final taskCounts = <String, int>{};
-    for (final t in tasks) {
-      if (t.linkedTargetId != null) {
-        taskCounts[t.linkedTargetId!] = (taskCounts[t.linkedTargetId!] ?? 0) + 1;
-      }
-    }
+    final graph = _buildGraph(futures, semesters);
+    final nodes = graph.nodes;
+    final edges = graph.edges;
 
-    // Deterministic node order keeps the layout stable between visits
-    final nodes = <_GraphNode>[
-      for (final g in [...futures]
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
-        _GraphNode.future(g),
-      for (final g in [...semesters]
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
-        _GraphNode.semester(g),
-    ];
-    final futureIds = {for (final g in futures) g.id};
-    final semIds = {for (final g in semesters) g.id};
-    final edges = <_GraphEdge>[
-      for (final g in futures)
-        if (g.parentId != null && futureIds.contains(g.parentId))
-          _GraphEdge(from: g.parentId!, to: g.id),
-      for (final g in semesters) ...[
-        if (g.parentId != null && semIds.contains(g.parentId))
-          _GraphEdge(from: g.parentId!, to: g.id),
-        if (g.futureGoalId != null && futureIds.contains(g.futureGoalId))
-          _GraphEdge(from: g.futureGoalId!, to: g.id, isLink: true),
-      ],
-    ];
-
-    return AppPage(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-            ),
-            Text(s.overview),
-          ],
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
-            child: SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(
-                    value: false,
-                    icon: Icon(Icons.account_tree_outlined, size: 18)),
-                ButtonSegment(
-                    value: true, icon: Icon(Icons.hub_outlined, size: 18)),
-              ],
-              selected: {_radial},
-              onSelectionChanged: (v) => setState(() => _radial = v.first),
-              showSelectedIcon: false,
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
+    return Column(
         children: [
           _FilterChips(
             current: _filter,
             s: s,
+            readOnly: widget.readOnly,
             onSelect: (f) => setState(() {
               _filter = f;
               _selectedId = null;
@@ -199,7 +280,7 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
                   edges: edges,
                   targetWidth: max(
                       600.0, constraints.maxWidth - AppSpacing.pageHorizontal * 2),
-                  radial: _radial,
+                  radial: widget.radial,
                 );
                 return InteractiveViewer(
                   constrained: false,
@@ -258,7 +339,7 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
                               painter: _EdgePainter(
                                 edges: edges,
                                 byId: layout.byId,
-                                radial: _radial,
+                                radial: widget.radial,
                                 particles: _particleCtrl,
                               ),
                             ),
@@ -269,6 +350,7 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
                               top: node.y,
                               child: _NodeCard(
                                 node: node,
+                                cats: cats,
                                 taskCount: taskCounts[node.id] ?? 0,
                                 selected: node.id == _selectedId,
                                 onTap: () => setState(() => _selectedId =
@@ -297,15 +379,16 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
               nodeId: _selectedId!,
               futures: allFutures,
               semesters: allSemesters,
-              tasks: tasks,
+              tasks: widget.tasks,
+              taskCounts: taskCounts,
               cats: cats,
               settings: semSettings,
               s: s,
+              readOnly: widget.readOnly,
               onClose: () => setState(() => _selectedId = null),
             ),
         ],
-      ),
-    ));
+      );
   }
 }
 
@@ -313,11 +396,14 @@ class _OverviewGraphScreenState extends ConsumerState<OverviewGraphScreen>
 class _FilterChips extends StatelessWidget {
   final _GraphFilter current;
   final AppStrings s;
+  // Someone else's graph: no "this semester", which is the viewer's own
+  final bool readOnly;
   final ValueChanged<_GraphFilter> onSelect;
 
   const _FilterChips({
     required this.current,
     required this.s,
+    this.readOnly = false,
     required this.onSelect,
   });
 
@@ -325,7 +411,7 @@ class _FilterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final labels = {
       _GraphFilter.all: s.catAll,
-      _GraphFilter.currentSemester: s.backToCurrentSem,
+      if (!readOnly) _GraphFilter.currentSemester: s.backToCurrentSem,
       _GraphFilter.unfinished: s.graphFilterUnfinished,
       _GraphFilter.unlinked: s.unlinked,
     };
@@ -429,9 +515,13 @@ class _SummaryCard extends ConsumerWidget {
   final List<FutureGoal> futures;
   final List<SemesterGoal> semesters;
   final List<Task> tasks;
+  final Map<String, int> taskCounts;
   final List<CategoryEntry> cats;
   final SemesterSettings settings;
   final AppStrings s;
+  // A friend's: the tasks are only counts, and nothing here is the viewer's
+  // to open
+  final bool readOnly;
   final VoidCallback onClose;
 
   const _SummaryCard({
@@ -440,9 +530,11 @@ class _SummaryCard extends ConsumerWidget {
     required this.futures,
     required this.semesters,
     required this.tasks,
+    required this.taskCounts,
     required this.cats,
     required this.settings,
     required this.s,
+    this.readOnly = false,
     required this.onClose,
   });
 
@@ -580,15 +672,23 @@ class _SummaryCard extends ConsumerWidget {
                     ? kEmptyValue
                     : s.goalProgress(childrenDone, children),
               ),
-              _MiniStat(label: s.tasks, value: '${open.length}'),
-              _MiniStat(
-                label: s.graphNextDue,
-                value: nextDue == null
-                    ? kEmptyValue
-                    : '${nextDue.month}/${nextDue.day}',
-              ),
+              if (readOnly)
+                _MiniStat(
+                  label: s.tasks,
+                  value: '${targetIds.fold<int>(0, (sum, id) => sum + (taskCounts[id] ?? 0))}',
+                )
+              else ...[
+                _MiniStat(label: s.tasks, value: '${open.length}'),
+                _MiniStat(
+                  label: s.graphNextDue,
+                  value: nextDue == null
+                      ? kEmptyValue
+                      : '${nextDue.month}/${nextDue.day}',
+                ),
+              ],
             ],
           ),
+          if (!readOnly) ...[
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
@@ -622,6 +722,7 @@ class _SummaryCard extends ConsumerWidget {
               ],
             ],
           ),
+          ],
         ],
       ),
     );
@@ -1102,12 +1203,15 @@ class _EdgePainter extends CustomPainter {
 
 class _NodeCard extends ConsumerWidget {
   final _GraphNode node;
+  // The graph owner's categories: a friend's custom ones are not the viewer's
+  final List<CategoryEntry> cats;
   final int taskCount;
   final bool selected;
   final VoidCallback onTap;
 
   const _NodeCard({
     required this.node,
+    required this.cats,
     required this.taskCount,
     required this.selected,
     required this.onTap,
@@ -1115,7 +1219,6 @@ class _NodeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cats = ref.watch(categoriesProvider);
     final semSettings = ref.watch(semesterSettingsProvider);
     final s = ref.watch(stringsProvider);
     final catC = resolveCatColor(cats, node.category);

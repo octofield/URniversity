@@ -780,7 +780,6 @@ class StringsZhTw implements AppStrings {
   @override String get shareRates => '任務達成率';
   @override String get shareRatesHint => '每日、每週的完成比例與連續天數，不含任務內容';
   @override String get shareTimetableHint => '課名與上課時間，不含成績、學分、老師與教室';
-  @override String get shareComingSoon => '朋友在下次更新後才看得到';
   @override String get friendRequestsIncoming => '待回覆';
   @override String get friendRequestsOutgoing => '已送出';
   @override String get noFriendsYet => '還沒有朋友，把你的邀請傳給同學吧';
@@ -813,4 +812,5 @@ class StringsZhTw implements AppStrings {
   @override String meetTaskAdded(String when) => '已加到任務：$when';
   @override String get featureFriends => '朋友（邀請、分享、共同空堂）';
   @override String get friendsOff => '朋友功能暫時關閉';
+  @override String get friendThisWeek => '這週';
 }

@@ -831,7 +831,6 @@ abstract class AppStrings {
   String get shareRates;
   String get shareRatesHint;
   String get shareTimetableHint;
-  String get shareComingSoon;
   String get friendRequestsIncoming;
   String get friendRequestsOutgoing;
   String get noFriendsYet;
@@ -864,4 +863,5 @@ abstract class AppStrings {
   String meetTaskAdded(String when);
   String get featureFriends;
   String get friendsOff;
+  String get friendThisWeek;
 }

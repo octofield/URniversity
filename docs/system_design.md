@@ -129,6 +129,7 @@ flowchart TD
     Today -.->|今天的課 · /timetable| Timetable["TimetableScreen\n課表｜成績"]
     Home -.->|側邊欄「課表」| Timetable
     Home -.->|側邊欄「後台」（管理員才有）| AdminS["AdminScreen · /admin"]
+    Home -.->|側邊欄「朋友」（登入帳號）| Friends
     Future -.->|頁首 icon| Graph
     Semester -.-> SemDetail["SemesterGoalDetailScreen"]
     Future -.-> FutDetail["FutureGoalDetailScreen"]
@@ -150,8 +151,8 @@ flowchart TD
 - 響應式判斷（詳見 §3-F）：寬度 < 768 用底部 `NavigationBar`；≥ 768 用左側 `NavigationRail`；
   ≥ 1200 時 `NavigationRail` 展開顯示文字。
 - **側邊欄**（手機的三條線抽屜、桌面的 `NavigationRail`）在四個分頁下方有一條分隔線，
-  線下是以「開新頁」方式進入的次要功能，目前是「課表」。展開的 rail 顯示圖示＋文字，
-  收合的 rail 只有圖示（滑過顯示「課表」）。
+  線下是以「開新頁」方式進入的次要功能：課表、**朋友**（2026-10-24，登入帳號才有；有待回覆邀請時圖示上有紅點，與「我的」頁首 👥 相同）、
+  後台（管理員）、立即同步。展開的 rail 顯示圖示＋文字，收合的 rail 只有圖示（滑過顯示名稱）。
 
 ---
 
@@ -431,6 +432,12 @@ API，等於把那份名單公開出去。
 > 再回到首頁並切到任務分頁，見 `providers/home_tab_provider.dart`）。
 > 篩選只縮小**學期目標**；願景只要還有目標掛在上面就留著，樹才不會失去根。
 
+> **2026-10-24 拆分**：圖本身是 `OverviewGraph`（篩選 chip、畫布、圖例、摘要卡），資料由參數傳入：願景、目標、
+> 每個目標的任務數、分類（顏色與圖示）、佈局、`readOnly`。`OverviewGraphScreen` 只讀自己的 provider 再交給它；
+> 朋友頁的關聯圖分頁（§2-P）用同一個元件、對方的資料，`readOnly` 時沒有「本學期」篩選（那是以自己的學期判斷）、
+> 摘要卡只有進度與任務數，沒有「打開」「看 N 個任務」與最近截止日。節點與邊由 `_buildGraph` 從已篩選的資料產生，
+> 佈局仍是 `_layoutGraph`（§3-G）。
+
 ### 2-H 任務完成度歷史（TaskHistoryScreen）
 
 輸入：日／週／月檢視切換（`SegmentedButton`；2026-10-03 起也能左右滑動切換，水平 shared axis，切換鈕跟著）、
@@ -622,7 +629,7 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 
 只給登入帳號（`friendsAvailableProvider` = 能同步 且 遠端開關 `friends` 開）。資料全部來自 `supabase/friends.sql` 的函式（data_dictionary.md D8-C、D40），本機不存。
 
-**入口**：「我的」頁首的 👥（設定齒輪左邊）。有待回覆的邀請時，👥 與「我的」分頁圖示（底部列、rail、抽屜）出現紅點（`incomingInviteCountProvider`）。
+**入口**：「我的」頁首的 👥（設定齒輪左邊），以及側邊欄的「朋友」（2026-10-24）。有待回覆的邀請時，👥 與「我的」分頁圖示（底部列、rail、抽屜）出現紅點（`incomingInviteCountProvider`）。
 沒有推播：清單在登入時、每次同步（每 5 分鐘、下拉、立即同步，`LiveSync.refreshAll`）與進朋友頁時重新讀取。
 
 **朋友頁**（`FriendsScreen`，`/friends`，`AppPage`、`ResponsiveBody`、可下拉同步）：
@@ -631,17 +638,20 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 |---|---|---|
 | 我的邀請（`InviteCard`） | 「複製邀請連結」「分享」（`share_plus`；沒有分享面板的平台改成複製） | QR code（`qr_flutter`，任何風格都是淺底深色，相機才讀得穩）、邀請碼以 4＋4 顯示（可選取） |
 | 輸入邀請碼 | 一個欄位：8 碼（大小寫、空白、`-` 都可），或貼上含邀請連結的整段文字；「送出邀請」 | 格式不對：「邀請碼格式不對（8 碼英數字）」，不送出；送出後 snackbar「已送出邀請，等對方接受」或「已成為朋友」（對方先邀過自己）；被拒時依代碼說明（§3-V） |
-| 分享給朋友 | 三個開關，預設全關：課表（課名與時間，不含成績、學分、老師、教室）、任務達成率、關聯圖（後兩項註明「朋友在下次更新後才看得到」） | 一按就變，寫入 D8-C；失敗就退回並顯示同步失敗 |
+| 分享給朋友 | 三個開關，預設全關：課表（課名與時間，不含成績、學分、老師、教室）、任務達成率（不含任務內容）、關聯圖（不含任務） | 一按就變，寫入 D8-C；失敗就退回並顯示同步失敗 |
 | 待回覆 | 婉拒、接受 | 接受後移到「朋友」；婉拒刪除那列 |
 | 已送出 | 取消邀請（先確認） | 刪除那列 |
 | 朋友 | 點一下開朋友頁；⋮ 選單「解除好友」（先確認：雙方會立即看不到彼此分享的內容） | 每列顯示對方開啟的項目（「課表 · 任務達成率」），全關時「○○ 目前沒有分享內容」；沒有朋友時一行提示 |
 
-**朋友詳情**（`FriendScreen`，沒有網址，`AppPageRoute` 推入）：頁首是對方頭像與暱稱；分頁**只放對方開啟的項目**。7-1 有：
+**朋友詳情**（`FriendScreen`，沒有網址，`AppPageRoute` 推入）：頁首是對方頭像與暱稱；分頁**只放對方開啟的項目**，依序是課表、共同空堂、任務達成率、關聯圖：
 
 - **課表**：對方這學期（自己目前所在的學期，`termAt`）的唯讀課表，用自己的課表樣式、對方學校的節次表畫；點課或空白都不會開任何東西（`TimetableGrid`／`TimetableAgenda` 的點擊參數為 null）。自己沒開課表分享時，下方一行「你也開啟課表分享，就能看到共同空堂」。
 - **共同空堂**：兩人都分享課表才出現。列出每週兩人都沒課的時段（「星期三 13:20–15:10」，演算法見 §3-V），每列「約這個時間」：
   新增一個一次性任務「和 ○○ 約」，截止時間是下一次那個時段的開始（今天還沒到就是今天，否則下週同一天），snackbar 說加到哪天幾點。
-- 對方全關（或只開了 7-2 才看得到的項目）：「○○ 目前沒有分享內容」。
+- **任務達成率**（7-2，2026-10-24）：精簡一頁。這週的完成率（大字）與「完成 N／M」、連續全部完成天數、近 12 週熱度圖（與回顧頁同一個 `ReviewHeatmap`）。
+  數字在 App 端由 `friend_rates()` 的計算欄位算出（`rateBetween`、`totalsBetween`、`allDoneStreak`、`dailyRates`），對方的任務標題與內容從未離開伺服器。
+- **關聯圖**（7-2）：`OverviewGraph(readOnly: true)`，對方的願景與頂層目標、任務數，顏色與圖示用對方的分類；右上可切換分層／放射。
+- 對方全關：「○○ 目前沒有分享內容」。
 
 **接受邀請**（`InviteAcceptScreen`，`/invite/<code>`）：訪客看到登入提示；碼格式不對或沒人用：「找不到這個邀請碼」；自己的碼：「這是你自己的邀請碼」；
 其他：對方頭像與「加 ○○ 為朋友？」，按「送出邀請」→「已送出，等 ○○ 接受」或「你和 ○○ 已經是朋友」。每種結果都有「到朋友頁」。
@@ -831,6 +841,22 @@ IconButton 的觸控範圍，也放得下 headlineSmall），三條線在左、�
 > 兩個詳細頁內各對話框的 `SizedBox(width: 400)` **不需要**改成響應式：`AlertDialog` 本身已由
 > `app_theme.dart` 限制最大寬度，並在窄螢幕上把 content 的約束夾到可用寬度，`SizedBox` 在此
 > 實際扮演的是「桌面上的最大寬度」，不會在手機上溢出。
+
+**電腦上的文字選取**（2026-10-24，`widgets/desktop_selection.dart`）：平台是 Windows、macOS、Linux 時
+（電腦上的瀏覽器回報的也是這三種），整個 App 包在一個 `SelectionArea` 裡：任何頁面、對話框、sheet 的文字都能用滑鼠拖曳選取，
+Ctrl+C 或右鍵選單複製。手機（App 與手機瀏覽器）完全不變。
+
+```mermaid
+flowchart TD
+    P{"defaultTargetPlatform"} -->|Android／iOS| N["不包，手勢照舊"]
+    P -->|Windows／macOS／Linux| S["MaterialApp.builder：Overlay ▸ SelectionArea"]
+    S --> R["rail：SelectionContainer.disabled\n（和頁面並排會打亂選取順序）"]
+    S --> T["四個分頁：只有顯示中的參與（TabSelectionScope）\n藏在底下的分頁交給不收任何東西的 registrar"]
+    S --> G["往下拉關頁、左右滑返回、左右滑換檢視：\n不接受滑鼠（pageDragDevices），觸控照舊"]
+```
+
+取捨：電腦上用滑鼠拖曳就是選取，不再能用滑鼠往下拉關頁或左右滑換檢視（電腦上本來就有返回鈕與分頁按鈕）。
+網頁版的任務列是滑鼠一拖就搬動的 `Draggable`，所以任務標題在網頁上要用雙擊選字；其他文字照常拖曳選取。
 
 ### 3-G 關聯圖佈局演算法（`overview_graph_screen.dart`）
 
@@ -1731,6 +1757,14 @@ flowchart TD
 
 「約這個時間」的截止時間：`nextSlotStart(slot, now)`，那個星期幾的開始時刻，今天已經到了就排下週。
 
+**每個函式回什麼**（詳細欄位見 data_dictionary.md「朋友的函式」）：
+
+| 函式 | 開關 | 回傳 | 刻意不回 |
+|---|---|---|---|
+| `friend_timetable` | `share_timetable` | 課名、顏色、上課時間、學校 | 成績、學分、老師、教室 |
+| `friend_rates`（7-2） | `share_rates` | 每個任務的到期、循環、完成日；標題一律空字串 | 標題、內容、連結的目標與課程 |
+| `friend_graph`（7-2） | `share_graph` | 願景、頂層目標、連結、每個目標的任務數、分類顏色 | 筆記、里程碑、任務本身 |
+
 ---
 
 ## 4. 系統操作步驟（主要使用案例）
@@ -2068,6 +2102,8 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 1. 朋友頁「分享給朋友」：打開「課表」（預設全關；對所有朋友一致）。
 2. 點一位朋友 → 只看到對方開啟的分頁。對方開了課表：看到他這學期的課表（唯讀，沒有成績、學分、老師、教室）。
 3. 兩人都開了課表：「共同空堂」分頁列出每週都空的時段 → 按「約這個時間」→ 任務清單多一個「和 ○○ 約」，截止在下一次那個時段開始。
+4. 對方開了任務達成率：看他這週的完成率、連續天數與近 12 週熱度圖（看不到任何任務名稱）。
+5. 對方開了關聯圖：看他的願景與目標怎麼連起來、每個目標掛了幾個任務；點節點只看進度，不能打開。
 
 ### UC17　每週回顧（Phase 4）
 
@@ -2316,4 +2352,4 @@ flowchart TD
 | `TimetableScreen`（課表／成績）／`TodayClassesStrip`／課程 sheet／搜尋 sheet | `coursesProvider`、`termsProvider`、`effectiveTermsProvider`、`gradeSettingsProvider`、`catalogSearchProvider`、`catalogSchoolsProvider`、`tasksProvider`（課程任務） | D27 `courses`、D30 `term_starts`、D31、D29 `course_catalog`、D32 `catalog_schools`（唯讀）、D1 `tasks.linked_course_id`；刪除寫 D6 |
 | 新手導覽章節（`HomeScreen` 上的 overlay，見 §3-O）／設定頁「新手指南」 | `onboardingProvider`、`tourReplayProvider` | D22 `onboarding_done` |
 | `FriendsScreen`／`InviteAcceptScreen`／「我的」頁首 👥 與分頁紅點 | `friendListProvider`、`incomingInviteCountProvider`、`myFriendCodeProvider`、`friendPreviewProvider`、`shareSettingsProvider`、`friendActionsProvider`（全部經 `FriendsSource` 呼叫 RPC） | D40 `friendships`、D8-C `user_settings.friend_code`／`share_*` |
-| `FriendScreen`（朋友的課表、共同空堂） | `friendTimetableProvider`（rpc `friend_timetable`）、`coursesProvider`（自己的）、`shareSettingsProvider`；「約這個時間」寫 `tasksProvider` | 朋友的 D27 `courses`（只經 RPC）、自己的 D27；D1 `tasks` |
+| `FriendScreen`（朋友的課表、共同空堂、達成率、關聯圖） | `friendTimetableProvider`、`friendRatesProvider`、`friendGraphProvider`（各自一個 rpc）、`coursesProvider`（自己的）、`shareSettingsProvider`；「約這個時間」寫 `tasksProvider` | 朋友的 D27、D1、D2、D3、D7（只經 RPC）、自己的 D27；D1 `tasks` |

@@ -608,7 +608,7 @@ flowchart TD
 
 ---
 
-## Diagram 1-K：朋友（經 RPC 的唯讀資料流，Phase 7-1，2026-10-23）
+## Diagram 1-K：朋友（經 RPC 的唯讀資料流，Phase 7，2026-10-23／24）
 
 ```mermaid
 flowchart TD
@@ -630,6 +630,8 @@ refreshAll（每 5 分鐘、下拉、立即同步）"]
 friend_code／share_*")]
     DFr[("D40 friendships")]
     DCo[("D27 courses（朋友的）")]
+    DFT[("D1 tasks（朋友的）")]
+    DFG[("D2／D3／D7（朋友的目標、願景、分類）")]
     DTask[("D1 tasks（自己的）")]
 
     Me -- "三個分享開關（只寫自己那列）" --> DSet
@@ -641,7 +643,9 @@ friend_code／share_*")]
     DFr -- "rpc friend_list：朋友與邀請＋對方的開關" --> PF
     PSync -- "重新讀取" --> PF
     DCo -- "rpc friend_timetable：是朋友且對方開啟才回；只有課名、顏色、時間" --> PF
-    PF -- "唯讀課表、共同空堂" --> Me
+    DFT -- "rpc friend_rates：對方開啟才回；標題一律空字串、沒有內容" --> PF
+    DFG -- "rpc friend_graph：對方開啟才回；沒有筆記、只有頂層目標與任務數" --> PF
+    PF -- "唯讀課表、共同空堂、達成率、關聯圖" --> Me
     Me -- "約這個時間" --> PTasks
     PTasks --> DTask
     Friend -. "同一套 RPC，看到的是你開啟的部分" .-> DFr
@@ -650,4 +654,4 @@ friend_code／share_*")]
 - **核心表的 RLS 沒有改**：`courses`、`tasks`、`user_settings` 仍然只能讀自己的列。朋友讀到的一切都經 SECURITY DEFINER 函式，每次都檢查「是朋友」與「對方開啟」，只回需要的欄位（data_dictionary.md「朋友的函式」）。
 - 沒有推播：新邀請在開 App、每次同步與進朋友頁時讀到，「我的」分頁顯示紅點。
 - 本機不存任何朋友資料（不是 SyncedListNotifier，沒有快取、沒有訪客資料）。
-- 7-2 會加 `friend_rates`（達成率）與 `friend_graph`（關聯圖）兩條同樣形狀的流。
+- 7-2（2026-10-24）加了 `friend_rates`（達成率）與 `friend_graph`（關聯圖）兩條同樣形狀的流；朋友的任務只以「計算欄位＋空標題」或「數量」離開伺服器。

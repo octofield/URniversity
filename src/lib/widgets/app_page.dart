@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'desktop_selection.dart';
 import '../core/theme/app_motion.dart';
 import '../core/theme/app_radius.dart';
 
@@ -292,6 +293,8 @@ class _AppPageState extends State<AppPage> with SingleTickerProviderStateMixin {
       // and reaches this through _onScroll instead
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
+        // Not the mouse on a computer: there it selects text
+        supportedDevices: pageDragDevices(),
         onVerticalDragUpdate: (d) {
           if (_direction == null && (d.delta.dy <= 0 || !_begin(AxisDirection.down))) return;
           if (_direction == AxisDirection.down) _move(d.delta.dy);

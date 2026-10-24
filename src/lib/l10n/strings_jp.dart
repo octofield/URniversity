@@ -776,7 +776,6 @@ class StringsJp implements AppStrings {
   @override String get shareRates => 'タスク達成率';
   @override String get shareRatesHint => '毎日・毎週の完了率と連続日数（タスクの内容は含みません）';
   @override String get shareTimetableHint => '授業名と時間（成績・単位・教員・教室は含みません）';
-  @override String get shareComingSoon => '次回のアップデート後に友達に表示されます';
   @override String get friendRequestsIncoming => '承認待ち';
   @override String get friendRequestsOutgoing => '送信済み';
   @override String get noFriendsYet => 'まだ友達がいません。招待をクラスメートに送りましょう';
@@ -809,4 +808,5 @@ class StringsJp implements AppStrings {
   @override String meetTaskAdded(String when) => 'タスクに追加しました：$when';
   @override String get featureFriends => '友達（招待・共有・共通の空きコマ）';
   @override String get friendsOff => '友達機能は現在オフです';
+  @override String get friendThisWeek => '今週';
 }

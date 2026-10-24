@@ -202,11 +202,9 @@ class _ShareSettings extends ConsumerWidget {
             children: [
               tile('timetable', s.timetable, s.shareTimetableHint, shares.timetable,
                   (v) => set(shares.copyWith(timetable: v))),
-              // Friends see these two from Phase 7-2 on; the switch is kept
-              // now so the choice is made once
-              tile('rates', s.shareRates, '${s.shareRatesHint}$kDotSeparator${s.shareComingSoon}', shares.rates,
+              tile('rates', s.shareRates, s.shareRatesHint, shares.rates,
                   (v) => set(shares.copyWith(rates: v))),
-              tile('graph', s.overview, '${s.shareGraphHint}$kDotSeparator${s.shareComingSoon}', shares.graph,
+              tile('graph', s.overview, s.shareGraphHint, shares.graph,
                   (v) => set(shares.copyWith(graph: v))),
             ],
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'desktop_selection.dart';
 
 // Swipe the page body sideways to move to the next or previous thing: the
 // three task views on the today page, the semesters on the targets page.
@@ -32,6 +33,8 @@ class SwipeSwitcher extends StatelessWidget {
       // Translucent, not opaque: the rows underneath keep their own taps and
       // long-press drags
       behavior: HitTestBehavior.translucent,
+      // Not the mouse on a computer: there it selects text
+      supportedDevices: pageDragDevices(),
       onHorizontalDragEnd: !canSwipe ? null : (details) {
         final velocity = details.primaryVelocity ?? 0;
         if (velocity.abs() < _minVelocity) return;

@@ -184,6 +184,8 @@ class LiveSync {
       // Friends are not a pushed list: a sync is when new requests show up
       ref.invalidate(friendListProvider);
       ref.invalidate(friendTimetableProvider);
+      ref.invalidate(friendRatesProvider);
+      ref.invalidate(friendGraphProvider);
       if (results.every((ok) => ok)) ref.read(lastSyncedProvider.notifier).state = DateTime.now();
     } finally {
       syncing.state = false;

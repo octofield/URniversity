@@ -170,11 +170,42 @@ def main():
         status, rows = b.select('courses', f'select=*&user_id=eq.{a.id}')
         check('the courses table itself still says no', rows == [], f'{status} {rows}')
 
+        print('— Rates and the graph (7-2)')
+        status, body = b.rpc('friend_rates', friend=a.id)
+        check('rates not shared: nothing', status == 200 and body is None, f'{status} {body}')
+        status, body = b.rpc('friend_graph', friend=a.id)
+        check('graph not shared: nothing', status == 200 and body is None, f'{status} {body}')
+        a.set_shares(share_rates=True, share_graph=True)
+        status, rates = b.rpc('friend_rates', friend=a.id)
+        check("rates shared: B reads A's tasks", status == 200 and isinstance(rates, list), f'{status} {rates}')
+        rates = rates if isinstance(rates, list) else []
+        if not rates:
+            print('      (A has no tasks: add one to check what a task carries)')
+        check('every title is empty', all(r.get('title') == '' for r in rates))
+        leaked = {k for r in rates for k in r} - {'id', 'title', 'due_time', 'is_completed', 'completed_dates', 'created_at',
+                                                 'recurrence_type', 'recurrence_interval', 'recurrence_weekdays',
+                                                 'recurrence_month_days'}
+        check('no content, links or anything else about a task', not leaked, ', '.join(sorted(leaked)))
+        status, graph = b.rpc('friend_graph', friend=a.id)
+        check('graph shared: B reads it', status == 200 and isinstance(graph, dict), f'{status} {graph}')
+        graph = graph if isinstance(graph, dict) else {}
+        goals = graph.get('futures', []) + graph.get('semesters', [])
+        check('no notes on any vision or target', all('notes' not in g for g in goals))
+        _, milestones = a.select('semester_goals', f'select=id&user_id=eq.{a.id}&parent_id=not.is.null')
+        milestone_ids = {m['id'] for m in milestones} if isinstance(milestones, list) else set()
+        check('targets only, no milestones', not milestone_ids & {g['id'] for g in graph.get('semesters', [])})
+        check('task counts are numbers, not tasks',
+              all(isinstance(v, int) for v in (graph.get('counts') or {}).values()), str(graph.get('counts')))
+
         print('— Unfriending')
         status, body = call('DELETE', f"/rest/v1/friendships?id=eq.{row['id']}", a.token)
         check('A removes B', status in (200, 204), f'{status} {body}')
         status, body = b.rpc('friend_timetable', friend=a.id, semester=SEMESTER)
         check('B reads nothing at once', body is None, f'{status} {body}')
+        _, body = b.rpc('friend_rates', friend=a.id)
+        check('nor the rates', body is None, str(body))
+        _, body = b.rpc('friend_graph', friend=a.id)
+        check('nor the graph', body is None, str(body))
     finally:
         a.set_shares(**a_shares)
         b.set_shares(**b_shares)

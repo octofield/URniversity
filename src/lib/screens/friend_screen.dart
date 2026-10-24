@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/history_stats.dart';
 import '../core/input_limits.dart';
 import '../core/period_tables.dart';
 import '../core/recent_picks.dart' show formatClock;
-import '../core/review_stats.dart' show termAt;
+import '../core/review_stats.dart' show dailyRates, termAt, weekOf;
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_radius.dart';
 import '../core/theme/app_spacing.dart';
@@ -20,15 +21,18 @@ import '../providers/timetable_style_provider.dart';
 import '../widgets/app_page.dart';
 import '../widgets/course_sheet.dart' show formatMinute;
 import '../widgets/empty_state.dart';
+import '../widgets/review_heatmap.dart';
 import '../widgets/responsive_body.dart';
 import '../widgets/sync_controls.dart';
 import '../widgets/timetable_agenda.dart';
 import '../widgets/timetable_grid.dart';
 import 'friends_screen.dart' show friendAvatar, friendName;
+import 'overview_graph_screen.dart' show GraphLayoutToggle, OverviewGraph;
 
 // One friend (system_design.md §2-P, UC24): only what they have switched on,
-// a tab each. Phase 7-1 has their timetable and, when the user shares theirs
-// too, the times both are free. Nothing here can be changed
+// a tab each — their timetable and, when the user shares theirs too, the
+// times both are free; their completion rates; their planning graph. Nothing
+// here can be changed
 class FriendScreen extends ConsumerWidget {
   final FriendEntry entry;
 
@@ -50,6 +54,8 @@ class FriendScreen extends ConsumerWidget {
     final tabs = <(String, Widget)>[
       if (shares.timetable) (s.timetable, _FriendTimetableTab(friend: entry, name: name, mineShared: mine.timetable)),
       if (shares.timetable && mine.timetable) (s.commonFreeTime, _CommonFreeTab(friend: entry, name: name)),
+      if (shares.rates) (s.shareRates, _FriendRatesTab(friend: entry, name: name)),
+      if (shares.graph) (s.overview, _FriendGraphTab(friend: entry, name: name)),
     ];
 
     final title = Row(
@@ -251,6 +257,160 @@ class _SlotRow extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Their completion rates, worked out here from what friend_rates() sends:
+// when each task was due, how it repeats, which days were done — no titles
+class _FriendRatesTab extends ConsumerWidget {
+  final FriendEntry friend;
+  final String name;
+
+  const _FriendRatesTab({required this.friend, required this.name});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
+    final theme = Theme.of(context).textTheme;
+    final async = ref.watch(friendRatesProvider(friend.userId));
+    final tasks = async.valueOrNull;
+    final now = ref.watch(effectiveNowProvider);
+    final today = DateTime(now.year, now.month, now.day);
+
+    final List<Widget> children;
+    if (tasks == null) {
+      children = [
+        if (async.isLoading)
+          const Padding(padding: EdgeInsets.all(AppSpacing.xl), child: Center(child: CircularProgressIndicator()))
+        else
+          EmptyState(
+            icon: Icons.visibility_off_outlined,
+            message: async.hasError ? s.friendsLoadFailed : s.friendSharesNothing(name),
+            compact: true,
+          ),
+      ];
+    } else {
+      final week = weekOf(today);
+      final rate = rateBetween(tasks, week.start, week.end);
+      final totals = totalsBetween(tasks, week.start, week.end);
+      final streak = allDoneStreak(tasks, today);
+      // Twelve whole weeks ending with this one, as on the review page
+      final heat = dailyRates(tasks, week.end.subtract(const Duration(days: 12 * 7 - 1)), week.end);
+      children = [
+        _RatesCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.friendThisWeek, style: theme.titleSmall),
+              const SizedBox(height: AppSpacing.xs),
+              if (rate == null)
+                Text(s.reviewNothingPlanned, style: theme.bodyMedium)
+              else ...[
+                Text(
+                  '${(rate * 100).round()}%',
+                  key: const ValueKey('friendRate'),
+                  style: theme.displaySmall?.copyWith(color: AppColors.primary),
+                ),
+                Text(s.reviewDoneOf(totals.done, totals.total), style: theme.bodyMedium),
+              ],
+              if (streak > 0) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(s.reviewStreak(streak), style: theme.bodyMedium?.copyWith(color: AppColors.success)),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _RatesCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.reviewHeatmapTitle, style: theme.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              ReviewHeatmap(rates: heat),
+              const SizedBox(height: AppSpacing.sm),
+              Text(s.reviewHeatmapLegend, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+            ],
+          ),
+        ),
+      ];
+    }
+
+    return PullToSync(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, AppSpacing.md, AppSpacing.pageHorizontal, AppSpacing.xl),
+        children: children,
+      ),
+    );
+  }
+}
+
+class _RatesCard extends StatelessWidget {
+  final Widget child;
+
+  const _RatesCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: child,
+      );
+}
+
+// Their planning graph, read only, in their own category colours
+class _FriendGraphTab extends ConsumerStatefulWidget {
+  final FriendEntry friend;
+  final String name;
+
+  const _FriendGraphTab({required this.friend, required this.name});
+
+  @override
+  ConsumerState<_FriendGraphTab> createState() => _FriendGraphTabState();
+}
+
+class _FriendGraphTabState extends ConsumerState<_FriendGraphTab> {
+  bool _radial = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+    final async = ref.watch(friendGraphProvider(widget.friend.userId));
+    final graph = async.valueOrNull;
+    if (graph == null) {
+      return async.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : EmptyState(
+              icon: Icons.visibility_off_outlined,
+              message: async.hasError ? s.friendsLoadFailed : s.friendSharesNothing(widget.name),
+            );
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.pageHorizontal, AppSpacing.sm, AppSpacing.pageHorizontal, 0),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: GraphLayoutToggle(radial: _radial, onChanged: (v) => setState(() => _radial = v)),
+          ),
+        ),
+        Expanded(
+          child: OverviewGraph(
+            futures: graph.futures,
+            semesters: graph.semesters,
+            taskCounts: graph.taskCounts,
+            categories: graph.categories,
+            radial: _radial,
+            readOnly: true,
+          ),
+        ),
+      ],
     );
   }
 }

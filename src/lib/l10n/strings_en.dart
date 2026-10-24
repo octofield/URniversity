@@ -785,7 +785,6 @@ class StringsEn implements AppStrings {
   @override String get shareRates => 'Completion rate';
   @override String get shareRatesHint => 'Daily and weekly completion and streaks, without what the tasks are';
   @override String get shareTimetableHint => 'Course names and times, without grades, credits, teachers or rooms';
-  @override String get shareComingSoon => 'Friends will see this after the next update';
   @override String get friendRequestsIncoming => 'Waiting for you';
   @override String get friendRequestsOutgoing => 'Sent';
   @override String get noFriendsYet => 'No friends yet. Send your invite to a classmate';
@@ -818,4 +817,5 @@ class StringsEn implements AppStrings {
   @override String meetTaskAdded(String when) => 'Added to tasks: $when';
   @override String get featureFriends => 'Friends (invites, sharing, free time together)';
   @override String get friendsOff => 'Friends is switched off for now';
+  @override String get friendThisWeek => 'This week';
 }

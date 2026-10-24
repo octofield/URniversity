@@ -1,4 +1,8 @@
+import '../utils/category_helpers.dart';
+import 'category.dart';
 import 'course.dart';
+import 'future_goal.dart';
+import 'semester_goal.dart';
 
 // One row of friend_list() (data_dictionary.md D40): someone the user is
 // friends with, or a request either way. Nothing here is stored on the device
@@ -123,4 +127,48 @@ class FriendTimetable {
         // Not sent: nothing here is kept or sorted by it
         createdAt: DateTime(2000),
       );
+}
+
+// A friend's planning graph (friend_graph()): their visions and top-level
+// targets, how many tasks hang off each target, and their own category colours
+// and icons — a custom category of theirs is not in the user's list
+class FriendGraph {
+  final List<FutureGoal> futures;
+  final List<SemesterGoal> semesters;
+  final Map<String, int> taskCounts;
+  final List<CategoryEntry> categories;
+
+  const FriendGraph({
+    this.futures = const [],
+    this.semesters = const [],
+    this.taskCounts = const {},
+    this.categories = const [],
+  });
+
+  factory FriendGraph.fromJson(Map<String, dynamic> j) {
+    final cats = (j['categories'] as Map?)?.cast<String, dynamic>();
+    final styles = (cats?['styles'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final ids = (cats?['ordered_list'] as List<dynamic>?)?.cast<String>() ?? FutureCategories.builtIns;
+    return FriendGraph(
+      futures: [
+        for (final g in (j['futures'] as List<dynamic>? ?? const []))
+          FutureGoal.fromJson((g as Map).cast<String, dynamic>()),
+      ],
+      semesters: [
+        for (final g in (j['semesters'] as List<dynamic>? ?? const []))
+          SemesterGoal.fromJson((g as Map).cast<String, dynamic>()),
+      ],
+      taskCounts: {
+        for (final e in ((j['counts'] as Map?)?.cast<String, dynamic>() ?? const {}).entries)
+          e.key: (e.value as num).toInt(),
+      },
+      // As CategoriesNotifier reads the user's own (categories_provider.dart)
+      categories: [
+        for (final id in ids)
+          styles[id] != null
+              ? CategoryEntry.fromJson(id, (styles[id] as Map).cast<String, dynamic>())
+              : CategoryEntry(id: id, color: defaultCatColor(id), icon: defaultCatIcon(id)),
+      ],
+    );
+  }
 }

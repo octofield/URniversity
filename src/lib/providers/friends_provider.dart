@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/friend.dart';
+import '../models/task.dart';
 import 'auth_provider.dart';
 import 'realtime_sync.dart';
 import 'remote_config_provider.dart';
@@ -27,6 +28,9 @@ abstract class FriendsSource {
   Future<FriendShares> myShares();
   Future<void> saveShares(FriendShares shares);
   Future<FriendTimetable?> timetable(String friendId, String semester);
+  // Their tasks, titles empty: only what completion rates are worked out from
+  Future<List<Task>?> rates(String friendId);
+  Future<FriendGraph?> graph(String friendId);
 }
 
 class SupabaseFriendsSource implements FriendsSource {
@@ -84,6 +88,20 @@ class SupabaseFriendsSource implements FriendsSource {
     final data = await _db.rpc('friend_timetable', params: {'friend': friendId, 'semester': semester});
     return data == null ? null : FriendTimetable.fromJson((data as Map).cast<String, dynamic>(), semester);
   }
+
+  @override
+  Future<List<Task>?> rates(String friendId) async {
+    final data = await _db.rpc('friend_rates', params: {'friend': friendId});
+    return data == null
+        ? null
+        : [for (final r in data as List<dynamic>) Task.fromJson((r as Map).cast<String, dynamic>())];
+  }
+
+  @override
+  Future<FriendGraph?> graph(String friendId) async {
+    final data = await _db.rpc('friend_graph', params: {'friend': friendId});
+    return data == null ? null : FriendGraph.fromJson((data as Map).cast<String, dynamic>());
+  }
 }
 
 final friendsSourceProvider = Provider<FriendsSource>((ref) => SupabaseFriendsSource());
@@ -117,6 +135,16 @@ final myFriendCodeProvider = FutureProvider<String?>((ref) async {
 final friendTimetableProvider = FutureProvider.family<FriendTimetable?, (String, String)>((ref, key) async {
   if (!ref.watch(friendsAvailableProvider)) return null;
   return ref.watch(friendsSourceProvider).timetable(key.$1, key.$2);
+});
+
+final friendRatesProvider = FutureProvider.family<List<Task>?, String>((ref, friendId) async {
+  if (!ref.watch(friendsAvailableProvider)) return null;
+  return ref.watch(friendsSourceProvider).rates(friendId);
+});
+
+final friendGraphProvider = FutureProvider.family<FriendGraph?, String>((ref, friendId) async {
+  if (!ref.watch(friendsAvailableProvider)) return null;
+  return ref.watch(friendsSourceProvider).graph(friendId);
 });
 
 final friendPreviewProvider = FutureProvider.autoDispose.family<FriendPreview?, String>((ref, code) async {

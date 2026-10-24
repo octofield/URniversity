@@ -323,8 +323,8 @@
 | 欄位 | 型別 | 必填 | 預設值 | 說明 |
 |---|---|---|---|---|
 | `friend_code` | text (UNIQUE) | ✗ | `null` | 邀請碼，8 碼，字元集 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`（去掉 0/O/1/I）。第一次呼叫 `my_friend_code()` 時產生（撞號重抽），之後不變。邀請連結 `https://urniversity.netlify.app/invite/<code>` |
-| `share_graph` | bool | ✓ | `false` | 朋友能看關聯圖（願景與學期目標，不含任務）。7-2 才有朋友端畫面 |
-| `share_rates` | bool | ✓ | `false` | 朋友能看任務達成率（不含任務內容）。7-2 才有朋友端畫面 |
+| `share_graph` | bool | ✓ | `false` | 朋友能看關聯圖：願景與頂層目標（標題、分類、完成、連結）與各目標的任務**數量**；不含筆記、不含任務（`friend_graph()`，2026-10-24） |
+| `share_rates` | bool | ✓ | `false` | 朋友能看任務達成率：只送計算用的欄位，**標題一律空字串**、不含內容與連結（`friend_rates()`，2026-10-24） |
 | `share_timetable` | bool | ✓ | `false` | 朋友能看課表：課名、顏色、上課時間，**不含**成績、學分、老師、教室 |
 
 - 三個開關對所有朋友一致（2026-09-25 決定），預設全關。
@@ -998,6 +998,8 @@ RLS 只開 `SELECT TO anon, authenticated`。
 | `respond_friend(friendship, accept)` | 只有 `addressee_id` 本人、狀態 `pending` | 接受改 `accepted`；婉拒刪除。否則 `not_allowed` |
 | `friend_list()` | 任何登入帳號 | 自己參與的每一列：`friendship_id`、對方 `user_id`、`status`（`incoming`／`outgoing`／`friend`）、暱稱、頭像、三個分享開關（**只有 `friend` 才可能是 true**）、`created_at` |
 | `friend_timetable(friend, semester)` | 必須是 `accepted` 朋友，且對方 `share_timetable` | `{school, courses: [{id, title, color, sessions: [{weekday, start_minute, end_minute}]}]}`；條件不符回 `null` |
+| `friend_rates(friend)`（7-2，2026-10-24） | 必須是 `accepted` 朋友，且對方 `share_rates` | 對方每個任務一列：`id`、`title`（**一律 `''`**）、`due_time`、`is_completed`、`completed_dates`、`created_at`、`recurrence_type`／`_interval`／`_weekdays`／`_month_days`。**不回** `content`、`linked_*`、`parent_task_id`。App 以 `Task.fromJson` 讀，再用 `history_stats.dart`、`review_stats.dart` 算；條件不符回 `null` |
+| `friend_graph(friend)`（7-2，2026-10-24） | 必須是 `accepted` 朋友，且對方 `share_graph` | `{futures: [D3 的 id、parent_id、title、categories、start_semester、end_semester、is_done、sort_order], semesters: [頂層 D2 的 id、title、semester、category（原本的 JSON 文字）、future_goal_id、is_done、sort_order], counts: {目標 id: 任務數}, categories: {ordered_list, styles}（D7）}`。**不含 `notes`、不含里程碑、不含任務**；條件不符回 `null` |
 | `_require_user()`、`_are_friends(a, b)` | 內部用，已收回執行權 | — |
 
 ---

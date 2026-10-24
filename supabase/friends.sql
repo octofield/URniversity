@@ -5,7 +5,7 @@
 -- only from the SECURITY DEFINER functions below, each of which checks that
 -- the two are friends AND that the owner has switched that kind of sharing on,
 -- and hands back only the columns needed (a timetable without grades, credits,
--- teachers or rooms).
+-- teachers or rooms; rates without task titles; a graph without notes).
 --
 -- friendships has no INSERT or UPDATE policy: a request and an answer go
 -- through request_friend() / respond_friend(), which apply the rules. Either
@@ -249,6 +249,74 @@ BEGIN
 END;
 $$;
 
+-- ── Phase 7-2: completion rates and the planning graph ─────────────────────
+
+-- A friend's tasks, when they share their completion rates: only what the
+-- rates are worked out from (when each was due, how it repeats, which days
+-- were done). The title comes back empty and nothing else about a task —
+-- what it says, what it links to — is sent. Null when the two are not
+-- friends or the switch is off
+CREATE OR REPLACE FUNCTION friend_rates(friend text) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  me text := _require_user();
+BEGIN
+  IF NOT _are_friends(me, friend) THEN RETURN NULL; END IF;
+  IF NOT EXISTS (SELECT 1 FROM user_settings WHERE user_id::text = friend AND share_rates) THEN
+    RETURN NULL;
+  END IF;
+  RETURN (SELECT coalesce(jsonb_agg(jsonb_build_object(
+            'id', t.id,
+            'title', '',
+            'due_time', t.due_time,
+            'is_completed', t.is_completed,
+            'completed_dates', t.completed_dates,
+            'created_at', t.created_at,
+            'recurrence_type', t.recurrence_type,
+            'recurrence_interval', t.recurrence_interval,
+            'recurrence_weekdays', t.recurrence_weekdays,
+            'recurrence_month_days', t.recurrence_month_days)), '[]'::jsonb)
+          FROM tasks t WHERE t.user_id::text = friend);
+END;
+$$;
+
+-- A friend's planning graph, when they share it: their visions and top-level
+-- targets (titles, categories, done, how they link), how many tasks hang off
+-- each target — a number, never the tasks — and their category colours and
+-- icons. No notes. Null when the two are not friends or the switch is off
+CREATE OR REPLACE FUNCTION friend_graph(friend text) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  me text := _require_user();
+BEGIN
+  IF NOT _are_friends(me, friend) THEN RETURN NULL; END IF;
+  IF NOT EXISTS (SELECT 1 FROM user_settings WHERE user_id::text = friend AND share_graph) THEN
+    RETURN NULL;
+  END IF;
+  RETURN jsonb_build_object(
+    'futures', (SELECT coalesce(jsonb_agg(jsonb_build_object(
+                   'id', g.id, 'parent_id', g.parent_id, 'title', g.title,
+                   'categories', coalesce(to_jsonb(g.categories), '[]'::jsonb),
+                   'start_semester', g.start_semester, 'end_semester', g.end_semester,
+                   'is_done', g.is_done, 'sort_order', g.sort_order)), '[]'::jsonb)
+                FROM future_goals g WHERE g.user_id::text = friend),
+    'semesters', (SELECT coalesce(jsonb_agg(jsonb_build_object(
+                     'id', g.id, 'title', g.title, 'semester', g.semester,
+                     -- text holding a JSON list, as SemesterGoal.fromJson reads it
+                     'category', g.category,
+                     'future_goal_id', g.future_goal_id,
+                     'is_done', g.is_done, 'sort_order', g.sort_order)), '[]'::jsonb)
+                  FROM semester_goals g WHERE g.user_id::text = friend AND g.parent_id IS NULL),
+    'counts', (SELECT coalesce(jsonb_object_agg(t.linked_target_id, t.n), '{}'::jsonb) FROM (
+                 SELECT linked_target_id, count(*) AS n FROM tasks
+                 WHERE user_id::text = friend AND linked_target_id IS NOT NULL
+                 GROUP BY linked_target_id) t),
+    'categories', (SELECT jsonb_build_object('ordered_list', to_jsonb(c.ordered_list), 'styles', c.styles)
+                   FROM user_categories c WHERE c.user_id::text = friend)
+  );
+END;
+$$;
+
 -- ── Who may call what ───────────────────────────────────────────────────────
 
 REVOKE EXECUTE ON FUNCTION _require_user() FROM PUBLIC, anon, authenticated;
@@ -259,9 +327,13 @@ REVOKE EXECUTE ON FUNCTION request_friend(text) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION respond_friend(uuid, boolean) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION friend_list() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION friend_timetable(text, text) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION friend_rates(text) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION friend_graph(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION my_friend_code() TO authenticated;
 GRANT EXECUTE ON FUNCTION friend_code_owner(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION request_friend(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION respond_friend(uuid, boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION friend_list() TO authenticated;
 GRANT EXECUTE ON FUNCTION friend_timetable(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION friend_rates(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION friend_graph(text) TO authenticated;
