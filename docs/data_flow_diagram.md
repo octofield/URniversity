@@ -499,6 +499,7 @@ flowchart TD
 | D26 | `app_style` | 裝置本機 SharedPreferences（使用者選的風格；登入帳號另同步到 D8 `user_settings.app_style`） |
 | D24 | `cache_*` 系列 key＋`cache_owner` | 裝置本機 SharedPreferences（登入帳號的清單快取，開 App 先畫、查詢回來覆蓋；登出即刪） |
 | D22 | `onboarding_done` | 裝置本機 SharedPreferences（新手導覽哪幾章跑過，StringList；不上雲、不進訪客資料清單） |
+| D40 | `friendships` | Supabase 資料表（朋友與邀請；只能經 RPC 新增與接受，見 1-K） |
 
 ---
 
@@ -604,3 +605,49 @@ flowchart TD
 - 統計只能透過 SECURITY DEFINER 函式取得，因為每張表的 RLS 都只讓人讀自己的資料；函式內先檢查 `is_admin()`。
 - 訪客資料只在裝置上，不在任何統計內。
 - 遠端設定讀不到時用本機快取；沒有快取就是全開、無公告、無維護。
+
+---
+
+## Diagram 1-K：朋友（經 RPC 的唯讀資料流，Phase 7-1，2026-10-23）
+
+```mermaid
+flowchart TD
+    Me(["使用者（登入帳號）"])
+    Friend(["朋友（另一個登入帳號）"])
+    Link(["邀請連結／QR code
+urniversity.netlify.app/invite/&lt;code&gt;"])
+
+    PF["friends_provider
+friendListProvider／myFriendCodeProvider／
+friendTimetableProvider／shareSettingsProvider"]
+    PAct["FriendActions
+request／respond／remove"]
+    PSync["realtime_sync
+refreshAll（每 5 分鐘、下拉、立即同步）"]
+    PTasks["tasksProvider"]
+
+    DSet[("D8-C user_settings
+friend_code／share_*")]
+    DFr[("D40 friendships")]
+    DCo[("D27 courses（朋友的）")]
+    DTask[("D1 tasks（自己的）")]
+
+    Me -- "三個分享開關（只寫自己那列）" --> DSet
+    DSet -- "rpc my_friend_code" --> PF
+    PF -- "QR、複製、分享" --> Link
+    Link -- "對方開啟 → rpc friend_code_owner、request_friend" --> DFr
+    Me -- "接受／婉拒（rpc respond_friend）、取消／解除（DELETE，RLS）" --> PAct
+    PAct --> DFr
+    DFr -- "rpc friend_list：朋友與邀請＋對方的開關" --> PF
+    PSync -- "重新讀取" --> PF
+    DCo -- "rpc friend_timetable：是朋友且對方開啟才回；只有課名、顏色、時間" --> PF
+    PF -- "唯讀課表、共同空堂" --> Me
+    Me -- "約這個時間" --> PTasks
+    PTasks --> DTask
+    Friend -. "同一套 RPC，看到的是你開啟的部分" .-> DFr
+```
+
+- **核心表的 RLS 沒有改**：`courses`、`tasks`、`user_settings` 仍然只能讀自己的列。朋友讀到的一切都經 SECURITY DEFINER 函式，每次都檢查「是朋友」與「對方開啟」，只回需要的欄位（data_dictionary.md「朋友的函式」）。
+- 沒有推播：新邀請在開 App、每次同步與進朋友頁時讀到，「我的」分頁顯示紅點。
+- 本機不存任何朋友資料（不是 SyncedListNotifier，沒有快取、沒有訪客資料）。
+- 7-2 會加 `friend_rates`（達成率）與 `friend_graph`（關聯圖）兩條同樣形狀的流。

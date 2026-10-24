@@ -11,7 +11,9 @@ import 'package:urniversity/l10n/strings_zh_tw.dart';
 import 'package:urniversity/providers/guest_provider.dart';
 import 'package:urniversity/providers/home_tab_provider.dart';
 import 'package:urniversity/screens/auth/login_screen.dart';
+import 'package:urniversity/screens/friends_screen.dart';
 import 'package:urniversity/screens/future_screen.dart';
+import 'package:urniversity/screens/invite_accept_screen.dart';
 import 'package:urniversity/screens/semester_screen.dart';
 import 'package:urniversity/screens/settings_screen.dart';
 import 'package:urniversity/screens/timetable_screen.dart';
@@ -137,6 +139,26 @@ void main() {
       await pumpApp(tester);
       await go(tester, '/login-callback');
       expect(location(tester), AppRoutes.tasks);
+      // /invite/ takes exactly one code
+      await go(tester, '/invite/');
+      expect(location(tester), AppRoutes.tasks);
+      await go(tester, '/invite/ABCD2345/more');
+      expect(location(tester), AppRoutes.tasks);
+    });
+
+    testWidgets('friends and an invite link have their own addresses and titles', (tester) async {
+      await pumpApp(tester);
+      String title() => tester.widgetList<Title>(find.byType(Title)).last.title;
+      await go(tester, AppRoutes.friends);
+      expect(find.byType(FriendsScreen), findsOneWidget);
+      expect(title(), '${zh.friends} · URniversity');
+
+      await go(tester, AppRoutes.invite('ABCD2345'));
+      expect(location(tester), '/invite/ABCD2345');
+      expect(find.byType(InviteAcceptScreen), findsOneWidget);
+      expect(title(), '${zh.inviteTitle} · URniversity');
+      // A guest cannot add friends: asked to make an account
+      expect(find.text(zh.friendsGuestPrompt), findsOneWidget);
     });
   });
 
@@ -154,6 +176,13 @@ void main() {
       expect(location(tester), AppRoutes.login);
       expect(routerOf(tester).state.uri.queryParameters['from'], AppRoutes.timetable);
       expect(find.text(zh.timetable), findsNothing);
+    });
+
+    testWidgets('an invite link opened signed out waits behind the login page', (tester) async {
+      await pumpApp(tester);
+      await go(tester, AppRoutes.invite('ABCD2345'));
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(routerOf(tester).state.uri.queryParameters['from'], '/invite/ABCD2345');
     });
 
     testWidgets('signing in (here: as a guest) goes on to where it was headed', (tester) async {

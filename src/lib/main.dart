@@ -48,6 +48,8 @@ import 'screens/splash_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/setup_profile_screen.dart';
 import 'screens/admin_screen.dart';
+import 'screens/friends_screen.dart';
+import 'screens/invite_accept_screen.dart';
 import 'widgets/app_page.dart';
 
 Future<void> main() async {
@@ -276,7 +278,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 // unknown — a mistyped address, or a sign-in deep link on Android, which the
 // router is handed too — lands on the tasks
 GoRouter _buildRouter(WidgetRef ref, Listenable refresh) {
-  const pages = {AppRoutes.timetable, AppRoutes.grades, AppRoutes.settings, AppRoutes.admin};
+  const pages = {AppRoutes.timetable, AppRoutes.grades, AppRoutes.settings, AppRoutes.admin, AppRoutes.friends};
   return GoRouter(
     navigatorKey: _navigatorKey,
     // Lets the first-run tour follow the user into sheets and pages
@@ -285,7 +287,11 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final path = state.uri.path;
-      final known = AppRoutes.tabs.contains(path) || pages.contains(path) || path == AppRoutes.login;
+      final known = AppRoutes.tabs.contains(path) ||
+          pages.contains(path) ||
+          path == AppRoutes.login ||
+          // An invite link: one code after /invite/
+          (path.startsWith(AppRoutes.invitePrefix) && path.length > AppRoutes.invitePrefix.length && !path.substring(AppRoutes.invitePrefix.length).contains('/'));
       if (!known) return AppRoutes.tasks;
       // A reset link wins over everything: _AuthGate shows the password page
       // wherever the user is, so never send them to /login meanwhile
@@ -319,6 +325,19 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(
         path: AppRoutes.admin,
         pageBuilder: (_, state) => GesturePage(key: state.pageKey, child: _titled((s) => s.adminTitle, const _AuthGate(child: AdminScreen()))),
+      ),
+      GoRoute(
+        path: AppRoutes.friends,
+        pageBuilder: (_, state) => GesturePage(key: state.pageKey, child: _titled((s) => s.friends, const _AuthGate(child: FriendsScreen()))),
+      ),
+      // Signed out, this goes to /login?from=/invite/<code> like any page and
+      // comes back once in; a guest is asked to make an account here
+      GoRoute(
+        path: '${AppRoutes.invitePrefix}:code',
+        pageBuilder: (_, state) => GesturePage(
+          key: state.pageKey,
+          child: _titled((s) => s.inviteTitle, _AuthGate(child: InviteAcceptScreen(code: state.pathParameters['code'] ?? ''))),
+        ),
       ),
       // The four tabs are one page under one key, so moving between them keeps
       // HomeScreen — its tab state, scroll positions, dragged buttons — and

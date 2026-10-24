@@ -30,6 +30,7 @@ import '../widgets/app_page.dart';
 import '../providers/admin_provider.dart' show isAdminProvider;
 import 'admin_screen.dart';
 import '../providers/realtime_sync.dart';
+import '../providers/friends_provider.dart' show incomingInviteCountProvider;
 import '../widgets/sync_controls.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -187,6 +188,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (icon: Icons.person_outlined, selectedIcon: Icons.person, label: s.me),
     ];
 
+    // A red dot on the Me tab while friend requests wait for an answer
+    // (Phase 7). Fetched at sign-in and on every sync; there is no push
+    final invites = ref.watch(incomingInviteCountProvider);
+    Widget navIcon(int i, Widget icon) => i == 3
+        ? Badge(
+            key: const ValueKey('nav.invites'),
+            isLabelVisible: invites > 0,
+            backgroundColor: AppColors.error,
+            smallSize: 8,
+            child: icon,
+          )
+        : icon;
+
     void openTimetable() => openPage(context, AppRoutes.timetable, () => const TimetableScreen());
     // Switched off from the admin backend (kRemoteFeatures): no way in
     final timetableOn = ref.watch(featureOnProvider('timetable'));
@@ -313,11 +327,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               destinations: [
                 for (var i = 0; i < destinations.length; i++)
                   NavigationRailDestination(
-                    icon: TourAnchor(id: 'nav.$i', child: Icon(destinations[i].icon)),
+                    icon: TourAnchor(id: 'nav.$i', child: navIcon(i, Icon(destinations[i].icon))),
                     selectedIcon: TourAnchor(
                       id: 'nav.$i',
-                      child: Icon(destinations[i].selectedIcon,
-                          color: AppColors.primary),
+                      child: navIcon(i, Icon(destinations[i].selectedIcon,
+                          color: AppColors.primary)),
                     ),
                     label: Text(destinations[i].label),
                   ),
@@ -400,12 +414,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: AppSpacing.md),
               for (var i = 0; i < destinations.length; i++)
                 ListTile(
-                  leading: Icon(
+                  leading: navIcon(i, Icon(
                     i == _index
                         ? destinations[i].selectedIcon
                         : destinations[i].icon,
                     color: i == _index ? AppColors.primary : null,
-                  ),
+                  )),
                   title: Text(
                     destinations[i].label,
                     style: TextStyle(
@@ -455,11 +469,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         destinations: [
           for (var i = 0; i < destinations.length; i++)
             NavigationDestination(
-              icon: TourAnchor(id: 'nav.$i', child: Icon(destinations[i].icon)),
+              icon: TourAnchor(id: 'nav.$i', child: navIcon(i, Icon(destinations[i].icon))),
               selectedIcon: TourAnchor(
                 id: 'nav.$i',
-                child: Icon(destinations[i].selectedIcon,
-                    color: AppColors.primary),
+                child: navIcon(i, Icon(destinations[i].selectedIcon,
+                    color: AppColors.primary)),
               ),
               label: destinations[i].label,
             ),

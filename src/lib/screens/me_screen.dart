@@ -27,8 +27,11 @@ import '../providers/universities_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/sheet_body.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/guest_login_prompt.dart';
 import '../widgets/hover_lift.dart';
 import '../widgets/page_header.dart';
+import '../providers/friends_provider.dart';
+import 'friends_screen.dart';
 import 'inspirations_screen.dart';
 import 'journal_edit_screen.dart';
 import 'journals_screen.dart';
@@ -58,6 +61,20 @@ class MeScreen extends ConsumerWidget {
         PageHeader(
           title: s.me,
           actions: [
+            // Friends (Phase 7), for an account; the dot is requests waiting
+            if (ref.watch(friendsAvailableProvider))
+              IconButton(
+                key: const ValueKey('me.friends'),
+                icon: Badge(
+                  isLabelVisible: ref.watch(incomingInviteCountProvider) > 0,
+                  backgroundColor: AppColors.error,
+                  smallSize: 8,
+                  child: const Icon(Icons.group_outlined),
+                ),
+                tooltip: s.friends,
+                visualDensity: VisualDensity.compact,
+                onPressed: () => openPage(context, AppRoutes.friends, () => const FriendsScreen()),
+              ),
             TourAnchor(id: 'me.settings', child: IconButton(
               icon: const Icon(Icons.settings_outlined),
               visualDensity: VisualDensity.compact,
@@ -319,7 +336,7 @@ class _ProfileCard extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.login, size: 18),
                   label: Text(s.loginOrCreateAccount),
-                  onPressed: () => _showMergeChoiceDialog(context, ref),
+                  onPressed: () => showLoginChoice(context, ref),
                 ),
               ),
             ],
@@ -1114,41 +1131,6 @@ class JournalDetailScreen extends ConsumerWidget {
       ),
     ));
   }
-}
-
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-
-void _showMergeChoiceDialog(BuildContext context, WidgetRef ref) {
-  final s = ref.read(stringsProvider);
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(s.loginOrCreateAccount),
-      content: Text(s.mergeGuestDataQuestion),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-        ),
-        TextButton(
-          onPressed: () {
-            Navigator.pop(ctx);
-            ref.read(shouldMergeGuestDataProvider.notifier).state = false;
-            ref.read(pendingGuestLoginProvider.notifier).state = true;
-          },
-          child: Text(s.discardGuestData),
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.pop(ctx);
-            ref.read(shouldMergeGuestDataProvider.notifier).state = true;
-            ref.read(pendingGuestLoginProvider.notifier).state = true;
-          },
-          child: Text(s.mergeGuestData),
-        ),
-      ],
-    ),
-  );
 }
 
 // ─── Search Picker ────────────────────────────────────────────────────────────

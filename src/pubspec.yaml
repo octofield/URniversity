@@ -63,6 +63,9 @@ dependencies:
   # download link on the web
   share_plus: ^13.3.1
   web: ^1.1.1
+  # Phase 7: the invite as a QR code. Drawing only; a phone's own camera reads
+  # it, so the app needs no scanner and no camera permission
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

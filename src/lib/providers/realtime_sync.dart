@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_provider.dart';
 import 'auth_status_provider.dart';
 import 'courses_provider.dart';
+import 'friends_provider.dart';
 import 'future_goals_provider.dart';
 import 'guest_provider.dart';
 import 'inspirations_provider.dart';
@@ -180,6 +181,9 @@ class LiveSync {
     try {
       final results = await Future.wait([for (final list in _lists.values) list.refresh()]);
       await ref.read(trashProvider.notifier).refresh();
+      // Friends are not a pushed list: a sync is when new requests show up
+      ref.invalidate(friendListProvider);
+      ref.invalidate(friendTimetableProvider);
       if (results.every((ok) => ok)) ref.read(lastSyncedProvider.notifier).state = DateTime.now();
     } finally {
       syncing.state = false;

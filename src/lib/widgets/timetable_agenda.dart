@@ -20,7 +20,8 @@ class TimetableAgenda extends StatefulWidget {
   // Today, when this week is showing: picked first, and its class under way
   // marked
   final DateTime? now;
-  final ValueChanged<Course> onTapCourse;
+  // Null: read only, as a friend's timetable is (§3-V)
+  final ValueChanged<Course>? onTapCourse;
   final bool allDays;
 
   const TimetableAgenda({
@@ -28,7 +29,7 @@ class TimetableAgenda extends StatefulWidget {
     required this.courses,
     required this.s,
     required this.now,
-    required this.onTapCourse,
+    this.onTapCourse,
     this.allDays = false,
   });
 
@@ -193,9 +194,9 @@ class _Timeline extends StatelessWidget {
   final AppStrings s;
   // Minutes past midnight now, when this is today's list
   final int? nowMinute;
-  final ValueChanged<Course> onTapCourse;
+  final ValueChanged<Course>? onTapCourse;
 
-  const _Timeline({required this.meetings, required this.s, required this.nowMinute, required this.onTapCourse});
+  const _Timeline({required this.meetings, required this.s, required this.nowMinute, this.onTapCourse});
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +270,7 @@ class _Timeline extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: () => onTapCourse(m.course),
+                    onTap: onTapCourse == null ? null : () => onTapCourse!(m.course),
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.md),
                       child: Column(

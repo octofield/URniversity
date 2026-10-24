@@ -19,6 +19,7 @@ const kRemoteFeatures = [
   'reviews',
   'onboarding_tour',
   'goal_templates',
+  'friends',
 ];
 
 class Announcement {

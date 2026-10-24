@@ -146,3 +146,72 @@ DateTime? nextMeetingStart(Course course, DateTime now) {
   return best;
 }
 
+
+// A stretch of a weekday when two people are both free (§3-V), in minutes
+// since midnight
+class FreeSlot {
+  final int weekday;
+  final int start;
+  final int end;
+
+  const FreeSlot(this.weekday, this.start, this.end);
+}
+
+// When neither of two people has a class, week by week: Monday to Friday,
+// plus a weekend day either of them has a class on. The day runs over the
+// daytime periods of [periods] (those starting 08:00–18:00, like the grid), or
+// 08:00–18:00 by the clock without a table. With a table, each gap is trimmed
+// to whole periods, so 12:10–15:30 is offered as 12:20–15:10. Gaps shorter
+// than [minMinutes] are left out
+List<FreeSlot> commonFreeSlots(
+  List<CourseSession> mine,
+  List<CourseSession> theirs, {
+  List<ClassPeriod>? periods,
+  int minMinutes = 50,
+}) {
+  final all = [...mine, ...theirs];
+  final daytime = [
+    for (final p in periods ?? const <ClassPeriod>[])
+      if (p.start >= 8 * 60 && p.start < 18 * 60) p,
+  ];
+  final dayStart = daytime.isEmpty ? 8 * 60 : daytime.first.start;
+  final dayEnd = daytime.isEmpty ? 18 * 60 : daytime.last.end;
+  final lastDay = all.any((s) => s.weekday == DateTime.sunday)
+      ? 7
+      : all.any((s) => s.weekday == DateTime.saturday)
+          ? 6
+          : 5;
+  final out = <FreeSlot>[];
+  for (var d = 1; d <= lastDay; d++) {
+    if (d == DateTime.saturday && lastDay == 7 && !all.any((s) => s.weekday == d)) continue;
+    final busy = [for (final s in all) if (s.weekday == d) s]
+      ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+    var from = dayStart;
+    void gap(int to) {
+      var a = from;
+      var b = to;
+      if (daytime.isNotEmpty) {
+        a = daytime.where((p) => p.start >= a).firstOrNull?.start ?? b;
+        b = daytime.where((p) => p.end <= b).lastOrNull?.end ?? a;
+      }
+      if (b - a >= minMinutes) out.add(FreeSlot(d, a, b));
+    }
+    for (final s in busy) {
+      if (s.startMinute > from) gap(s.startMinute < dayEnd ? s.startMinute : dayEnd);
+      if (s.endMinute > from) from = s.endMinute;
+      if (from >= dayEnd) break;
+    }
+    if (from < dayEnd) gap(dayEnd);
+  }
+  return out;
+}
+
+// The next time [slot] begins, from [now]: later today, or the same weekday
+// next week once today's has begun. "Meet then" makes a task due at this time
+DateTime nextSlotStart(FreeSlot slot, DateTime now) {
+  var days = (slot.weekday - now.weekday + 7) % 7;
+  final today = DateTime(now.year, now.month, now.day);
+  if (days == 0 && now.hour * 60 + now.minute >= slot.start) days = 7;
+  final day = DateTime(today.year, today.month, today.day + days);
+  return day.add(Duration(minutes: slot.start));
+}

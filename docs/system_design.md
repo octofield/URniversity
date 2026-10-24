@@ -49,6 +49,8 @@ flowchart TD
 | `/timetable`、`/grades` | `TimetableScreen`（`grades: true`） |
 | `/settings` | `SettingsScreen` |
 | `/admin` | `AdminScreen`（非管理員只看到「沒有後台權限」） |
+| `/friends` | `FriendsScreen`（2026-10-23，Phase 7；訪客看到「建立帳號後才能加朋友」） |
+| `/invite/<code>` | `InviteAcceptScreen`（邀請連結與 QR code 的落點；`/invite/` 後面恰好一段，否則當作未知） |
 | `/login` | `LoginScreen`（2026-10-03；`?from=` 記著登入後要回去的網址） |
 | 其他 | 轉到 `/tasks`（包含 Android 交給路由的登入 deep link） |
 
@@ -65,7 +67,7 @@ flowchart TD
 flowchart TD
     URL["網址（登入狀態或重設密碼一變就重算）"] --> R{"路徑"}
     R -->|/ 或未知| T["/tasks"]
-    R -->|已知| Rec{"正在重設密碼？"}
+    R -->|"已知（含 /invite/ 一段碼）"| Rec{"正在重設密碼？"}
     Rec -->|是| RecP["/login 轉 /tasks，其他不轉\n（_AuthGate 顯示重設密碼頁）"]
     Rec -->|否| L{"是 /login？"}
     L -->|是| In{"signedIn？"}
@@ -90,7 +92,10 @@ flowchart TD
   維護模式只取代頁面，不取代登入頁（管理員要能登入）。
 - 主要頁面用 `openPage()`（`context.push`，網址跟著變，上一頁回到原處）；直接輸入網址開啟時底下沒有頁面，AppBar 左上改成回任務頁的按鈕（`homeButtonIfFirst`）。
 - 詳情頁、sheet、日記、回收桶等沒有自己的網址，照舊 `Navigator.push`，但頁面用 `AppPageRoute`（2026-10-04，讓手勢能帶動轉場，§3-Q）；
-  路由裡的 `/timetable`、`/grades`、`/settings`、`/admin` 用 `GesturePage`（同一種路由）。
+  路由裡的 `/timetable`、`/grades`、`/settings`、`/admin`、`/friends`、`/invite/<code>` 用 `GesturePage`（同一種路由）。
+- **邀請連結**（2026-10-23）：未登入時照上面的規則先到 `/login?from=/invite/<code>`，登入或以訪客進入後回到接受畫面。
+  Android 上 `https://urniversity.netlify.app/invite/…` 是 App Link（`AndroidManifest.xml` 的 `autoVerify` intent-filter，
+  由 `web/.well-known/assetlinks.json` 驗證，裡面寫的是簽這個 APK 的金鑰指紋）：已安裝就直接開 App，路由收到同一個路徑；沒安裝就開網頁版。
 
 ### 1-B 畫面導覽架構
 
@@ -130,6 +135,10 @@ flowchart TD
     Me -.-> Journals["JournalsScreen"]
     Me -.-> JournalEdit["JournalEditScreen"]
     Me -.-> Inspirations["InspirationsScreen"]
+    Me -.->|頁首 👥（登入帳號；有待回覆邀請時紅點）| Friends["FriendsScreen · /friends"]
+    Friends -.->|點朋友| FriendS["FriendScreen\n朋友分享的內容（唯讀）"]
+    Link(["邀請連結／QR code"]) -.-> Invite["InviteAcceptScreen · /invite/&lt;code&gt;"]
+    Invite -.->|到朋友頁| Friends
     Today/Semester/Future/Me -.->|頁首齒輪| Settings["SettingsScreen"]
     Settings -.-> Trash["TrashScreen"]
     Settings -.-> CatSettings["CategorySettingsScreen\n分類設定"]
@@ -585,7 +594,7 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 | 總覽 | — | 使用者總數、今日新增、日／週／月活躍；近 30 天每日新增與活躍的長條圖；學校前 10 名；「訪客不在統計內」 |
 | 使用量 | — | 任務、目標、願景、日記、靈感、課程、回顧：總筆數、使用人數、近 30 天每日新增 |
 | 設定與錯誤 | — | 風格、語言分佈；學分分類開啟人數；近 7 天錯誤依位置＋代碼分組；最近 50 筆錯誤（可選取複製） |
-| 控制 | 六個功能開關；公告文字（≤ 200）、重要（警告色）、開始／結束日期；維護模式開關與訊息（≤ 200） | 按「儲存」寫入 D35；顯示最後修改時間與修改者。改了公告文字就是新公告（新 id），按掉舊公告的人會再看到 |
+| 控制 | 七個功能開關；公告文字（≤ 200）、重要（警告色）、開始／結束日期；維護模式開關與訊息（≤ 200） | 按「儲存」寫入 D35；顯示最後修改時間與修改者。改了公告文字就是新公告（新 id），按掉舊公告的人會再看到 |
 | 使用者 | 搜尋 email、暱稱、學校（Enter 送出）；上一頁／下一頁（每頁 50） | email、暱稱、學校、學系、註冊與最後登入日期、是否停用；「停用／恢復」要先確認 |
 
 ### 2-M 引導式回顧（Phase 4）
@@ -608,6 +617,35 @@ sheet 的每個欄位下都多一行「0/100」；接近上限時出現，才說
 （沿用 `taskTargetFilterProvider`），再點一下取消。
 
 **回顧紀錄**（`ReviewsScreen`）：新到舊，展開看快照數字、三段文字與專注目標；可刪除（`confirmDelete`）。
+
+### 2-P 朋友（Phase 7-1，2026-10-23）
+
+只給登入帳號（`friendsAvailableProvider` = 能同步 且 遠端開關 `friends` 開）。資料全部來自 `supabase/friends.sql` 的函式（data_dictionary.md D8-C、D40），本機不存。
+
+**入口**：「我的」頁首的 👥（設定齒輪左邊）。有待回覆的邀請時，👥 與「我的」分頁圖示（底部列、rail、抽屜）出現紅點（`incomingInviteCountProvider`）。
+沒有推播：清單在登入時、每次同步（每 5 分鐘、下拉、立即同步，`LiveSync.refreshAll`）與進朋友頁時重新讀取。
+
+**朋友頁**（`FriendsScreen`，`/friends`，`AppPage`、`ResponsiveBody`、可下拉同步）：
+
+| 區塊 | 輸入 | 輸出 |
+|---|---|---|
+| 我的邀請（`InviteCard`） | 「複製邀請連結」「分享」（`share_plus`；沒有分享面板的平台改成複製） | QR code（`qr_flutter`，任何風格都是淺底深色，相機才讀得穩）、邀請碼以 4＋4 顯示（可選取） |
+| 輸入邀請碼 | 一個欄位：8 碼（大小寫、空白、`-` 都可），或貼上含邀請連結的整段文字；「送出邀請」 | 格式不對：「邀請碼格式不對（8 碼英數字）」，不送出；送出後 snackbar「已送出邀請，等對方接受」或「已成為朋友」（對方先邀過自己）；被拒時依代碼說明（§3-V） |
+| 分享給朋友 | 三個開關，預設全關：課表（課名與時間，不含成績、學分、老師、教室）、任務達成率、關聯圖（後兩項註明「朋友在下次更新後才看得到」） | 一按就變，寫入 D8-C；失敗就退回並顯示同步失敗 |
+| 待回覆 | 婉拒、接受 | 接受後移到「朋友」；婉拒刪除那列 |
+| 已送出 | 取消邀請（先確認） | 刪除那列 |
+| 朋友 | 點一下開朋友頁；⋮ 選單「解除好友」（先確認：雙方會立即看不到彼此分享的內容） | 每列顯示對方開啟的項目（「課表 · 任務達成率」），全關時「○○ 目前沒有分享內容」；沒有朋友時一行提示 |
+
+**朋友詳情**（`FriendScreen`，沒有網址，`AppPageRoute` 推入）：頁首是對方頭像與暱稱；分頁**只放對方開啟的項目**。7-1 有：
+
+- **課表**：對方這學期（自己目前所在的學期，`termAt`）的唯讀課表，用自己的課表樣式、對方學校的節次表畫；點課或空白都不會開任何東西（`TimetableGrid`／`TimetableAgenda` 的點擊參數為 null）。自己沒開課表分享時，下方一行「你也開啟課表分享，就能看到共同空堂」。
+- **共同空堂**：兩人都分享課表才出現。列出每週兩人都沒課的時段（「星期三 13:20–15:10」，演算法見 §3-V），每列「約這個時間」：
+  新增一個一次性任務「和 ○○ 約」，截止時間是下一次那個時段的開始（今天還沒到就是今天，否則下週同一天），snackbar 說加到哪天幾點。
+- 對方全關（或只開了 7-2 才看得到的項目）：「○○ 目前沒有分享內容」。
+
+**接受邀請**（`InviteAcceptScreen`，`/invite/<code>`）：訪客看到登入提示；碼格式不對或沒人用：「找不到這個邀請碼」；自己的碼：「這是你自己的邀請碼」；
+其他：對方頭像與「加 ○○ 為朋友？」，按「送出邀請」→「已送出，等 ○○ 接受」或「你和 ○○ 已經是朋友」。每種結果都有「到朋友頁」。
+**掃碼的人送出邀請，碼的主人接受才成為朋友**（roadmap 原本寫掃碼後直接接受；改成這樣是因為連結可能被轉傳給任何人）。
 
 ## 3. 處理過程（核心演算法）
 
@@ -1623,6 +1661,7 @@ flowchart TD
   | `reviews` | 回顧卡與週回顧提醒不出現 |
   | `onboarding_tour` | 章節不自動播放（設定 › 新手指南仍可重播） |
   | `goal_templates` | 目標頁、願景頁的範本鈕與導覽的範本一站不見 |
+  | `friends` | 「我的」頁首 👥 與紅點不見，不再讀朋友清單；直接開 `/friends`、邀請連結顯示「朋友功能暫時關閉」 |
 
 - 公告：在開始（含）與結束（不含）之間、而且這台裝置沒按掉這個 id，就在分頁最上方顯示；下方分頁不再重複留狀態列空間。
 - 維護模式：`_AuthGate` 在要顯示頁面時，若維護中而且 `isAdminProvider` 不是 true，就改顯示 `MaintenanceScreen`（「重新檢查」會重讀 D35）。登入頁照常，管理員登入後即可通過。
@@ -1644,6 +1683,53 @@ flowchart TD
 
 **同步失敗上傳與活躍紀錄**：`reportSyncError` 在寫進同步紀錄的同時上傳 D37（登入帳號、每次開啟最多 10 筆、網路類不傳、傳不出去不再回報）；
 登入帳號每天第一次開 App 寫 D36 一列。兩者都不是使用者資料，失敗只 debugPrint。
+
+### 3-V 朋友：邀請、權限、共同空堂（`supabase/friends.sql`、`core/friend_code.dart`、`core/timetable.dart`）
+
+**權限的原則**（2026-09-25 決定）：核心表的 RLS 不動，每張表仍然只能讀自己的列。朋友讀到的東西只來自 SECURITY DEFINER 函式，
+每次都檢查「兩人是 `accepted` 朋友」**而且**「對方開啟了那一項」，只回傳需要的欄位。`friendships` 沒有 INSERT／UPDATE 政策，
+所以邀請與接受只能經函式套用規則；任何一方都能刪除自己參與的列（取消、婉拒、解除），刪了對方立即讀不到。
+
+**邀請碼**：8 碼，字元集去掉 0/O/1/I（32 個字元，約 1.1 兆種），第一次要用時由 `my_friend_code()` 產生、撞號重抽，之後不變。
+App 端 `normalizeFriendCode` 接受大小寫、空白、`-`，或從一段文字裡的 `/invite/<code>` 取出；`isValidFriendCode` 不合格就不送出。
+
+**邀請的狀態**（一對人最多一列，不論誰先邀）：
+
+```mermaid
+stateDiagram-v2
+    [*] --> 無
+    無 --> pending: B 以 A 的碼 request_friend（A 是 addressee）
+    無 --> 無: 碼找不到 not_found／自己的碼 self／B 未回覆已達 20 limit
+    pending --> pending: B 再送一次 → already；B 想自己接受 → not_allowed
+    pending --> accepted: A respond_friend(接受)\n或 A 也用 B 的碼送出（雙方都邀了＝都同意）
+    pending --> 無: A 婉拒（respond_friend 否）／B 取消（DELETE）
+    accepted --> 無: 任一方解除好友（DELETE）
+    accepted --> accepted: 再送 → already
+```
+
+錯誤代碼對應的文字（`friend_failure.dart`）：`not_found` 找不到這個邀請碼；`self` 這是你自己的邀請碼；`already` 你們已經是朋友，或邀請已經送出；
+`limit` 未回覆的邀請已達 20 個；`not_allowed` 這個邀請已經不在了；連線失敗沿用登入的網路訊息；其他「沒有成功，稍後再試一次」。
+
+**共同空堂**（`commonFreeSlots(mine, theirs, periods:, minMinutes: 50)`，純函式）：
+
+```mermaid
+flowchart TD
+    A["兩人這學期的所有上課時段"] --> B["天：週一到五；任一人週六／週日有課才加那天"]
+    B --> C{"自己學校有節次表？"}
+    C -->|有| D["一天的範圍：08:00–18:00 之間開始的節次\n（台大 08:10–18:20）"]
+    C -->|沒有| E["一天的範圍：08:00–18:00"]
+    D --> F["每天：範圍扣掉兩人時段的聯集 → 空檔"]
+    E --> F
+    F --> G{"有節次表？"}
+    G -->|有| H["空檔修到整節：開始取第一個不早於它的節次開始，\n結束取最後一個不晚於它的節次結束（12:10–15:30 → 12:20–15:10）"]
+    G -->|沒有| I["照時鐘"]
+    H --> J{"長度 ≥ 50 分鐘？"}
+    I --> J
+    J -->|是| K["列出（星期、開始、結束）"]
+    J -->|否| L["不列"]
+```
+
+「約這個時間」的截止時間：`nextSlotStart(slot, now)`，那個星期幾的開始時刻，今天已經到了就排下週。
 
 ---
 
@@ -1967,6 +2053,22 @@ future_goals  →  semester_goals  →  tasks  →  inspirations / journals / pr
 2. 所有人下次開 App（或維護畫面按「重新檢查」）生效；管理員不受維護模式影響。
 3. 後台 › 使用者：搜尋帳號 → 停用（確認）→ 對方無法再登入；恢復同樣要確認。
 
+### UC23　加朋友（Phase 7-1，2026-10-23）
+
+前提：兩人都是登入帳號，`supabase/friends.sql` 已執行。
+
+1. A：「我的」頁首 👥 → 朋友頁「我的邀請」：讓 B 用手機相機掃 QR code，或「複製邀請連結」「分享」傳給 B；也可以直接唸 8 碼。
+2. B：掃碼或點連結 → 已安裝就開 App（Android App Link），否則開網頁版 → 未登入先登入 →「加 A 為朋友？」→「送出邀請」。
+   （或在自己的朋友頁「輸入邀請碼」貼上連結或 8 碼 →「送出邀請」。）
+3. A：下次開 App 或同步時，「我的」分頁與 👥 出現紅點 → 朋友頁「待回覆」→「接受」。兩人互相出現在「朋友」區。
+4. 不想要：A 按「婉拒」；B 在「已送出」按「取消邀請」；成為朋友後任一方 ⋮ →「解除好友」。都會先確認，刪除後雙方立即看不到彼此分享的內容。
+
+### UC24　看朋友分享的內容、約共同空堂
+
+1. 朋友頁「分享給朋友」：打開「課表」（預設全關；對所有朋友一致）。
+2. 點一位朋友 → 只看到對方開啟的分頁。對方開了課表：看到他這學期的課表（唯讀，沒有成績、學分、老師、教室）。
+3. 兩人都開了課表：「共同空堂」分頁列出每週都空的時段 → 按「約這個時間」→ 任務清單多一個「和 ○○ 約」，截止在下一次那個時段開始。
+
 ### UC17　每週回顧（Phase 4）
 
 1. 週日晚上 20:00 收到「本週回顧・3 分鐘」通知（可在通知設定改時間或關閉）；或週日 18:00 之後打開 App，
@@ -2213,3 +2315,5 @@ flowchart TD
 | `ReviewScreen`／`ReviewsScreen`／任務頁回顧卡與本週專注 | `reviewsProvider`、`dueReviewProvider`、`activeFocusProvider`（讀 `tasksProvider`／`semesterGoalsProvider`／`journalProvider`） | D23 `reviews`；延後任務寫 D1 |
 | `TimetableScreen`（課表／成績）／`TodayClassesStrip`／課程 sheet／搜尋 sheet | `coursesProvider`、`termsProvider`、`effectiveTermsProvider`、`gradeSettingsProvider`、`catalogSearchProvider`、`catalogSchoolsProvider`、`tasksProvider`（課程任務） | D27 `courses`、D30 `term_starts`、D31、D29 `course_catalog`、D32 `catalog_schools`（唯讀）、D1 `tasks.linked_course_id`；刪除寫 D6 |
 | 新手導覽章節（`HomeScreen` 上的 overlay，見 §3-O）／設定頁「新手指南」 | `onboardingProvider`、`tourReplayProvider` | D22 `onboarding_done` |
+| `FriendsScreen`／`InviteAcceptScreen`／「我的」頁首 👥 與分頁紅點 | `friendListProvider`、`incomingInviteCountProvider`、`myFriendCodeProvider`、`friendPreviewProvider`、`shareSettingsProvider`、`friendActionsProvider`（全部經 `FriendsSource` 呼叫 RPC） | D40 `friendships`、D8-C `user_settings.friend_code`／`share_*` |
+| `FriendScreen`（朋友的課表、共同空堂） | `friendTimetableProvider`（rpc `friend_timetable`）、`coursesProvider`（自己的）、`shareSettingsProvider`；「約這個時間」寫 `tasksProvider` | 朋友的 D27 `courses`（只經 RPC）、自己的 D27；D1 `tasks` |

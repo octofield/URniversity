@@ -26,8 +26,9 @@ class TimetableGrid extends StatelessWidget {
   final AppStrings s;
   // Draws the "now" line in this weekday's column, when this week is showing
   final DateTime? now;
-  final ValueChanged<Course> onTapCourse;
-  final void Function(int weekday, int minute) onTapEmpty;
+  // Both null: read only, as a friend's timetable is (§3-V)
+  final ValueChanged<Course>? onTapCourse;
+  final void Function(int weekday, int minute)? onTapEmpty;
   final TimetableStyle style;
 
   const TimetableGrid({
@@ -36,8 +37,8 @@ class TimetableGrid extends StatelessWidget {
     required this.periods,
     required this.s,
     required this.now,
-    required this.onTapCourse,
-    required this.onTapEmpty,
+    this.onTapCourse,
+    this.onTapEmpty,
     this.style = TimetableStyle.standard,
   });
 
@@ -108,7 +109,7 @@ class TimetableGrid extends StatelessWidget {
                 session: m,
                 style: style,
                 credits: c.credits > 0 ? s.creditsCount(formatCredits(c.credits)) : null,
-                onTap: () => onTapCourse(c),
+                onTap: onTapCourse == null ? null : () => onTapCourse!(c),
               ),
             ),
       ];
@@ -214,10 +215,12 @@ class TimetableGrid extends StatelessWidget {
                       behavior: HitTestBehavior.opaque,
                       // The row tapped, from its start: a new course usually
                       // begins with a period (or on the hour)
-                      onTapUp: (details) => onTapEmpty(
-                        d,
-                        rows[(details.localPosition.dy / rowHeight).floor().clamp(0, rows.length - 1)].start,
-                      ),
+                      onTapUp: onTapEmpty == null
+                          ? null
+                          : (details) => onTapEmpty!(
+                                d,
+                                rows[(details.localPosition.dy / rowHeight).floor().clamp(0, rows.length - 1)].start,
+                              ),
                       child: Container(
                         decoration: BoxDecoration(
                           color: now?.weekday == d && style != TimetableStyle.solid && !inverse
@@ -315,14 +318,14 @@ class _Block extends StatelessWidget {
   final TimetableStyle style;
   // "3 學分", or null for a course with none
   final String? credits;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _Block({
     required this.course,
     required this.session,
     required this.style,
     this.credits,
-    required this.onTap,
+    this.onTap,
   });
 
   @override

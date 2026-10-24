@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.octofield.urniversity",
+      "sha256_cert_fingerprints": [
+        "8D:B1:48:95:09:4B:62:41:0D:0C:AC:0E:B3:53:05:E3:CD:41:71:2C:FF:AC:5A:84:6B:9F:A4:EC:CD:B0:EF:1A"
+      ]
+    }
+  }
+]

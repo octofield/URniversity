@@ -507,6 +507,7 @@ class _ControlsState extends ConsumerState<_Controls> {
         'credit_categories' => s.featureCreditCategories,
         'reviews' => s.featureReviews,
         'onboarding_tour' => s.featureOnboardingTour,
+        'friends' => s.featureFriends,
         _ => s.featureGoalTemplates,
       };
 

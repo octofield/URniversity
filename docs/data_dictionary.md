@@ -1,7 +1,7 @@
 # 資料字典（Data Dictionary, DD）
 
 本文件列出 **URniversity** 所有持久化資料儲存（Supabase 資料表、裝置本機 SharedPreferences）
-的欄位定義，是 [data_flow_diagram.md](./data_flow_diagram.md) 中每個資料儲存代號（D1～D11）的詳細展開。
+的欄位定義，是 [data_flow_diagram.md](./data_flow_diagram.md) 中每個資料儲存代號（D1～D40）的詳細展開。
 
 > **維護規則**：修改資料模型（`src/lib/models/*.dart`）、Supabase 欄位，或 SharedPreferences
 > key 時，都必須同步更新本文件與 `data_flow_diagram.md`。詳見專案根目錄 `CLAUDE.md`。
@@ -46,6 +46,7 @@
   | `app_config.announcement->text`、`app_config.maintenance->message` | 200 | `CHECK`（`admin.sql`）；`InputLimits.announcement` / `.maintenanceMessage`，只有管理員會輸入 |
   | `user_settings.app_style` | 20 | `user_settings_app_style_len`（在 `supabase/app_style.sql`；值只由 App 從列舉寫入，沒有對應的 `InputLimits`） |
   | `user_settings.timetable_style` | 20 | `user_settings_timetable_style_len`（在 `supabase/timetable_style.sql`；同上，值只來自列舉） |
+  | `user_settings.friend_code`（格式，不是長度） | 8 | `user_settings_friend_code_check`：`^[A-HJ-NP-Z2-9]{8}$`（`supabase/friends.sql`）；只由 `my_friend_code()` 產生，App 端 `isValidFriendCode` 檢查輸入 |
   | 分類名稱（D7 `ordered_list` 與 D2 `category` 內的 JSON 字串） | 20 | **無**：存在 JSON 字串裡，資料庫無法逐一檢查，只有 App 端擋 |
 
 ## D1. `tasks`（任務）
@@ -306,7 +307,7 @@
 | `requirement_department` | text | ✗ | `null` | 查 D33 用的學系全名，≤ 50；預設是 `department` |
 | `catalog_department` | text | ✗ | `null` | 目錄裡的系名（簡稱，例如「資工系」），≤ 50；比對 D29 `required_for` 判斷必修 |
 | `credits_required`、`credits_general`、`credits_elective` | int | ✗ | `null` | 學校沒公告時使用者自填的三個門檻，0–400 |
-| `timetable_style` | text | ✗ | `null`（＝`standard`） | 課表樣式：`standard` / `solid` / `outline` / `paper` / `agenda`，≤ 20 字；由 `supabase/timetable_style.sql` 新增（2026-10-04）。與 `app_style` 一樣**單獨讀寫**（`_loadTimetableStyle` / `_saveTimetableStyle`），沒跑 SQL 只有這一項同步失敗；不認得的值退回 `standard`。雲端沒有值時保留這台裝置的選擇 |
+| `timetable_style` | text | ✗ | `null`（＝`standard`） | 課表樣式：D39 的十種（`standard` … `weekList`），≤ 20 字；由 `supabase/timetable_style.sql` 新增（2026-10-04）。與 `app_style` 一樣**單獨讀寫**（`_loadTimetableStyle` / `_saveTimetableStyle`），沒跑 SQL 只有這一項同步失敗；不認得的值退回 `standard`。雲端沒有值時保留這台裝置的選擇 |
 | `app_style` | text | ✗ | `null`（＝`linen`） | App 風格的**選擇**：`linen` / `modern` / `midnight` / `sage` / `ocean` / `sakura` / `mono` / `lavender` / `amber` / `forest`（後三者 2026-10-10），或 `random`，≤ 20 字；隨機模式每次抽到的風格不寫回；由 `supabase/app_style.sql` 新增。**單獨讀寫**（`_loadStyle` / `_saveStyle`），不混進其他設定的 select 與 upsert；不認得的值退回 `linen` |
 
 **特別說明：**
@@ -314,6 +315,21 @@
   欄位時務必同時更新 8-A 或 8-B 對應的 `toRow()` / `_saveSettings()`，並在此同步補上欄位說明。
 - **App 設定（8-B）在訪客模式下完全不持久化**（`_saveSettings()` 開頭直接 `return`），只有
   個人資料（8-A）在訪客模式下會寫入本機 `guest_profile`（見 D10）。
+
+### 8-C 朋友欄位（Phase 7，`friends_provider.dart` 負責，2026-10-23）
+
+由 `supabase/friends.sql` 新增。**單獨讀寫**（`SupabaseFriendsSource.myShares` / `saveShares`），不混進 8-A、8-B 的 select 與 upsert：沒跑 SQL 前只有朋友頁失敗。
+
+| 欄位 | 型別 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `friend_code` | text (UNIQUE) | ✗ | `null` | 邀請碼，8 碼，字元集 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`（去掉 0/O/1/I）。第一次呼叫 `my_friend_code()` 時產生（撞號重抽），之後不變。邀請連結 `https://urniversity.netlify.app/invite/<code>` |
+| `share_graph` | bool | ✓ | `false` | 朋友能看關聯圖（願景與學期目標，不含任務）。7-2 才有朋友端畫面 |
+| `share_rates` | bool | ✓ | `false` | 朋友能看任務達成率（不含任務內容）。7-2 才有朋友端畫面 |
+| `share_timetable` | bool | ✓ | `false` | 朋友能看課表：課名、顏色、上課時間，**不含**成績、學分、老師、教室 |
+
+- 三個開關對所有朋友一致（2026-09-25 決定），預設全關。
+- 別人**不能直接讀**這些欄位（`user_settings` 只能讀自己的列）：`friend_list()` 只對已成為朋友的人回傳三個開關，`friend_code_owner()` 只回傳碼的主人的暱稱與頭像。
+- 訪客沒有這些欄位：朋友功能只給登入帳號。
 
 ---
 
@@ -891,7 +907,7 @@ RLS 只開 `SELECT TO anon, authenticated`。
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `id` | int (PK) | 恆為 1 |
-| `flags` | jsonb | 功能開關 `{"timetable": false, …}`；**沒有的 key 視為開**。key 清單 `kRemoteFeatures`：`timetable`、`catalog_search`、`credit_categories`、`reviews`、`onboarding_tour`、`goal_templates` |
+| `flags` | jsonb | 功能開關 `{"timetable": false, …}`；**沒有的 key 視為開**。key 清單 `kRemoteFeatures`：`timetable`、`catalog_search`、`credit_categories`、`reviews`、`onboarding_tour`、`goal_templates`、`friends`（2026-10-23） |
 | `announcement` | jsonb | `{id, text ≤ 200, level: info／warning, starts_at, ends_at}`；null 是沒有公告。改了文字就換新 id |
 | `maintenance` | jsonb | `{enabled, message ≤ 200}` |
 | `updated_at`、`updated_by` | timestamptz、text | 最後由哪個管理員（email）儲存 |
@@ -949,6 +965,40 @@ RLS 只開 `SELECT TO anon, authenticated`。
 - 課表的畫法（system_design.md §3-S），預設 `standard`；不認得的值退回 `standard`。
 - 值：`standard` / `solid` / `outline` / `paper` / `agenda`，2026-10-10 加 `compact` / `pastel` / `inverse` / `notebook` / `weekList`（最長 8 字，SQL 的 20 字上限夠用）。
 - 訪客也存；登入帳號另同步 D8-B `user_settings.timetable_style`（登入時讀雲端，有值就套用；每次改選就寫上去）。
+
+---
+
+## D40. `friendships`（朋友關係與邀請，Phase 7）
+
+建表：`supabase/friends.sql`（2026-10-23）。對應 Dart 型別：`FriendEntry`（`src/lib/models/friend.dart`，讀自 `friend_list()`，不存本機）。
+
+| 欄位 | 型別 | 必填 | 預設值 | 說明 |
+|---|---|---|---|---|
+| `id` | uuid (PK) | ✓ | `gen_random_uuid()` | 接受、婉拒、取消、解除都以它指名 |
+| `requester_id` | text | ✓ | — | 送出邀請的人 |
+| `addressee_id` | text | ✓ | — | 被邀請的人（邀請碼的主人）；只有他能接受或婉拒 |
+| `status` | text | ✓ | `pending` | `pending`（等回覆）／`accepted`（已是朋友）。婉拒、取消、解除都是**刪除這列** |
+| `created_at` | timestamptz | ✓ | `now()` | 清單排序 |
+
+- `CHECK (requester_id <> addressee_id)`；唯一索引 `(least(requester_id, addressee_id), greatest(…))`：**一對人只有一列**，不論誰先邀。
+- 索引：`requester_id`、`addressee_id`。
+- RLS：只有 SELECT、DELETE 政策（自己是其中一方的列）；**沒有 INSERT、UPDATE 政策**，新增與接受只能經 `request_friend()`、`respond_friend()`。
+- 狀態機與規則見 system_design.md §3-V。
+
+## 朋友的函式（`supabase/friends.sql`）
+
+全部 SECURITY DEFINER、`search_path = public`，只授權給 `authenticated`（`anon` 與 PUBLIC 已收回）。錯誤以 `RAISE EXCEPTION '<代碼>'`（ERRCODE `P0001`）丟出，App 以 `friendFailureFrom`（`core/friend_failure.dart`）對應成文字。
+比較 `user_settings.user_id` 時兩邊都轉 `::text`（有的資料庫是 uuid）。
+
+| 函式 | 誰能呼叫／條件 | 回傳 |
+|---|---|---|
+| `my_friend_code()` | 任何登入帳號 | 自己的邀請碼；沒有就產生並寫入 D8-C（設定列不存在時一併建立） |
+| `friend_code_owner(code)` | 任何登入帳號（有碼才看得到） | 碼的主人：`user_id`、暱稱（沒有就用 Google 名稱）、`avatar_index`、Google 頭像網址、`is_self`；找不到回空 |
+| `request_friend(code)` | 任何登入帳號 | `pending`；對方已先邀過自己就直接成立，回 `accepted`。錯誤：`not_found`、`self`、`already`（已是朋友或已送過）、`limit`（自己送出未回覆的已達 20） |
+| `respond_friend(friendship, accept)` | 只有 `addressee_id` 本人、狀態 `pending` | 接受改 `accepted`；婉拒刪除。否則 `not_allowed` |
+| `friend_list()` | 任何登入帳號 | 自己參與的每一列：`friendship_id`、對方 `user_id`、`status`（`incoming`／`outgoing`／`friend`）、暱稱、頭像、三個分享開關（**只有 `friend` 才可能是 true**）、`created_at` |
+| `friend_timetable(friend, semester)` | 必須是 `accepted` 朋友，且對方 `share_timetable` | `{school, courses: [{id, title, color, sessions: [{weekday, start_minute, end_minute}]}]}`；條件不符回 `null` |
+| `_require_user()`、`_are_friends(a, b)` | 內部用，已收回執行權 | — |
 
 ---
 

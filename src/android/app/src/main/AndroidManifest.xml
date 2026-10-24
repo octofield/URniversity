@@ -43,6 +43,16 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="com.octofield.urniversity"/>
             </intent-filter>
+            <!-- Friend invites (Phase 7): https://urniversity.netlify.app/invite/<code>
+                 opens the app rather than the browser. Verified against
+                 web/.well-known/assetlinks.json, which names the key this APK is
+                 signed with; the router takes the path from there -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="urniversity.netlify.app" android:pathPrefix="/invite/"/>
+            </intent-filter>
         </activity>
         <!-- The launcher icon, one alias per app style (system_design.md §3-R).
              Exactly one is enabled at a time; MainActivity switches them when
